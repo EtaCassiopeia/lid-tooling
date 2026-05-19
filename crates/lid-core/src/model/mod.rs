@@ -5,4 +5,4 @@
 
 pub mod ids;
 
-pub use ids::{GitSha, SpecId};
+pub use ids::{GitSha, SegmentId, SpecId};

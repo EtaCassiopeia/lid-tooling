@@ -11,4 +11,4 @@ pub mod error;
 pub mod model;
 
 pub use error::{LidError, Result};
-pub use model::{GitSha, SpecId};
+pub use model::{GitSha, SegmentId, SpecId};

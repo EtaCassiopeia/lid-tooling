@@ -34,6 +34,15 @@ static SPEC_ID_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
 static GIT_SHA_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[0-9a-f]{7,40}$").expect("GIT_SHA_PATTERN compiles"));
 
+/// Anchored pattern for a segment name (kebab-case, e.g. `linked-intent-dev`).
+///
+/// Lowercase letter start, optional body of lowercase alphanumerics or
+/// hyphens, must end with an alphanumeric if longer than one character.
+#[allow(clippy::expect_used)] // constant pattern; compilation is infallible
+static SEGMENT_ID_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^[a-z](?:[a-z0-9-]*[a-z0-9])?$").expect("SEGMENT_ID_PATTERN compiles")
+});
+
 /// A LID spec identifier such as `AUTH-UI-001`.
 ///
 /// Stable once assigned; the methodology forbids reuse after deletion.
@@ -144,6 +153,64 @@ impl AsRef<str> for GitSha {
 }
 
 impl<'de> Deserialize<'de> for GitSha {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        Self::parse(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+/// A LID arrow-segment name such as `linked-intent-dev` or `arrow-maintenance`.
+///
+/// Used as both the YAML key under `arrows:` in `index.yaml` and as the
+/// reference target in `blocks` / `blockedBy` / `merged_into` edges.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+#[serde(transparent)]
+pub struct SegmentId(String);
+
+impl SegmentId {
+    /// Parse a candidate string into a [`SegmentId`].
+    ///
+    /// # Errors
+    /// Returns [`LidError::InvalidSegmentId`] if the input is empty, starts
+    /// with a non-lowercase-letter, ends with a hyphen, or contains
+    /// characters outside `[a-z0-9-]`.
+    pub fn parse(value: &str) -> Result<Self, LidError> {
+        if !SEGMENT_ID_PATTERN.is_match(value) {
+            return Err(LidError::InvalidSegmentId {
+                value: value.to_owned(),
+                reason: "expected kebab-case: ^[a-z]([a-z0-9-]*[a-z0-9])?$",
+            });
+        }
+        Ok(Self(value.to_owned()))
+    }
+
+    /// Borrow the underlying string slice.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for SegmentId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl FromStr for SegmentId {
+    type Err = LidError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse(s)
+    }
+}
+
+impl AsRef<str> for SegmentId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for SegmentId {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let s = String::deserialize(d)?;
         Self::parse(&s).map_err(serde::de::Error::custom)
@@ -287,6 +354,55 @@ mod tests {
         assert_eq!(back, sha);
     }
 
+    // ── SegmentId ──────────────────────────────────────────────────────
+
+    #[test]
+    fn parses_upstream_segment_names() {
+        for s in [
+            "linked-intent-dev",
+            "lid-coach",
+            "arrow-maintenance",
+            "lid-experimental",
+            "bidirectional-differential",
+            "marketing-site",
+            "project-structure",
+        ] {
+            assert!(SegmentId::parse(s).is_ok(), "should parse: {s}");
+        }
+    }
+
+    #[test]
+    fn parses_single_letter_segment() {
+        assert!(SegmentId::parse("a").is_ok());
+    }
+
+    #[test]
+    fn rejects_uppercase_segment() {
+        assert!(SegmentId::parse("Auth").is_err());
+        assert!(SegmentId::parse("AUTH").is_err());
+    }
+
+    #[test]
+    fn rejects_segment_edge_hyphens() {
+        assert!(SegmentId::parse("-auth").is_err());
+        assert!(SegmentId::parse("auth-").is_err());
+    }
+
+    #[test]
+    fn rejects_segment_underscores_or_spaces() {
+        assert!(SegmentId::parse("auth_login").is_err());
+        assert!(SegmentId::parse("auth login").is_err());
+    }
+
+    #[test]
+    fn segment_id_serde_roundtrip() {
+        let seg = SegmentId::parse("arrow-maintenance").unwrap();
+        let json = serde_json::to_string(&seg).unwrap();
+        assert_eq!(json, "\"arrow-maintenance\"");
+        let back: SegmentId = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, seg);
+    }
+
     // ── Property: well-shaped inputs parse ─────────────────────────────
 
     proptest! {
@@ -301,10 +417,16 @@ mod tests {
         }
 
         #[test]
+        fn well_shaped_segment_ids_parse(s in r"[a-z][a-z0-9-]{0,8}[a-z0-9]") {
+            prop_assert!(SegmentId::parse(&s).is_ok(), "should parse: {s}");
+        }
+
+        #[test]
         fn parse_never_panics(s in ".*") {
             // Any UTF-8 input: parse returns Ok or Err, never panics.
             let _ = SpecId::parse(&s);
             let _ = GitSha::parse(&s);
+            let _ = SegmentId::parse(&s);
         }
     }
 }

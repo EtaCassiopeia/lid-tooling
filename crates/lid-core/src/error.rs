@@ -32,6 +32,10 @@ pub enum LidError {
     #[error("invalid git sha {value:?}: {reason}")]
     InvalidGitSha { value: String, reason: &'static str },
 
+    /// A `SegmentId` failed validation against the kebab-case shape.
+    #[error("invalid segment id {value:?}: {reason}")]
+    InvalidSegmentId { value: String, reason: &'static str },
+
     /// No LID repository (no `docs/arrows/index.yaml`) was found at or above
     /// the starting path during discovery.
     #[error("no LID repository found at or above {start}")]
