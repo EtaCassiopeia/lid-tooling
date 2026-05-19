@@ -8,5 +8,7 @@
 //! supports.
 
 pub mod error;
+pub mod model;
 
 pub use error::{LidError, Result};
+pub use model::{GitSha, SpecId};
