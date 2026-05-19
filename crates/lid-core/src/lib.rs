@@ -6,3 +6,7 @@
 //!
 //! See <https://github.com/jszmajda/lid> for the methodology this crate
 //! supports.
+
+pub mod error;
+
+pub use error::{LidError, Result};
