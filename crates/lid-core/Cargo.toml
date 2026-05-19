@@ -1,0 +1,13 @@
+[package]
+name = "lid-core"
+description = "Core engine for LID (Linked-Intent Development) tooling: parsers, model, and coherence checks."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
