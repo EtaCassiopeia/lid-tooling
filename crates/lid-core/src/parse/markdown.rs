@@ -14,7 +14,9 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::error::{LidError, Result};
-use crate::model::{ArrowDoc, ArrowReferences, SpecFile, SpecId, SpecLine, SpecStatus};
+use crate::model::{
+    ArrowDoc, ArrowReferences, DecisionRow, LldDoc, SpecFile, SpecId, SpecLine, SpecStatus,
+};
 
 /// Matches `- [x] **AUTH-001**: text` and its `[ ]`/`[D]` variants.
 ///
@@ -187,6 +189,89 @@ pub fn parse_arrow_doc(content: &str, source_path: &Path) -> ArrowDoc {
     ArrowDoc {
         path: source_path.to_path_buf(),
         references,
+    }
+}
+
+/// Load and parse a Low-Level Design doc (`docs/llds/{name}.md`).
+///
+/// # Errors
+/// Returns [`LidError::Io`] when the file cannot be read.
+pub fn load_lld(path: &Path) -> Result<LldDoc> {
+    let content = fs::read_to_string(path).map_err(|source| LidError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    Ok(parse_lld(&content, path))
+}
+
+/// Parse an LLD from an in-memory string, extracting rows of the
+/// `Decisions & Alternatives` table when present.
+///
+/// Rows are detected once both the column-header row and the GFM
+/// separator row (`| --- | --- | …`) have been seen under the
+/// `## Decisions & Alternatives` heading. Cells with fewer than four
+/// columns are skipped silently — a four-column table is the methodology's
+/// canonical shape (Decision, Chosen, Alternatives, Rationale).
+#[must_use]
+pub fn parse_lld(content: &str, source_path: &Path) -> LldDoc {
+    let mut decisions: Vec<DecisionRow> = Vec::new();
+    let mut in_decisions_section = false;
+    let mut header_row_seen = false;
+    let mut separator_row_seen = false;
+
+    for raw_line in content.lines() {
+        if let Some(rest) = raw_line.strip_prefix("## ") {
+            in_decisions_section = matches!(
+                rest.trim(),
+                "Decisions & Alternatives" | "Decisions and Alternatives"
+            );
+            header_row_seen = false;
+            separator_row_seen = false;
+            continue;
+        }
+
+        if !in_decisions_section {
+            continue;
+        }
+
+        let trimmed = raw_line.trim();
+        if !trimmed.starts_with('|') {
+            continue;
+        }
+
+        if !header_row_seen {
+            header_row_seen = true;
+            continue;
+        }
+        if !separator_row_seen {
+            // Canonical separator is `| --- | --- | … |`; accept any pipe
+            // row that's mostly dashes/colons/spaces.
+            separator_row_seen = true;
+            continue;
+        }
+
+        let cells: Vec<String> = trimmed
+            .trim_start_matches('|')
+            .trim_end_matches('|')
+            .split('|')
+            .map(|c| c.trim().to_owned())
+            .collect();
+        if cells.len() < 4 {
+            continue;
+        }
+        let inferred = cells.iter().any(|c| c.contains("[inferred]"));
+        decisions.push(DecisionRow {
+            decision: cells[0].clone(),
+            chosen: cells[1].clone(),
+            alternatives: cells[2].clone(),
+            rationale: cells[3].clone(),
+            inferred,
+        });
+    }
+
+    LldDoc {
+        path: source_path.to_path_buf(),
+        decisions,
     }
 }
 
@@ -479,5 +564,111 @@ some prose
         assert_eq!(d.references.lld.len(), 1);
         // Unknown subsection's bullets are silently dropped.
         assert!(d.references.hld.is_empty());
+    }
+
+    // ── LLD parser ─────────────────────────────────────────────────────
+
+    fn lld(content: &str) -> LldDoc {
+        parse_lld(content, Path::new("<inline>.md"))
+    }
+
+    #[test]
+    fn lld_with_no_decisions_section_yields_empty() {
+        let content = "\
+# LLD: auth
+
+## Context and Design Philosophy
+
+Some prose.
+
+## Plugin Structure
+
+Some prose.
+";
+        let d = lld(content);
+        assert!(d.decisions.is_empty());
+    }
+
+    #[test]
+    fn lld_extracts_single_decision_row() {
+        let content = "\
+## Decisions & Alternatives
+
+| Decision | Chosen | Alternatives | Rationale |
+| --- | --- | --- | --- |
+| Storage layer | PostgreSQL | SQLite, DynamoDB | Existing infra |
+";
+        let d = lld(content);
+        assert_eq!(d.decisions.len(), 1);
+        assert_eq!(d.decisions[0].decision, "Storage layer");
+        assert_eq!(d.decisions[0].chosen, "PostgreSQL");
+        assert_eq!(d.decisions[0].alternatives, "SQLite, DynamoDB");
+        assert_eq!(d.decisions[0].rationale, "Existing infra");
+        assert!(!d.decisions[0].inferred);
+    }
+
+    #[test]
+    fn lld_detects_inferred_marker_in_any_cell() {
+        let content = "\
+## Decisions & Alternatives
+
+| Decision | Chosen | Alternatives | Rationale |
+| --- | --- | --- | --- |
+| Session store | Redis | DB table | Latency [inferred] |
+| Cache key shape | Hash | Plain | Avoid collisions |
+";
+        let d = lld(content);
+        assert_eq!(d.decisions.len(), 2);
+        assert!(d.decisions[0].inferred);
+        assert!(!d.decisions[1].inferred);
+    }
+
+    #[test]
+    fn lld_stops_capturing_at_next_h2() {
+        let content = "\
+## Decisions & Alternatives
+
+| Decision | Chosen | Alternatives | Rationale |
+| --- | --- | --- | --- |
+| A | B | C | D |
+
+## Open Questions
+
+| not | a | decision | row |
+| --- | --- | --- | --- |
+| should | not | be | captured |
+";
+        let d = lld(content);
+        assert_eq!(d.decisions.len(), 1);
+        assert_eq!(d.decisions[0].decision, "A");
+    }
+
+    #[test]
+    fn lld_accepts_decisions_and_alternatives_alt_spelling() {
+        // Some authors write "Decisions and Alternatives" (no ampersand).
+        let content = "\
+## Decisions and Alternatives
+
+| Decision | Chosen | Alternatives | Rationale |
+| --- | --- | --- | --- |
+| X | Y | Z | because |
+";
+        let d = lld(content);
+        assert_eq!(d.decisions.len(), 1);
+    }
+
+    #[test]
+    fn lld_skips_rows_with_too_few_columns() {
+        let content = "\
+## Decisions & Alternatives
+
+| Decision | Chosen | Alternatives | Rationale |
+| --- | --- | --- | --- |
+| short | row |
+| Valid | Row | Yes | Indeed |
+";
+        let d = lld(content);
+        assert_eq!(d.decisions.len(), 1);
+        assert_eq!(d.decisions[0].decision, "Valid");
     }
 }
