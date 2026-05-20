@@ -24,6 +24,14 @@ pub enum LidError {
         source: io::Error,
     },
 
+    /// YAML deserialization error.
+    #[error("YAML parse error in {path}: {source}")]
+    Yaml {
+        path: PathBuf,
+        #[source]
+        source: Box<serde_yaml_ng::Error>,
+    },
+
     /// A `SpecId` failed validation against the `^[A-Z][A-Z0-9-]+$` shape.
     #[error("invalid spec id {value:?}: {reason}")]
     InvalidSpecId { value: String, reason: &'static str },
