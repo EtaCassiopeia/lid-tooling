@@ -32,6 +32,20 @@ pub enum LidError {
         source: Box<serde_yaml_ng::Error>,
     },
 
+    /// Markdown parse error with file + line context.
+    ///
+    /// Carries an opaque source so that any validation error
+    /// (`InvalidSpecId`, future variants) can be wrapped with a locatable
+    /// position without forcing every markdown caller to know which
+    /// concrete variant is underneath.
+    #[error("{path}:{line}: {source}")]
+    Markdown {
+        path: PathBuf,
+        line: usize,
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync + 'static>,
+    },
+
     /// A `SpecId` failed validation against the `^[A-Z][A-Z0-9-]+$` shape.
     #[error("invalid spec id {value:?}: {reason}")]
     InvalidSpecId { value: String, reason: &'static str },

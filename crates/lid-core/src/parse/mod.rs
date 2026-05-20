@@ -5,4 +5,5 @@
 //! consult the filesystem beyond the single file they are given — file
 //! discovery is the responsibility of `crate::repo`.
 
+pub mod markdown;
 pub mod yaml;
