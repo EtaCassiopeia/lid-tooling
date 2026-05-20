@@ -14,7 +14,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::error::{LidError, Result};
-use crate::model::{SpecFile, SpecId, SpecLine, SpecStatus};
+use crate::model::{ArrowDoc, ArrowReferences, SpecFile, SpecId, SpecLine, SpecStatus};
 
 /// Matches `- [x] **AUTH-001**: text` and its `[ ]`/`[D]` variants.
 ///
@@ -130,6 +130,64 @@ pub fn parse_spec_file(content: &str, source_path: &Path) -> Result<SpecFile> {
         implementing_artifacts,
         lld,
     })
+}
+
+/// Load and parse an arrow detail doc (`docs/arrows/{segment}.md`).
+///
+/// # Errors
+/// Returns [`LidError::Io`] when the file cannot be read.
+pub fn load_arrow_doc(path: &Path) -> Result<ArrowDoc> {
+    let content = fs::read_to_string(path).map_err(|source| LidError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    Ok(parse_arrow_doc(&content, path))
+}
+
+/// Parse an arrow detail doc from an in-memory string.
+///
+/// Captures bullets under `## References` grouped by `### {Kind}`
+/// subheading (`HLD`, `LLD`, `EARS`, `Tests`, `Code`). Unknown subsection
+/// names are ignored so that future additions to the methodology don't
+/// fail parsing.
+#[must_use]
+pub fn parse_arrow_doc(content: &str, source_path: &Path) -> ArrowDoc {
+    let mut references = ArrowReferences::default();
+    let mut current_h2: Option<String> = None;
+    let mut current_h3: Option<String> = None;
+
+    for raw_line in content.lines() {
+        if let Some(rest) = raw_line.strip_prefix("## ") {
+            current_h2 = Some(rest.trim().to_owned());
+            current_h3 = None;
+            continue;
+        }
+        if let Some(rest) = raw_line.strip_prefix("### ") {
+            current_h3 = Some(rest.trim().to_owned());
+            continue;
+        }
+
+        if current_h2.as_deref() != Some("References") {
+            continue;
+        }
+        let Some(rest) = raw_line.strip_prefix("- ") else {
+            continue;
+        };
+        let bullet = rest.trim().to_owned();
+        match current_h3.as_deref() {
+            Some("HLD") => references.hld.push(bullet),
+            Some("LLD") => references.lld.push(bullet),
+            Some("EARS") => references.ears.push(bullet),
+            Some("Tests") => references.tests.push(bullet),
+            Some("Code") => references.code.push(bullet),
+            _ => {}
+        }
+    }
+
+    ArrowDoc {
+        path: source_path.to_path_buf(),
+        references,
+    }
 }
 
 #[cfg(test)]
@@ -305,5 +363,121 @@ some prose
         assert_eq!(f.specs[1].id.as_str(), "ARROW-MAINT-018");
         assert_eq!(f.implementing_artifacts.len(), 1);
         assert!(f.lld.is_some());
+    }
+
+    // ── Arrow doc parser ───────────────────────────────────────────────
+
+    fn arrow(content: &str) -> ArrowDoc {
+        parse_arrow_doc(content, Path::new("<inline>.md"))
+    }
+
+    const ARROW_DOC_SAMPLE: &str = "\
+# Arrow: auth
+
+## Status
+
+**OK** — last audited 2026-04-01.
+
+## References
+
+### HLD
+
+- docs/high-level-design.md §Authentication
+
+### LLD
+
+- docs/llds/auth.md
+
+### EARS
+
+- docs/specs/auth-specs.md
+
+### Tests
+
+- tests/auth/login.test.ts
+- tests/auth/logout.test.ts
+
+### Code
+
+- src/auth/login.ts
+- src/auth/logout.ts
+
+## Spec Coverage
+
+| Category | Spec IDs | Implemented |
+| --- | --- | --- |
+| auth | AUTH-001 to AUTH-010 | 10 |
+
+## Key Findings
+
+1. Coverage is complete.
+";
+
+    #[test]
+    fn arrow_doc_collects_all_reference_categories() {
+        let d = arrow(ARROW_DOC_SAMPLE);
+        assert_eq!(d.references.hld.len(), 1);
+        assert_eq!(d.references.lld, vec!["docs/llds/auth.md".to_owned()]);
+        assert_eq!(
+            d.references.ears,
+            vec!["docs/specs/auth-specs.md".to_owned()]
+        );
+        assert_eq!(d.references.tests.len(), 2);
+        assert_eq!(d.references.code.len(), 2);
+    }
+
+    #[test]
+    fn arrow_doc_preserves_hld_section_anchor() {
+        let d = arrow(ARROW_DOC_SAMPLE);
+        assert_eq!(
+            d.references.hld[0],
+            "docs/high-level-design.md §Authentication"
+        );
+    }
+
+    #[test]
+    fn arrow_doc_with_empty_content_yields_empty_references() {
+        let d = arrow("");
+        assert!(d.references.hld.is_empty());
+        assert!(d.references.lld.is_empty());
+    }
+
+    #[test]
+    fn arrow_doc_ignores_bullets_outside_references_section() {
+        let content = "\
+## Status
+- this is not a reference
+
+## References
+
+### LLD
+- docs/llds/auth.md
+
+## Spec Coverage
+- also not a reference
+";
+        let d = arrow(content);
+        assert_eq!(d.references.lld, vec!["docs/llds/auth.md".to_owned()]);
+        assert!(d.references.hld.is_empty());
+        assert!(d.references.tests.is_empty());
+    }
+
+    #[test]
+    fn arrow_doc_ignores_unknown_subsections() {
+        let content = "\
+## References
+
+### Future-category
+
+- docs/something.md
+
+### LLD
+
+- docs/llds/auth.md
+";
+        let d = arrow(content);
+        assert_eq!(d.references.lld.len(), 1);
+        // Unknown subsection's bullets are silently dropped.
+        assert!(d.references.hld.is_empty());
     }
 }
