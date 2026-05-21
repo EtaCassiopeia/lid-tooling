@@ -9,6 +9,10 @@
 //! Concrete checks live in submodules; this module owns the trait and
 //! the common report types.
 
+pub mod schema;
+
+pub use schema::SchemaCheck;
+
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
