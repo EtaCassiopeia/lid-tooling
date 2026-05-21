@@ -6,4 +6,5 @@
 //! discovery is the responsibility of `crate::repo`.
 
 pub mod markdown;
+pub mod source;
 pub mod yaml;
