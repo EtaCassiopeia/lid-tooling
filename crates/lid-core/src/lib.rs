@@ -10,6 +10,8 @@
 pub mod error;
 pub mod model;
 pub mod parse;
+pub mod repo;
 
 pub use error::{LidError, Result};
 pub use model::{ArrowIndex, GitSha, Segment, SegmentId, SpecId, Status};
+pub use repo::LidRepo;
