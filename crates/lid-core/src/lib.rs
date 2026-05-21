@@ -7,11 +7,13 @@
 //! See <https://github.com/jszmajda/lid> for the methodology this crate
 //! supports.
 
+pub mod checks;
 pub mod error;
 pub mod model;
 pub mod parse;
 pub mod repo;
 
+pub use checks::{Category, Check, CheckId, Finding, Location, Severity};
 pub use error::{LidError, Result};
 pub use model::{ArrowIndex, GitSha, Segment, SegmentId, SpecId, Status};
 pub use repo::LidRepo;
