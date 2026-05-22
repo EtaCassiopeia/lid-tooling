@@ -11,10 +11,12 @@
 
 pub mod orphans;
 pub mod references;
+pub mod reverse_orphan;
 pub mod schema;
 
 pub use orphans::OrphanCheck;
 pub use references::ReferenceCoherenceCheck;
+pub use reverse_orphan::ReverseOrphanCheck;
 pub use schema::SchemaCheck;
 
 use std::path::PathBuf;
