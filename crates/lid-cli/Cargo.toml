@@ -1,0 +1,25 @@
+[package]
+name = "lid-cli"
+description = "Command-line frontend for lid-core: drop-in coherence checker for the LID methodology."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "lidc"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+lid-core = { path = "../lid-core" }
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"

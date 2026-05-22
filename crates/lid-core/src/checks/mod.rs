@@ -21,6 +21,22 @@ pub use reverse_orphan::ReverseOrphanCheck;
 pub use schema::SchemaCheck;
 pub use spec_id_format::SpecIdFormatCheck;
 
+/// The default ordered list of checks to run in a `lidc check` pass.
+///
+/// Adapters (CLI, LSP, MCP) should call this rather than instantiating
+/// concrete checks themselves so that adding a new check is a one-line
+/// change to the registry instead of a sweep across every consumer.
+#[must_use]
+pub fn default_checks() -> Vec<Box<dyn Check>> {
+    vec![
+        Box::new(SchemaCheck),
+        Box::new(ReferenceCoherenceCheck),
+        Box::new(OrphanCheck),
+        Box::new(ReverseOrphanCheck),
+        Box::new(SpecIdFormatCheck),
+    ]
+}
+
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
