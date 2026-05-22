@@ -9,9 +9,11 @@
 //! Concrete checks live in submodules; this module owns the trait and
 //! the common report types.
 
+pub mod orphans;
 pub mod references;
 pub mod schema;
 
+pub use orphans::OrphanCheck;
 pub use references::ReferenceCoherenceCheck;
 pub use schema::SchemaCheck;
 
