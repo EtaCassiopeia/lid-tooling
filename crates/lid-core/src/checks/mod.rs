@@ -13,11 +13,13 @@ pub mod orphans;
 pub mod references;
 pub mod reverse_orphan;
 pub mod schema;
+pub mod spec_id_format;
 
 pub use orphans::OrphanCheck;
 pub use references::ReferenceCoherenceCheck;
 pub use reverse_orphan::ReverseOrphanCheck;
 pub use schema::SchemaCheck;
+pub use spec_id_format::SpecIdFormatCheck;
 
 use std::path::PathBuf;
 
