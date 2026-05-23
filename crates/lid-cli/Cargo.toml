@@ -18,6 +18,7 @@ workspace = true
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 lid-core = { path = "../lid-core" }
+owo-colors = "4"
 
 [dev-dependencies]
 assert_cmd = "2"

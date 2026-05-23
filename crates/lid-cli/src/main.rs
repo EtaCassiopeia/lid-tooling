@@ -1,10 +1,11 @@
 //! `lidc` — coherence checker for the LID methodology.
 //!
-//! Subcommands and renderers will accrete over the next few commits.
 //! Today the binary supports one operation: discover a LID repo and run
-//! the default check registry against it, printing each finding in a
-//! plain `severity check.id message` form. Markdown / JSON renderers
-//! and the `--only` / `--fail-on` flags land in subsequent commits.
+//! the default check registry against it, printing each finding via the
+//! `report::markdown` renderer. JSON output and the `--only` /
+//! `--fail-on` flags land in subsequent commits.
+
+mod report;
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -12,6 +13,8 @@ use std::process::ExitCode;
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use lid_core::{LidRepo, checks};
+
+use crate::report::{RenderOptions, markdown};
 
 #[derive(Parser)]
 #[command(name = "lidc", version, about = "LID coherence checker")]
@@ -65,39 +68,13 @@ fn cmd_check(root: Option<&Path>) -> Result<ExitCode> {
         findings.extend(check.run(&repo));
     }
 
+    let opts = RenderOptions::from_stdout();
+    let rendered = markdown::render(&repo, &findings, opts);
+    print!("{rendered}");
+
     if findings.is_empty() {
-        println!("✓ no findings");
-        return Ok(ExitCode::SUCCESS);
+        Ok(ExitCode::SUCCESS)
+    } else {
+        Ok(ExitCode::from(1))
     }
-
-    for f in &findings {
-        let loc = f
-            .location
-            .as_ref()
-            .map(|l| {
-                let path = display_relative(&repo, &l.path);
-                match l.line {
-                    Some(line) => format!("{path}:{line}"),
-                    None => path,
-                }
-            })
-            .unwrap_or_default();
-        let prefix = if loc.is_empty() {
-            String::new()
-        } else {
-            format!("{loc}: ")
-        };
-        println!("{:?} [{:?}] {prefix}{}", f.severity, f.check, f.message);
-    }
-    println!();
-    println!("{} finding(s)", findings.len());
-
-    Ok(ExitCode::from(1))
-}
-
-fn display_relative(repo: &LidRepo, path: &Path) -> String {
-    path.strip_prefix(&repo.root)
-        .unwrap_or(path)
-        .display()
-        .to_string()
 }

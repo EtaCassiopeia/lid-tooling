@@ -62,6 +62,32 @@ pub enum CheckId {
     Dag,
 }
 
+impl CheckId {
+    /// The kebab-case string form used by JSON output, the `--only` flag,
+    /// and human-readable rendering. Kept in lockstep with the serde
+    /// representation by a unit test below.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Schema => "schema",
+            Self::ReferenceCoherence => "reference-coherence",
+            Self::Coverage => "coverage",
+            Self::Orphan => "orphan",
+            Self::ReverseOrphan => "reverse-orphan",
+            Self::SpecIdFormat => "spec-id-format",
+            Self::SpecStatusCounts => "spec-status-counts",
+            Self::LldDecisions => "lld-decisions",
+            Self::Dag => "dag",
+        }
+    }
+}
+
+impl std::fmt::Display for CheckId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// How serious a finding is.
 ///
 /// `Error` and `Warning` are surfaced by default; `Info` is hidden
@@ -198,5 +224,29 @@ mod tests {
             serde_json::to_string(&CheckId::ReverseOrphan).unwrap(),
             "\"reverse-orphan\""
         );
+    }
+
+    #[test]
+    fn check_id_as_str_matches_serde_representation() {
+        for id in [
+            CheckId::Schema,
+            CheckId::ReferenceCoherence,
+            CheckId::Coverage,
+            CheckId::Orphan,
+            CheckId::ReverseOrphan,
+            CheckId::SpecIdFormat,
+            CheckId::SpecStatusCounts,
+            CheckId::LldDecisions,
+            CheckId::Dag,
+        ] {
+            let serde_form = serde_json::to_string(&id).unwrap();
+            let serde_form = serde_form.trim_matches('"');
+            assert_eq!(
+                id.as_str(),
+                serde_form,
+                "as_str() must match serde rename for {id:?}"
+            );
+            assert_eq!(id.to_string(), serde_form);
+        }
     }
 }

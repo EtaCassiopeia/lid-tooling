@@ -15,5 +15,5 @@ pub mod repo;
 
 pub use checks::{Category, Check, CheckId, Finding, Location, Severity};
 pub use error::{LidError, Result};
-pub use model::{ArrowIndex, GitSha, Segment, SegmentId, SpecId, Status};
+pub use model::{ArrowIndex, GitSha, Segment, SegmentId, SpecId, Status, Unmapped};
 pub use repo::LidRepo;
