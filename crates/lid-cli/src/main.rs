@@ -1,18 +1,19 @@
 //! `lidc` — coherence checker for the LID methodology.
 //!
-//! Today the binary supports one operation: discover a LID repo and run
-//! the default check registry against it, printing findings via the
-//! markdown renderer (default) or the JSON renderer (`--json`). The
-//! `--only` / `--fail-on` flags land in subsequent commits.
+//! Today the binary supports one operation: `lidc check` discovers a
+//! LID repo, runs the registered checks (filtered by `--only`) against
+//! it, prints findings via the markdown renderer (default) or the JSON
+//! renderer (`--json`), and exits with a code that respects `--fail-on`.
 
 mod report;
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use clap::{Args, Parser, Subcommand};
-use lid_core::{LidRepo, checks};
+use lid_core::{CheckId, LidRepo, Severity, checks};
 
 use crate::report::{RenderOptions, json, markdown};
 
@@ -41,7 +42,21 @@ enum Cmd {
 }
 
 #[derive(Args)]
-struct CheckArgs {}
+struct CheckArgs {
+    /// Only run the listed checks (comma-separated, kebab-case names).
+    ///
+    /// Example: `--only schema,reference-coherence`. The set of valid
+    /// names matches `CheckId::as_str()` in `lid-core`.
+    #[arg(long, value_delimiter = ',')]
+    only: Vec<String>,
+
+    /// Severity threshold for non-zero exit. The run "fails" (exit 1)
+    /// when at least one finding has severity >= this value.
+    ///
+    /// One of `error` (default), `warning`, or `info`.
+    #[arg(long, default_value = "error")]
+    fail_on: String,
+}
 
 fn main() -> ExitCode {
     match run() {
@@ -55,11 +70,17 @@ fn main() -> ExitCode {
 
 fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
-    let Cmd::Check(_) = cli.cmd;
-    cmd_check(cli.root.as_deref(), cli.json)
+    let Cmd::Check(args) = &cli.cmd;
+    cmd_check(cli.root.as_deref(), cli.json, args)
 }
 
-fn cmd_check(root: Option<&Path>, as_json: bool) -> Result<ExitCode> {
+fn cmd_check(root: Option<&Path>, as_json: bool, args: &CheckArgs) -> Result<ExitCode> {
+    let only = parse_only(&args.only)?;
+    let fail_threshold: Severity = args
+        .fail_on
+        .parse()
+        .map_err(|e: String| anyhow!("invalid --fail-on value: {e}"))?;
+
     let start = match root {
         Some(p) => p.to_path_buf(),
         None => std::env::current_dir().context("reading the current directory")?,
@@ -70,6 +91,11 @@ fn cmd_check(root: Option<&Path>, as_json: bool) -> Result<ExitCode> {
 
     let mut findings = Vec::new();
     for check in checks::default_checks() {
+        if let Some(filter) = &only {
+            if !filter.contains(&check.id()) {
+                continue;
+            }
+        }
         findings.extend(check.run(&repo));
     }
 
@@ -82,9 +108,24 @@ fn cmd_check(root: Option<&Path>, as_json: bool) -> Result<ExitCode> {
         print!("{rendered}");
     }
 
-    if findings.is_empty() {
-        Ok(ExitCode::SUCCESS)
+    let any_at_or_above = findings.iter().any(|f| f.severity >= fail_threshold);
+    Ok(if any_at_or_above {
+        ExitCode::from(1)
     } else {
-        Ok(ExitCode::from(1))
+        ExitCode::SUCCESS
+    })
+}
+
+fn parse_only(values: &[String]) -> Result<Option<BTreeSet<CheckId>>> {
+    if values.is_empty() {
+        return Ok(None);
     }
+    let mut set = BTreeSet::new();
+    for raw in values {
+        let id: CheckId = raw
+            .parse()
+            .map_err(|e: String| anyhow!("invalid --only value: {e}"))?;
+        set.insert(id);
+    }
+    Ok(Some(set))
 }

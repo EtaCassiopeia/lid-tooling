@@ -88,6 +88,28 @@ impl std::fmt::Display for CheckId {
     }
 }
 
+impl std::str::FromStr for CheckId {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        for id in [
+            Self::Schema,
+            Self::ReferenceCoherence,
+            Self::Coverage,
+            Self::Orphan,
+            Self::ReverseOrphan,
+            Self::SpecIdFormat,
+            Self::SpecStatusCounts,
+            Self::LldDecisions,
+            Self::Dag,
+        ] {
+            if id.as_str() == s {
+                return Ok(id);
+            }
+        }
+        Err(format!("unknown check id `{s}`"))
+    }
+}
+
 /// How serious a finding is.
 ///
 /// `Error` and `Warning` are surfaced by default; `Info` is hidden
@@ -99,6 +121,39 @@ pub enum Severity {
     Info,
     Warning,
     Error,
+}
+
+impl Severity {
+    /// The lowercase string form (`error`, `warning`, `info`) used by
+    /// JSON output and the `--fail-on` flag.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Error => "error",
+            Self::Warning => "warning",
+            Self::Info => "info",
+        }
+    }
+}
+
+impl std::fmt::Display for Severity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl std::str::FromStr for Severity {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "error" => Ok(Self::Error),
+            "warning" => Ok(Self::Warning),
+            "info" => Ok(Self::Info),
+            other => Err(format!(
+                "unknown severity `{other}` (expected one of: error, warning, info)"
+            )),
+        }
+    }
 }
 
 /// Broad grouping that mirrors the audit-checklist's sections; used for
@@ -248,5 +303,41 @@ mod tests {
             );
             assert_eq!(id.to_string(), serde_form);
         }
+    }
+
+    #[test]
+    fn check_id_from_str_roundtrips() {
+        for id in [
+            CheckId::Schema,
+            CheckId::ReferenceCoherence,
+            CheckId::Coverage,
+            CheckId::Orphan,
+            CheckId::ReverseOrphan,
+            CheckId::SpecIdFormat,
+            CheckId::SpecStatusCounts,
+            CheckId::LldDecisions,
+            CheckId::Dag,
+        ] {
+            let back: CheckId = id.as_str().parse().unwrap();
+            assert_eq!(back, id);
+        }
+    }
+
+    #[test]
+    fn check_id_from_str_rejects_unknown() {
+        let err: Result<CheckId, _> = "bogus-check".parse();
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn severity_from_str_accepts_each_lowercase_form() {
+        assert_eq!("error".parse::<Severity>().unwrap(), Severity::Error);
+        assert_eq!("warning".parse::<Severity>().unwrap(), Severity::Warning);
+        assert_eq!("info".parse::<Severity>().unwrap(), Severity::Info);
+    }
+
+    #[test]
+    fn severity_from_str_rejects_unknown() {
+        assert!("bogus".parse::<Severity>().is_err());
     }
 }

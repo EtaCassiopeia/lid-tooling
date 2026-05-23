@@ -151,3 +151,64 @@ fn check_exits_two_when_no_lid_repo_present() {
         .code(2)
         .stderr(contains("LID repo"));
 }
+
+#[test]
+fn only_filter_runs_just_the_listed_check() {
+    let dir = tempfile::tempdir().unwrap();
+    // This layout has a reverse orphan (caught by reverse-orphan) but no
+    // schema or reference issues. `--only schema` should report nothing.
+    make_minimal_repo(dir.path(), "");
+    fs::create_dir_all(dir.path().join("src")).unwrap();
+    fs::write(
+        dir.path().join("src/auth.rs"),
+        "// @spec AUTH-999\nfn login() {}\n",
+    )
+    .unwrap();
+
+    Command::cargo_bin("lidc")
+        .unwrap()
+        .args(["check", "--only", "schema", "--root"])
+        .arg(dir.path())
+        .assert()
+        .success()
+        .stdout(contains("no findings"));
+}
+
+#[test]
+fn fail_on_warning_promotes_orphan_to_exit_one() {
+    let dir = tempfile::tempdir().unwrap();
+    make_minimal_repo(dir.path(), "");
+    // Add an LLD that no arrow doc references — caught by `orphan`,
+    // which is Warning severity.
+    fs::write(dir.path().join("docs/llds/lonely.md"), "# LLD: lonely\n").unwrap();
+
+    // Default `--fail-on error` => exit 0 (only a Warning present).
+    Command::cargo_bin("lidc")
+        .unwrap()
+        .args(["check", "--root"])
+        .arg(dir.path())
+        .assert()
+        .success();
+
+    // `--fail-on warning` => exit 1.
+    Command::cargo_bin("lidc")
+        .unwrap()
+        .args(["check", "--fail-on", "warning", "--root"])
+        .arg(dir.path())
+        .assert()
+        .code(1);
+}
+
+#[test]
+fn invalid_only_value_exits_two_with_helpful_error() {
+    let dir = tempfile::tempdir().unwrap();
+    make_minimal_repo(dir.path(), "");
+
+    Command::cargo_bin("lidc")
+        .unwrap()
+        .args(["check", "--only", "bogus-check", "--root"])
+        .arg(dir.path())
+        .assert()
+        .code(2)
+        .stderr(contains("bogus-check"));
+}
