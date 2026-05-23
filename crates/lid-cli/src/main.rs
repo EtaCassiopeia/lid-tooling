@@ -1,9 +1,9 @@
 //! `lidc` — coherence checker for the LID methodology.
 //!
 //! Today the binary supports one operation: discover a LID repo and run
-//! the default check registry against it, printing each finding via the
-//! `report::markdown` renderer. JSON output and the `--only` /
-//! `--fail-on` flags land in subsequent commits.
+//! the default check registry against it, printing findings via the
+//! markdown renderer (default) or the JSON renderer (`--json`). The
+//! `--only` / `--fail-on` flags land in subsequent commits.
 
 mod report;
 
@@ -14,7 +14,7 @@ use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use lid_core::{LidRepo, checks};
 
-use crate::report::{RenderOptions, markdown};
+use crate::report::{RenderOptions, json, markdown};
 
 #[derive(Parser)]
 #[command(name = "lidc", version, about = "LID coherence checker")]
@@ -24,6 +24,11 @@ struct Cli {
     /// is found.
     #[arg(long, global = true)]
     root: Option<PathBuf>,
+
+    /// Emit findings as a stable JSON document instead of the
+    /// terminal-friendly grouped format.
+    #[arg(long, global = true)]
+    json: bool,
 
     #[command(subcommand)]
     cmd: Cmd,
@@ -51,10 +56,10 @@ fn main() -> ExitCode {
 fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
     let Cmd::Check(_) = cli.cmd;
-    cmd_check(cli.root.as_deref())
+    cmd_check(cli.root.as_deref(), cli.json)
 }
 
-fn cmd_check(root: Option<&Path>) -> Result<ExitCode> {
+fn cmd_check(root: Option<&Path>, as_json: bool) -> Result<ExitCode> {
     let start = match root {
         Some(p) => p.to_path_buf(),
         None => std::env::current_dir().context("reading the current directory")?,
@@ -68,9 +73,14 @@ fn cmd_check(root: Option<&Path>) -> Result<ExitCode> {
         findings.extend(check.run(&repo));
     }
 
-    let opts = RenderOptions::from_stdout();
-    let rendered = markdown::render(&repo, &findings, opts);
-    print!("{rendered}");
+    if as_json {
+        let rendered = json::render(&findings).context("rendering JSON report")?;
+        println!("{rendered}");
+    } else {
+        let opts = RenderOptions::from_stdout();
+        let rendered = markdown::render(&repo, &findings, opts);
+        print!("{rendered}");
+    }
 
     if findings.is_empty() {
         Ok(ExitCode::SUCCESS)

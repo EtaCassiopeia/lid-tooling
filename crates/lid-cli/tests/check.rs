@@ -6,7 +6,7 @@
 //! clap parsing, `LidRepo::discover`, every check in `default_checks`,
 //! and the plaintext renderer.
 
-#![allow(clippy::unwrap_used)] // tests
+#![allow(clippy::unwrap_used, clippy::expect_used)] // tests
 
 use std::fs;
 use std::path::Path;
@@ -110,6 +110,33 @@ fn check_reports_reverse_orphan_with_exit_one() {
         .assert()
         .code(1)
         .stdout(contains("AUTH-999"));
+}
+
+#[test]
+fn check_json_output_parses_and_carries_summary() {
+    let dir = tempfile::tempdir().unwrap();
+    make_minimal_repo(dir.path(), "");
+    // Plant a reverse-orphan so the output has a non-trivial finding.
+    fs::create_dir_all(dir.path().join("src")).unwrap();
+    fs::write(
+        dir.path().join("src/auth.rs"),
+        "// @spec AUTH-999\nfn login() {}\n",
+    )
+    .unwrap();
+
+    let output = Command::cargo_bin("lidc")
+        .unwrap()
+        .args(["check", "--json", "--root"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1), "stdout={:?}", output.stdout);
+    let body = std::str::from_utf8(&output.stdout).unwrap();
+    let v: serde_json::Value = serde_json::from_str(body).expect("stdout must be valid JSON");
+    assert!(v["tool"]["name"].is_string());
+    assert_eq!(v["summary"]["findings"], 1);
+    assert_eq!(v["summary"]["by_check"]["reverse-orphan"], 1);
+    assert_eq!(v["findings"][0]["spec"], "AUTH-999");
 }
 
 #[test]

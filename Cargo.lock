@@ -383,6 +383,8 @@ dependencies = [
  "lid-core",
  "owo-colors",
  "predicates",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 

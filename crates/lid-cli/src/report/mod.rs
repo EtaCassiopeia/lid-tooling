@@ -3,6 +3,7 @@
 //! returns a `String` — so `main` decides where to write and tests
 //! don't need to capture stdout.
 
+pub mod json;
 pub mod markdown;
 
 use std::io::IsTerminal;
