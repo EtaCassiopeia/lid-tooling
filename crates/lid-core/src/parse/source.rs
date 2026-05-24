@@ -86,21 +86,35 @@ pub fn scan_content(content: &str, path: &Path, out: &mut Vec<SpecCitation>) {
 
 /// Heuristic classification of a path into a [`CitationKind`].
 ///
-/// Spec docs win first (paths containing `docs/specs/`), then tests
-/// (paths containing `/tests/`, `/test/`, or file names matching common
-/// test conventions), then code (recognised source extensions), then
-/// everything else.
+/// Markdown / YAML extensions are documentation regardless of where the
+/// file lives — a `.md` file under `tests/fixtures/` is still prose,
+/// not a test. That lets the doc tree contain `@spec` examples without
+/// the source scanner mistaking them for actual citations from tests.
+///
+/// For code-shaped extensions, paths whose components include `tests`
+/// or `test` (or whose filename matches `*_test.go` / `*.test.ts` /
+/// `test_*.py` conventions) classify as Test; the rest of the
+/// recognised source extensions classify as Code; anything else
+/// classifies as Other.
 fn classify_path(path: &Path) -> CitationKind {
-    if path_has_component(path, "specs") && path_has_component(path, "docs") {
-        return CitationKind::Spec;
+    let ext = path.extension().and_then(|e| e.to_str());
+
+    // Documentation extensions never count as Test or Code.
+    if matches!(ext, Some("md" | "yaml" | "yml")) {
+        if path_has_component(path, "specs") && path_has_component(path, "docs") {
+            return CitationKind::Spec;
+        }
+        return CitationKind::Other;
     }
+
     if path_has_component(path, "tests")
         || path_has_component(path, "test")
         || is_test_filename(path)
     {
         return CitationKind::Test;
     }
-    match path.extension().and_then(|e| e.to_str()) {
+
+    match ext {
         Some(
             "rs" | "ts" | "tsx" | "js" | "jsx" | "py" | "go" | "java" | "scala" | "rb" | "kt"
             | "swift" | "cs" | "cpp" | "c" | "h" | "hpp",
@@ -234,6 +248,25 @@ fn three() {}
     fn classifies_spec_doc_paths() {
         let out = scan("- @spec AUTH-001\n", "docs/specs/auth-specs.md");
         assert_eq!(out[0].kind, CitationKind::Spec);
+    }
+
+    #[test]
+    fn markdown_under_tests_directory_is_not_classified_as_test() {
+        // Doc fixtures often live under `tests/fixtures/…/foo.md`; a
+        // `.md` extension wins over the path-component heuristic so
+        // illustrative `@spec` examples don't get treated as real
+        // test citations.
+        let out = scan(
+            "@spec AUTH-001 — illustrative example\n",
+            "crates/cli/tests/fixtures/sample.md",
+        );
+        assert_eq!(out[0].kind, CitationKind::Other);
+    }
+
+    #[test]
+    fn yaml_files_classify_as_other() {
+        let out = scan("# @spec AUTH-001\n", "ci/pipeline.yaml");
+        assert_eq!(out[0].kind, CitationKind::Other);
     }
 
     #[test]

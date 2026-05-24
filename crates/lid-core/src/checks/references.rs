@@ -10,12 +10,12 @@
 //! section-anchor resolution would require an HLD parser and is
 //! deferred.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::LidRepo;
 use crate::model::ArrowDoc;
 
-use super::{Category, Check, CheckId, Finding, Location, Severity};
+use super::{Category, Check, CheckId, Finding, Location, Severity, resolve_arrow_ref};
 
 pub struct ReferenceCoherenceCheck;
 
@@ -75,7 +75,7 @@ fn check_category(
     findings: &mut Vec<Finding>,
 ) {
     for raw in bullets {
-        let Some(resolved) = resolve_ref(repo, raw) else {
+        let Some(resolved) = resolve_arrow_ref(repo, raw) else {
             continue;
         };
         if !resolved.is_file() {
@@ -94,37 +94,14 @@ fn check_category(
                 spec: None,
                 remediation: Some(format!(
                     "ensure `{}` exists or update the bullet in `## References / ### {category}`",
-                    display_relative_path(repo, &resolved),
+                    display_relative(repo, &resolved),
                 )),
             });
         }
     }
 }
 
-/// Resolve a raw `## References` bullet to a filesystem path.
-///
-/// Strips a trailing `§Section` annotation if present, trims whitespace,
-/// and joins relative paths against the repo root. Returns `None` for
-/// empty bullets so a malformed line is skipped rather than treated as
-/// a missing reference.
-fn resolve_ref(repo: &LidRepo, raw: &str) -> Option<PathBuf> {
-    let path_part = raw.split('§').next().unwrap_or(raw).trim();
-    if path_part.is_empty() {
-        return None;
-    }
-    let p = Path::new(path_part);
-    Some(if p.is_absolute() {
-        p.to_path_buf()
-    } else {
-        repo.root.join(p)
-    })
-}
-
 fn display_relative(repo: &LidRepo, path: &Path) -> String {
-    display_relative_path(repo, path)
-}
-
-fn display_relative_path(repo: &LidRepo, path: &Path) -> String {
     path.strip_prefix(&repo.root)
         .unwrap_or(path)
         .display()
@@ -136,6 +113,7 @@ fn display_relative_path(repo: &LidRepo, path: &Path) -> String {
 mod tests {
     use std::collections::BTreeMap;
     use std::fs;
+    use std::path::PathBuf;
 
     use super::*;
     use crate::model::{ArrowIndex, ArrowReferences, Segment, SegmentId, Status, Unmapped};
@@ -276,5 +254,65 @@ mod tests {
     #[test]
     fn check_id_is_reference_coherence() {
         assert_eq!(ReferenceCoherenceCheck.id(), CheckId::ReferenceCoherence);
+    }
+
+    #[test]
+    fn extracts_path_from_backtick_wrapped_bullet() {
+        let refs = ArrowReferences {
+            lld: vec!["`docs/llds/auth.md`".into()],
+            ..Default::default()
+        };
+        let (_dir, repo) = make_repo(&["docs/llds/auth.md"], refs);
+        let findings = ReferenceCoherenceCheck.run(&repo);
+        assert!(findings.is_empty(), "got {findings:?}");
+    }
+
+    #[test]
+    fn extracts_path_from_bullet_with_em_dash_trailer() {
+        let refs = ArrowReferences {
+            lld: vec!["`docs/llds/auth.md` — this segment's LLD.".into()],
+            ..Default::default()
+        };
+        let (_dir, repo) = make_repo(&["docs/llds/auth.md"], refs);
+        let findings = ReferenceCoherenceCheck.run(&repo);
+        assert!(findings.is_empty(), "got {findings:?}");
+    }
+
+    #[test]
+    fn extracts_path_from_bullet_with_multiple_section_anchors() {
+        let refs = ArrowReferences {
+            hld: vec![
+                "`docs/high-level-design.md` § Architecture / Plugins; § Key Design Decisions"
+                    .into(),
+            ],
+            ..Default::default()
+        };
+        let (_dir, repo) = make_repo(&["docs/high-level-design.md"], refs);
+        let findings = ReferenceCoherenceCheck.run(&repo);
+        assert!(findings.is_empty(), "got {findings:?}");
+    }
+
+    #[test]
+    fn extracts_path_when_nested_code_span_follows() {
+        // `path.md` (12 specs, prefix `AUTH-*`)
+        let refs = ArrowReferences {
+            ears: vec!["`docs/specs/auth-specs.md` (12 specs, prefix `AUTH-*`)".into()],
+            ..Default::default()
+        };
+        let (_dir, repo) = make_repo(&["docs/specs/auth-specs.md"], refs);
+        let findings = ReferenceCoherenceCheck.run(&repo);
+        assert!(findings.is_empty(), "got {findings:?}");
+    }
+
+    #[test]
+    fn prose_only_bullet_is_silently_skipped() {
+        let refs = ArrowReferences {
+            ears: vec!["None on the container itself. See the LLD for details.".into()],
+            ..Default::default()
+        };
+        let (_dir, repo) = make_repo(&[], refs);
+        let findings = ReferenceCoherenceCheck.run(&repo);
+        // Prose without a path-shaped token is informational, not a missing ref.
+        assert!(findings.is_empty(), "got {findings:?}");
     }
 }

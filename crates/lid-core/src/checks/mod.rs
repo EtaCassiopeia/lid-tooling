@@ -221,6 +221,69 @@ pub trait Check: Send + Sync {
     fn run(&self, repo: &LidRepo) -> Vec<Finding>;
 }
 
+/// Resolve a raw `## References` bullet to a filesystem path.
+///
+/// Shared by `references::ReferenceCoherenceCheck` and
+/// `orphans::OrphanCheck` so both consume bullets the same way.
+///
+/// The methodology's prose convention permits decorated bullets:
+///
+/// * `docs/llds/auth.md`
+/// * `` `docs/llds/auth.md` ``
+/// * `` `docs/llds/auth.md` § Section / Subsection ``
+/// * `` `docs/llds/auth.md` — short description ``
+/// * `` `docs/specs/auth-specs.md` (12 specs, prefix `AUTH-*`) ``
+///
+/// Extraction strategy: take the first markdown code span if present;
+/// otherwise take the substring before the first `§`, em-dash, or `;`.
+/// The result is sanity-checked to make sure it looks path-shaped —
+/// pure prose bullets (no `/`, no recognised extension) return `None`.
+pub(crate) fn resolve_arrow_ref(repo: &LidRepo, raw: &str) -> Option<std::path::PathBuf> {
+    use std::path::Path;
+    let trimmed = raw.trim();
+    let candidate = if let Some(span) = extract_first_code_span(trimmed) {
+        span.trim()
+    } else {
+        let stop = ['§', '—', ';']
+            .iter()
+            .filter_map(|c| trimmed.find(*c))
+            .min();
+        match stop {
+            Some(i) => trimmed[..i].trim(),
+            None => trimmed,
+        }
+    };
+    if !looks_like_path(candidate) {
+        return None;
+    }
+    let p = Path::new(candidate);
+    Some(if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        repo.root.join(p)
+    })
+}
+
+fn extract_first_code_span(s: &str) -> Option<&str> {
+    let start = s.find('`')?;
+    let after = &s[start + 1..];
+    let end = after.find('`')?;
+    Some(&after[..end])
+}
+
+fn looks_like_path(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    if s.contains('/') {
+        return true;
+    }
+    matches!(
+        std::path::Path::new(s).extension().and_then(|e| e.to_str()),
+        Some("md" | "yaml" | "yml" | "rs" | "ts" | "tsx" | "py" | "go" | "java" | "scala")
+    )
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {

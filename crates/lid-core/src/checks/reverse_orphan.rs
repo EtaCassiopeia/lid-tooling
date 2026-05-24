@@ -13,7 +13,7 @@
 use std::collections::BTreeSet;
 
 use crate::LidRepo;
-use crate::model::SpecId;
+use crate::model::{CitationKind, SpecId};
 
 use super::{Category, Check, CheckId, Finding, Location, Severity};
 
@@ -33,6 +33,13 @@ impl Check for ReverseOrphanCheck {
 
         let mut findings = Vec::new();
         for c in &repo.citations {
+            // Only Code and Test citations are real references; the
+            // methodology says `@spec` belongs in code and tests, so any
+            // hits in prose docs (HLDs, LLDs, README files) are almost
+            // certainly illustrative examples, not actual citations.
+            if !matches!(c.kind, CitationKind::Code | CitationKind::Test) {
+                continue;
+            }
             if known.contains(&c.id) {
                 continue;
             }
@@ -171,5 +178,33 @@ mod tests {
     #[test]
     fn check_id_is_reverse_orphan() {
         assert_eq!(ReverseOrphanCheck.id(), CheckId::ReverseOrphan);
+    }
+
+    #[test]
+    fn citation_from_prose_kind_is_ignored() {
+        // `@spec FOO-001` written inside an HLD/LLD as an illustrative
+        // example is classified as Spec or Other and should not produce
+        // a reverse-orphan finding even if FOO-001 doesn't exist.
+        let mut prose = citation("FOO-001", "docs/high-level-design.md", 12);
+        prose.kind = CitationKind::Other;
+        let repo = make_repo(&[], vec![prose]);
+        let findings = ReverseOrphanCheck.run(&repo);
+        assert!(findings.is_empty(), "got {findings:?}");
+
+        // Likewise for citations inside a spec file itself.
+        let mut spec_kind = citation("FOO-001", "docs/specs/auth-specs.md", 5);
+        spec_kind.kind = CitationKind::Spec;
+        let repo = make_repo(&[], vec![spec_kind]);
+        let findings = ReverseOrphanCheck.run(&repo);
+        assert!(findings.is_empty(), "got {findings:?}");
+    }
+
+    #[test]
+    fn citation_from_test_kind_is_still_flagged() {
+        let mut test_cite = citation("FOO-001", "tests/foo.test.ts", 1);
+        test_cite.kind = CitationKind::Test;
+        let repo = make_repo(&[], vec![test_cite]);
+        let findings = ReverseOrphanCheck.run(&repo);
+        assert_eq!(findings.len(), 1);
     }
 }

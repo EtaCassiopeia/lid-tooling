@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 
 use crate::LidRepo;
 
-use super::{Category, Check, CheckId, Finding, Location, Severity};
+use super::{Category, Check, CheckId, Finding, Location, Severity, resolve_arrow_ref};
 
 pub struct OrphanCheck;
 
@@ -55,7 +55,7 @@ where
     repo.arrow_docs
         .iter()
         .flat_map(|d| select(&d.references).iter())
-        .filter_map(|r| resolve_ref(repo, r))
+        .filter_map(|r| resolve_arrow_ref(repo, r))
         .collect()
 }
 
@@ -73,19 +73,6 @@ where
             }
         })
         .collect()
-}
-
-fn resolve_ref(repo: &LidRepo, raw: &str) -> Option<PathBuf> {
-    let path_part = raw.split('§').next().unwrap_or(raw).trim();
-    if path_part.is_empty() {
-        return None;
-    }
-    let p = Path::new(path_part);
-    Some(if p.is_absolute() {
-        p.to_path_buf()
-    } else {
-        repo.root.join(p)
-    })
 }
 
 fn orphan_finding(repo: &LidRepo, path: &Path, kind: &str) -> Finding {
