@@ -51,6 +51,14 @@ arrows:
         "# auth\n\n- [x] **AUTH-001**: ok.\n",
     )
     .unwrap();
+
+    // The `[x]` spec needs a test citation to satisfy `CoverageCheck`.
+    fs::create_dir_all(root.join("tests")).unwrap();
+    fs::write(
+        root.join("tests/auth.test.ts"),
+        "// @spec AUTH-001\nit('logs in', () => {});\n",
+    )
+    .unwrap();
 }
 
 #[test]

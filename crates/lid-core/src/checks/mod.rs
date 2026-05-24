@@ -9,12 +9,14 @@
 //! Concrete checks live in submodules; this module owns the trait and
 //! the common report types.
 
+pub mod coverage;
 pub mod orphans;
 pub mod references;
 pub mod reverse_orphan;
 pub mod schema;
 pub mod spec_id_format;
 
+pub use coverage::CoverageCheck;
 pub use orphans::OrphanCheck;
 pub use references::ReferenceCoherenceCheck;
 pub use reverse_orphan::ReverseOrphanCheck;
@@ -34,6 +36,7 @@ pub fn default_checks() -> Vec<Box<dyn Check>> {
         Box::new(OrphanCheck),
         Box::new(ReverseOrphanCheck),
         Box::new(SpecIdFormatCheck),
+        Box::new(CoverageCheck),
     ]
 }
 
