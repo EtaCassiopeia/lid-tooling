@@ -43,7 +43,17 @@ arrows:
     .unwrap();
     fs::write(
         root.join("docs/llds/auth.md"),
-        "# LLD: auth\n\nSome prose.\n",
+        "\
+# LLD: auth
+
+Some prose.
+
+## Decisions & Alternatives
+
+| Decision | Chosen | Alternatives | Rationale |
+| --- | --- | --- | --- |
+| Session store | Redis | Memcached | Latency |
+",
     )
     .unwrap();
     fs::write(
