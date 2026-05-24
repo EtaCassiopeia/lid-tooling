@@ -10,6 +10,7 @@
 //! the common report types.
 
 pub mod coverage;
+pub mod dag;
 pub mod lld_decisions;
 pub mod orphans;
 pub mod references;
@@ -19,6 +20,7 @@ pub mod spec_id_format;
 pub mod spec_status_counts;
 
 pub use coverage::CoverageCheck;
+pub use dag::DagCheck;
 pub use lld_decisions::LldDecisionsCheck;
 pub use orphans::OrphanCheck;
 pub use references::ReferenceCoherenceCheck;
@@ -43,6 +45,7 @@ pub fn default_checks() -> Vec<Box<dyn Check>> {
         Box::new(CoverageCheck),
         Box::new(SpecStatusCountsCheck),
         Box::new(LldDecisionsCheck),
+        Box::new(DagCheck),
     ]
 }
 
