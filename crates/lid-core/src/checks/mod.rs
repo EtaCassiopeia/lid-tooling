@@ -15,6 +15,7 @@ pub mod references;
 pub mod reverse_orphan;
 pub mod schema;
 pub mod spec_id_format;
+pub mod spec_status_counts;
 
 pub use coverage::CoverageCheck;
 pub use orphans::OrphanCheck;
@@ -22,6 +23,7 @@ pub use references::ReferenceCoherenceCheck;
 pub use reverse_orphan::ReverseOrphanCheck;
 pub use schema::SchemaCheck;
 pub use spec_id_format::SpecIdFormatCheck;
+pub use spec_status_counts::SpecStatusCountsCheck;
 
 /// The default ordered list of checks to run in a `lidc check` pass.
 ///
@@ -37,6 +39,7 @@ pub fn default_checks() -> Vec<Box<dyn Check>> {
         Box::new(ReverseOrphanCheck),
         Box::new(SpecIdFormatCheck),
         Box::new(CoverageCheck),
+        Box::new(SpecStatusCountsCheck),
     ]
 }
 
