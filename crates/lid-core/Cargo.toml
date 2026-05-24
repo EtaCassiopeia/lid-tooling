@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
+dashmap = "6"
 ignore = "0.4"
 petgraph = { version = "0.6", default-features = false }
 regex = "1"
