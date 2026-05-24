@@ -62,26 +62,53 @@ pub fn scan_path(root: &Path) -> Vec<SpecCitation> {
 pub fn scan_content(content: &str, path: &Path, out: &mut Vec<SpecCitation>) {
     let kind = classify_path(path);
     for (idx, line) in content.lines().enumerate() {
-        if !AT_SPEC_KEYWORD_RE.is_match(line) {
-            continue;
-        }
         let line_no = idx + 1;
-        for m in SPEC_ID_IN_TEXT_RE.find_iter(line) {
-            let candidate = m.as_str();
-            if !candidate.bytes().any(|b| b.is_ascii_digit()) {
-                continue;
-            }
-            let Ok(id) = SpecId::parse(candidate) else {
-                continue;
-            };
+        for citation in find_citations_in_line(line) {
             out.push(SpecCitation {
-                id,
+                id: citation.id,
                 file: path.to_path_buf(),
                 line: line_no,
                 kind,
             });
         }
     }
+}
+
+/// One spec-id reference within a single line, with the byte range of
+/// the matched ID inside the line. Returned by [`find_citations_in_line`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineCitation {
+    pub id: SpecId,
+    /// Byte offsets within the source line.
+    pub byte_range: std::ops::Range<usize>,
+}
+
+/// Extract every valid `@spec` reference on `line`, with the byte range
+/// of each spec ID. The line must contain the `@spec` keyword for any
+/// match to count — bare spec-ID-shaped tokens elsewhere on the line
+/// are ignored. Empty result for lines without `@spec`.
+///
+/// This is the line-level building block shared by the source scanner
+/// and the LSP server's hover / definition handlers.
+#[must_use]
+pub fn find_citations_in_line(line: &str) -> Vec<LineCitation> {
+    if !AT_SPEC_KEYWORD_RE.is_match(line) {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for m in SPEC_ID_IN_TEXT_RE.find_iter(line) {
+        let candidate = m.as_str();
+        if !candidate.bytes().any(|b| b.is_ascii_digit()) {
+            continue;
+        }
+        if let Ok(id) = SpecId::parse(candidate) {
+            out.push(LineCitation {
+                id,
+                byte_range: m.start()..m.end(),
+            });
+        }
+    }
+    out
 }
 
 /// Heuristic classification of a path into a [`CitationKind`].
@@ -305,6 +332,22 @@ fn three() {}
         let citations = scan_path(root);
         assert_eq!(citations.len(), 1);
         assert_eq!(citations[0].id.as_str(), "GOOD-001");
+    }
+
+    #[test]
+    fn find_citations_in_line_returns_byte_ranges() {
+        let line = "// @spec AUTH-001, AUTH-002 trailing comment";
+        let cits = find_citations_in_line(line);
+        assert_eq!(cits.len(), 2);
+        assert_eq!(cits[0].id.as_str(), "AUTH-001");
+        assert_eq!(&line[cits[0].byte_range.clone()], "AUTH-001");
+        assert_eq!(cits[1].id.as_str(), "AUTH-002");
+        assert_eq!(&line[cits[1].byte_range.clone()], "AUTH-002");
+    }
+
+    #[test]
+    fn find_citations_in_line_ignores_lines_without_at_spec() {
+        assert!(find_citations_in_line("const NAMES = ['AUTH-001'];").is_empty());
     }
 
     #[test]

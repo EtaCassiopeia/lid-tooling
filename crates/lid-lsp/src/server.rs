@@ -1,22 +1,31 @@
 //! The LSP server type.
 //!
 //! `LidServer` implements [`tower_lsp::LanguageServer`]. State that
-//! the handlers consult (today: the [`DocStore`]) lives on the server
-//! itself so the impl methods stay short and the unit-testable logic
-//! sits in `lid_core`.
+//! the handlers consult (today: the [`DocStore`] and the lazily-loaded
+//! [`LidRepo`]) lives on the server itself so the impl methods stay
+//! short and the unit-testable logic sits in `crate::handlers`.
 
-use lid_core::DocStore;
+use lid_core::{DocStore, LidRepo};
+use tokio::sync::OnceCell;
 use tower_lsp::lsp_types::{
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    InitializeParams, InitializeResult, InitializedParams, MessageType, ServerCapabilities,
-    ServerInfo, TextDocumentSyncCapability, TextDocumentSyncKind,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, Hover,
+    HoverParams, HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams,
+    MessageType, ServerCapabilities, ServerInfo, TextDocumentSyncCapability, TextDocumentSyncKind,
+    Url,
 };
 use tower_lsp::{Client, LanguageServer, jsonrpc::Result};
+
+use crate::handlers;
 
 #[derive(Debug)]
 pub struct LidServer {
     client: Client,
     store: DocStore,
+    /// The discovered LID repository for this session. Initialised on
+    /// first request that needs it — typically the first hover.
+    /// Outer cell guarantees init-once; inner `Option` records "we
+    /// tried, no repo found" so the failure isn't retried.
+    repo: OnceCell<Option<LidRepo>>,
 }
 
 impl LidServer {
@@ -25,18 +34,43 @@ impl LidServer {
         Self {
             client,
             store: DocStore::new(),
+            repo: OnceCell::new(),
         }
+    }
+
+    /// Discover (or return the cached) `LidRepo` using the given URI
+    /// as a starting hint for the upward walk. Returns `None` when
+    /// the URI can't be converted to a path or no LID repo is reachable.
+    async fn ensure_repo(&self, hint: &Url) -> Option<&LidRepo> {
+        let cached = self
+            .repo
+            .get_or_init(|| async {
+                let Ok(path) = hint.to_file_path() else {
+                    tracing::debug!(uri = %hint, "uri is not a file path; skipping repo discovery");
+                    return None;
+                };
+                match LidRepo::discover(&path) {
+                    Ok(repo) => {
+                        tracing::info!(root = ?repo.root, "LID repo discovered");
+                        Some(repo)
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "no LID repo at or above {}", path.display());
+                        None
+                    }
+                }
+            })
+            .await;
+        cached.as_ref()
     }
 }
 
 #[tower_lsp::async_trait]
 impl LanguageServer for LidServer {
     async fn initialize(&self, _params: InitializeParams) -> Result<InitializeResult> {
-        // Capabilities grow as handlers land. Today: full-text sync
-        // (the simplest mode — server gets the whole buffer on every
-        // change) and nothing else.
         let capabilities = ServerCapabilities {
             text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+            hover_provider: Some(HoverProviderCapability::Simple(true)),
             ..ServerCapabilities::default()
         };
 
@@ -69,8 +103,6 @@ impl LanguageServer for LidServer {
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let uri = params.text_document.uri.to_string();
         let version = params.text_document.version;
-        // We registered FULL sync, so the first (and only) change
-        // entry carries the entire new buffer.
         let Some(change) = params.content_changes.into_iter().next() else {
             tracing::warn!(uri = %uri, "did_change with no content");
             return;
@@ -83,6 +115,21 @@ impl LanguageServer for LidServer {
         let uri = params.text_document.uri.to_string();
         tracing::debug!(uri = %uri, "did_close");
         let _ = self.store.remove(&uri);
+    }
+
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+
+        let Some(doc) = self.store.get(uri.as_str()) else {
+            return Ok(None);
+        };
+        let Some(repo) = self.ensure_repo(&uri).await else {
+            return Ok(None);
+        };
+        Ok(handlers::hover::hover_at_position(
+            repo, &doc.text, position,
+        ))
     }
 
     async fn shutdown(&self) -> Result<()> {

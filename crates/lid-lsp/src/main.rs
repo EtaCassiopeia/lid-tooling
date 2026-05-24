@@ -5,6 +5,7 @@
 //! land in subsequent commits. The structure exists already so each
 //! handler is one focused change.
 
+mod handlers;
 mod server;
 
 use tokio::io::{stdin, stdout};
