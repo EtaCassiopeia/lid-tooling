@@ -1,11 +1,13 @@
 //! The LSP server type.
 //!
-//! `LidServer` implements [`tower_lsp::LanguageServer`]; the concrete
-//! handlers grow one commit at a time as features land. Today the
-//! server only completes the initialize/shutdown handshake — enough
-//! for an editor to connect and confirm the binary speaks LSP.
+//! `LidServer` implements [`tower_lsp::LanguageServer`]. State that
+//! the handlers consult (today: the [`DocStore`]) lives on the server
+//! itself so the impl methods stay short and the unit-testable logic
+//! sits in `lid_core`.
 
+use lid_core::DocStore;
 use tower_lsp::lsp_types::{
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     InitializeParams, InitializeResult, InitializedParams, MessageType, ServerCapabilities,
     ServerInfo, TextDocumentSyncCapability, TextDocumentSyncKind,
 };
@@ -14,21 +16,25 @@ use tower_lsp::{Client, LanguageServer, jsonrpc::Result};
 #[derive(Debug)]
 pub struct LidServer {
     client: Client,
+    store: DocStore,
 }
 
 impl LidServer {
-    /// Constructor used by `LspService::new`. Held private to the
-    /// crate; external callers don't construct servers directly.
+    /// Constructor used by `LspService::new`.
     pub(crate) fn new(client: Client) -> Self {
-        Self { client }
+        Self {
+            client,
+            store: DocStore::new(),
+        }
     }
 }
 
 #[tower_lsp::async_trait]
 impl LanguageServer for LidServer {
     async fn initialize(&self, _params: InitializeParams) -> Result<InitializeResult> {
-        // Capabilities are intentionally minimal at this stage. Each
-        // future handler commit adds its capability flag here.
+        // Capabilities grow as handlers land. Today: full-text sync
+        // (the simplest mode — server gets the whole buffer on every
+        // change) and nothing else.
         let capabilities = ServerCapabilities {
             text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
             ..ServerCapabilities::default()
@@ -51,6 +57,32 @@ impl LanguageServer for LidServer {
             )
             .await;
         tracing::info!("client connected, server is ready");
+    }
+
+    async fn did_open(&self, params: DidOpenTextDocumentParams) {
+        let td = params.text_document;
+        let uri = td.uri.to_string();
+        tracing::debug!(uri = %uri, version = td.version, "did_open");
+        let _ = self.store.upsert(uri, td.text, td.version);
+    }
+
+    async fn did_change(&self, params: DidChangeTextDocumentParams) {
+        let uri = params.text_document.uri.to_string();
+        let version = params.text_document.version;
+        // We registered FULL sync, so the first (and only) change
+        // entry carries the entire new buffer.
+        let Some(change) = params.content_changes.into_iter().next() else {
+            tracing::warn!(uri = %uri, "did_change with no content");
+            return;
+        };
+        tracing::debug!(uri = %uri, version, "did_change");
+        let _ = self.store.upsert(uri, change.text, version);
+    }
+
+    async fn did_close(&self, params: DidCloseTextDocumentParams) {
+        let uri = params.text_document.uri.to_string();
+        tracing::debug!(uri = %uri, "did_close");
+        let _ = self.store.remove(&uri);
     }
 
     async fn shutdown(&self) -> Result<()> {
