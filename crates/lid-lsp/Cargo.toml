@@ -1,0 +1,23 @@
+[package]
+name = "lid-lsp"
+description = "Language Server Protocol implementation for the LID methodology — hover, go-to-definition, diagnostics, and rename for LID artifacts and `@spec` citations."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "lid-lsp"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1"
+lid-core = { path = "../lid-core" }
+tokio = { version = "1", features = ["io-std", "macros", "rt-multi-thread"] }
+tower-lsp = "0.20"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
