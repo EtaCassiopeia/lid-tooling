@@ -11,8 +11,9 @@ use tower_lsp::lsp_types::{
     CompletionOptions, CompletionParams, CompletionResponse, DidChangeTextDocumentParams,
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, GotoDefinitionParams,
     GotoDefinitionResponse, Hover, HoverParams, HoverProviderCapability, InitializeParams,
-    InitializeResult, InitializedParams, MessageType, OneOf, ServerCapabilities, ServerInfo,
-    TextDocumentSyncCapability, TextDocumentSyncKind, Url,
+    InitializeResult, InitializedParams, Location, MessageType, OneOf, ReferenceParams,
+    ServerCapabilities, ServerInfo, SymbolInformation, TextDocumentSyncCapability,
+    TextDocumentSyncKind, Url, WorkspaceSymbolParams,
 };
 use tower_lsp::{Client, LanguageServer, jsonrpc::Result};
 
@@ -86,6 +87,8 @@ impl LanguageServer for LidServer {
             text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             definition_provider: Some(OneOf::Left(true)),
+            references_provider: Some(OneOf::Left(true)),
+            workspace_symbol_provider: Some(OneOf::Left(true)),
             completion_provider: Some(CompletionOptions {
                 // Trigger after a space or comma so the editor asks
                 // for completions when the user types `@spec ` or
@@ -198,6 +201,43 @@ impl LanguageServer for LidServer {
         Ok(handlers::definition::definition_at_position(
             repo, &doc.text, position,
         ))
+    }
+
+    async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+        let include_declaration = params.context.include_declaration;
+
+        let Some(doc) = self.store.get(uri.as_str()) else {
+            return Ok(None);
+        };
+        let Some(repo) = self.ensure_repo(&uri).await else {
+            return Ok(None);
+        };
+        Ok(handlers::references::references_at_position(
+            repo,
+            &doc.text,
+            position,
+            include_declaration,
+        ))
+    }
+
+    async fn symbol(
+        &self,
+        params: WorkspaceSymbolParams,
+    ) -> Result<Option<Vec<SymbolInformation>>> {
+        // workspace/symbol has no URI hint; rely on the cached repo
+        // that earlier requests (typically didOpen/hover) populated.
+        let Some(repo_cell) = self.repo.get() else {
+            return Ok(None);
+        };
+        let Some(repo) = repo_cell.as_ref() else {
+            return Ok(None);
+        };
+        Ok(Some(handlers::workspace_symbol::list_symbols(
+            repo,
+            &params.query,
+        )))
     }
 
     async fn shutdown(&self) -> Result<()> {
