@@ -47,6 +47,44 @@ static IMPL_ARTIFACTS_HEADER_RE: LazyLock<Regex> = LazyLock::new(|| {
 static BULLET_LINE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^- (.+?)\s*$").expect("BULLET_LINE_RE compiles"));
 
+/// One spec-shaped line, parsed from a single source-file line. Used
+/// by the LSP server to identify when the cursor is positioned on a
+/// spec definition (`- [x] **AUTH-001**: …`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpecLineMatch {
+    pub id: SpecId,
+    pub status: SpecStatus,
+    pub text: String,
+    /// Byte range of the spec ID within the source line (without the
+    /// surrounding `**`).
+    pub id_byte_range: std::ops::Range<usize>,
+}
+
+/// Parse a single line and return the spec it defines, if any.
+///
+/// Returns `None` when the line isn't spec-shaped or when the captured
+/// ID fails `SpecId::parse` (e.g. `A-Z` has no digit). The handler
+/// callers in `lid-lsp` use this to position-test the cursor against
+/// the `**SPEC-ID**` span.
+#[must_use]
+pub fn find_spec_line_match(line: &str) -> Option<SpecLineMatch> {
+    let caps = SPEC_LINE_RE.captures(line)?;
+    let id_match = caps.get(2)?;
+    let id = SpecId::parse(id_match.as_str()).ok()?;
+    let status = match &caps[1] {
+        "x" => SpecStatus::Implemented,
+        "D" => SpecStatus::Deferred,
+        " " => SpecStatus::Open,
+        _ => return None,
+    };
+    Some(SpecLineMatch {
+        id,
+        status,
+        text: caps[3].to_owned(),
+        id_byte_range: id_match.start()..id_match.end(),
+    })
+}
+
 /// Load and parse an EARS spec file.
 ///
 /// # Errors
@@ -428,6 +466,31 @@ some prose
 ";
         let f = parse(content).unwrap();
         assert!(f.specs.is_empty());
+    }
+
+    #[test]
+    fn find_spec_line_match_extracts_id_with_byte_range() {
+        let line = "- [x] **AUTH-001**: requirement text";
+        let m = find_spec_line_match(line).unwrap();
+        assert_eq!(m.id.as_str(), "AUTH-001");
+        assert_eq!(m.status, SpecStatus::Implemented);
+        assert_eq!(m.text, "requirement text");
+        assert_eq!(&line[m.id_byte_range.clone()], "AUTH-001");
+    }
+
+    #[test]
+    fn find_spec_line_match_handles_open_and_deferred_markers() {
+        let open = find_spec_line_match("- [ ] **AUTH-002**: text").unwrap();
+        assert_eq!(open.status, SpecStatus::Open);
+        let deferred = find_spec_line_match("- [D] **AUTH-003**: text").unwrap();
+        assert_eq!(deferred.status, SpecStatus::Deferred);
+    }
+
+    #[test]
+    fn find_spec_line_match_returns_none_for_non_spec_lines() {
+        assert!(find_spec_line_match("just prose").is_none());
+        assert!(find_spec_line_match("- a regular bullet").is_none());
+        assert!(find_spec_line_match("- [x] not a spec id").is_none());
     }
 
     #[test]
