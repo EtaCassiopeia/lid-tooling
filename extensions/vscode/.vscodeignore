@@ -3,7 +3,10 @@
 .gitignore
 .eslintrc*
 tsconfig.json
-node_modules/**
 src/**
 out/**/*.map
 **/*.ts
+**/*.tsbuildinfo
+node_modules/**/*.map
+node_modules/**/*.ts
+node_modules/.bin/**
