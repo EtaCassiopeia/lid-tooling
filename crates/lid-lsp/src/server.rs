@@ -11,9 +11,10 @@ use tower_lsp::lsp_types::{
     CompletionOptions, CompletionParams, CompletionResponse, DidChangeTextDocumentParams,
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, GotoDefinitionParams,
     GotoDefinitionResponse, Hover, HoverParams, HoverProviderCapability, InitializeParams,
-    InitializeResult, InitializedParams, Location, MessageType, OneOf, ReferenceParams,
-    ServerCapabilities, ServerInfo, SymbolInformation, TextDocumentSyncCapability,
-    TextDocumentSyncKind, Url, WorkspaceSymbolParams,
+    InitializeResult, InitializedParams, Location, MessageType, OneOf, PrepareRenameResponse,
+    ReferenceParams, RenameOptions, RenameParams, ServerCapabilities, ServerInfo,
+    SymbolInformation, TextDocumentPositionParams, TextDocumentSyncCapability,
+    TextDocumentSyncKind, Url, WorkDoneProgressOptions, WorkspaceEdit, WorkspaceSymbolParams,
 };
 use tower_lsp::{Client, LanguageServer, jsonrpc::Result};
 
@@ -89,6 +90,10 @@ impl LanguageServer for LidServer {
             definition_provider: Some(OneOf::Left(true)),
             references_provider: Some(OneOf::Left(true)),
             workspace_symbol_provider: Some(OneOf::Left(true)),
+            rename_provider: Some(OneOf::Right(RenameOptions {
+                prepare_provider: Some(true),
+                work_done_progress_options: WorkDoneProgressOptions::default(),
+            })),
             completion_provider: Some(CompletionOptions {
                 // Trigger after a space or comma so the editor asks
                 // for completions when the user types `@spec ` or
@@ -220,6 +225,37 @@ impl LanguageServer for LidServer {
             position,
             include_declaration,
         ))
+    }
+
+    async fn prepare_rename(
+        &self,
+        params: TextDocumentPositionParams,
+    ) -> Result<Option<PrepareRenameResponse>> {
+        let uri = params.text_document.uri;
+        let position = params.position;
+        let Some(doc) = self.store.get(uri.as_str()) else {
+            return Ok(None);
+        };
+        Ok(handlers::rename::prepare_rename_at_position(
+            &doc.text, position,
+        ))
+    }
+
+    async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+        let new_name = params.new_name;
+
+        let Some(doc) = self.store.get(uri.as_str()) else {
+            return Ok(None);
+        };
+        let Some(repo) = self.ensure_repo(&uri).await else {
+            return Ok(None);
+        };
+        match handlers::rename::rename_at_position(repo, &doc.text, position, &new_name) {
+            Ok(edit) => Ok(Some(edit)),
+            Err(e) => Err(tower_lsp::jsonrpc::Error::invalid_params(e.to_string())),
+        }
     }
 
     async fn symbol(

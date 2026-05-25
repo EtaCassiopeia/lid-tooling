@@ -696,6 +696,7 @@ dependencies = [
  "lid-core",
  "serde_json",
  "tempfile",
+ "thiserror",
  "tokio",
  "tower-lsp",
  "tracing",

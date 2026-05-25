@@ -17,6 +17,7 @@ workspace = true
 [dependencies]
 anyhow = "1"
 lid-core = { path = "../lid-core" }
+thiserror = "2"
 tokio = { version = "1", features = ["io-std", "macros", "rt-multi-thread"] }
 tower-lsp = "0.20"
 tracing = "0.1"
