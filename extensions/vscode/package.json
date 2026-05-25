@@ -50,6 +50,18 @@
         }
       }
     },
+    "commands": [
+      {
+        "command": "lid.restartServer",
+        "title": "Restart LID Server",
+        "category": "LID"
+      },
+      {
+        "command": "lid.showOutputChannel",
+        "title": "Show Output Channel",
+        "category": "LID"
+      }
+    ],
     "grammars": [
       {
         "scopeName": "lid.source.injection",

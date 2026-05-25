@@ -1,17 +1,9 @@
 // VS Code entry point for the LID extension.
 //
-// On activation we spawn the `lid-lsp` binary and connect it to the
-// editor via `vscode-languageclient`. The binary is located by, in
-// order of precedence:
-//
-//   1. The `lid.serverPath` setting (when non-empty)
-//   2. The bundled binary at `<extension>/server/lid-lsp[.exe]`
-//      (populated by the release pipeline once M4.37 lands)
-//   3. The unqualified name `lid-lsp` — relies on the user having
-//      `cargo install`ed it or otherwise put it on PATH.
-//
-// The trace channel is automatically wired by `vscode-languageclient`
-// to the `lid.trace.server` setting declared in `package.json`.
+// On activation we spawn the `lid-lsp` binary, connect it to the
+// editor via `vscode-languageclient`, install a status-bar indicator
+// for server state, and register a couple of commands for the user
+// to interact with the server.
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -22,12 +14,58 @@ import {
     LanguageClient,
     LanguageClientOptions,
     ServerOptions,
+    State,
     TransportKind,
 } from 'vscode-languageclient/node';
 
+const COMMAND_RESTART_SERVER = 'lid.restartServer';
+const COMMAND_SHOW_OUTPUT = 'lid.showOutputChannel';
+
 let client: LanguageClient | undefined;
+let statusBarItem: vscode.StatusBarItem | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+    statusBarItem = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Right,
+        100,
+    );
+    statusBarItem.command = COMMAND_SHOW_OUTPUT;
+    statusBarItem.tooltip = 'Click to show the LID output channel';
+    statusBarItem.text = '$(sync~spin) LID: starting…';
+    statusBarItem.show();
+    context.subscriptions.push(statusBarItem);
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMAND_SHOW_OUTPUT, () => {
+            client?.outputChannel.show(true);
+        }),
+        vscode.commands.registerCommand(COMMAND_RESTART_SERVER, async () => {
+            if (client === undefined) {
+                vscode.window.showInformationMessage(
+                    'LID: server is not running; reload the window to start it.',
+                );
+                return;
+            }
+            setStatusStarting();
+            try {
+                await client.restart();
+                setStatusReady();
+            } catch (err) {
+                setStatusError(err);
+            }
+        }),
+    );
+
+    await startServer(context);
+}
+
+export function deactivate(): Thenable<void> | undefined {
+    statusBarItem?.dispose();
+    statusBarItem = undefined;
+    return client?.stop();
+}
+
+async function startServer(context: vscode.ExtensionContext): Promise<void> {
     const serverPath = resolveServerPath(context);
     const executable: Executable = {
         command: serverPath,
@@ -67,22 +105,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     };
 
     client = new LanguageClient('lid', 'LID', serverOptions, clientOptions);
+    client.onDidChangeState((event) => {
+        switch (event.newState) {
+            case State.Running:
+                setStatusReady();
+                break;
+            case State.Starting:
+                setStatusStarting();
+                break;
+            case State.Stopped:
+                setStatusStopped();
+                break;
+        }
+    });
+
     try {
         await client.start();
-        console.log(`LID LSP client started (server: ${serverPath})`);
     } catch (err) {
-        const message =
-            err instanceof Error ? err.message : String(err);
+        setStatusError(err);
         vscode.window.showErrorMessage(
-            `LID: failed to start lid-lsp (\`${serverPath}\`): ${message}. ` +
+            `LID: failed to start lid-lsp (\`${serverPath}\`): ${formatError(err)}. ` +
                 'Set `lid.serverPath` or install `lid-lsp` on PATH.',
         );
         client = undefined;
     }
-}
-
-export function deactivate(): Thenable<void> | undefined {
-    return client?.stop();
 }
 
 function resolveServerPath(context: vscode.ExtensionContext): string {
@@ -103,4 +149,44 @@ function resolveServerPath(context: vscode.ExtensionContext): string {
     // that's wrong, the `client.start()` call throws and we surface
     // a clear error message above.
     return 'lid-lsp';
+}
+
+function setStatusStarting(): void {
+    if (statusBarItem !== undefined) {
+        statusBarItem.text = '$(sync~spin) LID: starting…';
+        statusBarItem.backgroundColor = undefined;
+    }
+}
+
+function setStatusReady(): void {
+    if (statusBarItem !== undefined) {
+        statusBarItem.text = '$(check) LID';
+        statusBarItem.backgroundColor = undefined;
+    }
+}
+
+function setStatusStopped(): void {
+    if (statusBarItem !== undefined) {
+        statusBarItem.text = '$(circle-slash) LID: stopped';
+        statusBarItem.backgroundColor = new vscode.ThemeColor(
+            'statusBarItem.warningBackground',
+        );
+    }
+}
+
+function setStatusError(err: unknown): void {
+    if (statusBarItem !== undefined) {
+        statusBarItem.text = '$(error) LID: error';
+        statusBarItem.backgroundColor = new vscode.ThemeColor(
+            'statusBarItem.errorBackground',
+        );
+        statusBarItem.tooltip = `LID: ${formatError(err)}. Click to view output.`;
+    }
+}
+
+function formatError(err: unknown): string {
+    if (err instanceof Error) {
+        return err.message;
+    }
+    return String(err);
 }
