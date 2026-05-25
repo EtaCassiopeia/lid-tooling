@@ -9,4 +9,5 @@
 //! programmatically-constructed `LidRepo` without any LSP plumbing.
 
 pub mod definition;
+pub mod diagnostics;
 pub mod hover;
