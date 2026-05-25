@@ -49,7 +49,35 @@
           "description": "Verbosity of LSP message tracing in the Output panel."
         }
       }
-    }
+    },
+    "grammars": [
+      {
+        "scopeName": "lid.source.injection",
+        "path": "./syntaxes/lid-source.tmLanguage.json",
+        "injectTo": [
+          "source.rust",
+          "source.ts",
+          "source.tsx",
+          "source.js",
+          "source.jsx",
+          "source.python",
+          "source.go",
+          "source.java",
+          "source.scala",
+          "source.cs",
+          "source.ruby",
+          "source.cpp",
+          "source.c"
+        ]
+      },
+      {
+        "scopeName": "lid.markdown.injection",
+        "path": "./syntaxes/lid-markdown.tmLanguage.json",
+        "injectTo": [
+          "text.html.markdown"
+        ]
+      }
+    ]
   },
   "scripts": {
     "compile": "tsc -p ./",

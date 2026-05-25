@@ -1,0 +1,72 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "scopeName": "lid.markdown.injection",
+  "injectionSelector": "L:text.html.markdown",
+  "patterns": [
+    {
+      "include": "#spec-line"
+    },
+    {
+      "include": "#at-spec-in-prose"
+    }
+  ],
+  "repository": {
+    "spec-line": {
+      "match": "^(-\\s\\[)([xD ])(\\])\\s+(\\*\\*)([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)(\\*\\*)(:)(.*)$",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.list.markdown"
+        },
+        "2": {
+          "name": "constant.language.lid.spec-status"
+        },
+        "3": {
+          "name": "punctuation.definition.list.markdown"
+        },
+        "4": {
+          "name": "punctuation.definition.bold.markdown"
+        },
+        "5": {
+          "name": "entity.name.type.lid.spec-id"
+        },
+        "6": {
+          "name": "punctuation.definition.bold.markdown"
+        },
+        "7": {
+          "name": "punctuation.separator.lid"
+        },
+        "8": {
+          "patterns": [
+            {
+              "include": "#ears-keywords"
+            }
+          ]
+        }
+      }
+    },
+    "at-spec-in-prose": {
+      "match": "(@spec)\\s+([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+(?:\\s*,\\s*[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)*)",
+      "captures": {
+        "1": {
+          "name": "keyword.control.lid.spec-annotation"
+        },
+        "2": {
+          "patterns": [
+            {
+              "match": "[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+",
+              "name": "entity.name.type.lid.spec-id"
+            },
+            {
+              "match": ",",
+              "name": "punctuation.separator.lid"
+            }
+          ]
+        }
+      }
+    },
+    "ears-keywords": {
+      "match": "\\b(SHALL|WHEN|WHILE|IF|WHERE|THEN)\\b",
+      "name": "keyword.control.lid.ears"
+    }
+  }
+}
