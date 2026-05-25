@@ -8,10 +8,11 @@
 use lid_core::{DocStore, LidRepo};
 use tokio::sync::OnceCell;
 use tower_lsp::lsp_types::{
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, HoverProviderCapability,
-    InitializeParams, InitializeResult, InitializedParams, MessageType, OneOf, ServerCapabilities,
-    ServerInfo, TextDocumentSyncCapability, TextDocumentSyncKind, Url,
+    CompletionOptions, CompletionParams, CompletionResponse, DidChangeTextDocumentParams,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, GotoDefinitionParams,
+    GotoDefinitionResponse, Hover, HoverParams, HoverProviderCapability, InitializeParams,
+    InitializeResult, InitializedParams, MessageType, OneOf, ServerCapabilities, ServerInfo,
+    TextDocumentSyncCapability, TextDocumentSyncKind, Url,
 };
 use tower_lsp::{Client, LanguageServer, jsonrpc::Result};
 
@@ -85,6 +86,13 @@ impl LanguageServer for LidServer {
             text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             definition_provider: Some(OneOf::Left(true)),
+            completion_provider: Some(CompletionOptions {
+                // Trigger after a space or comma so the editor asks
+                // for completions when the user types `@spec ` or
+                // `AUTH-001,`.
+                trigger_characters: Some(vec![" ".into(), ",".into()]),
+                ..CompletionOptions::default()
+            }),
             ..ServerCapabilities::default()
         };
 
@@ -155,6 +163,21 @@ impl LanguageServer for LidServer {
             return Ok(None);
         };
         Ok(handlers::hover::hover_at_position(
+            repo, &doc.text, position,
+        ))
+    }
+
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+
+        let Some(doc) = self.store.get(uri.as_str()) else {
+            return Ok(None);
+        };
+        let Some(repo) = self.ensure_repo(&uri).await else {
+            return Ok(None);
+        };
+        Ok(handlers::completion::completions_at_position(
             repo, &doc.text, position,
         ))
     }

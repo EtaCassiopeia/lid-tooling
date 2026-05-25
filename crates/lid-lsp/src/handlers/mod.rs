@@ -8,6 +8,7 @@
 //! Keeping the logic pure lets us unit-test every handler against a
 //! programmatically-constructed `LidRepo` without any LSP plumbing.
 
+pub mod completion;
 pub mod definition;
 pub mod diagnostics;
 pub mod hover;
