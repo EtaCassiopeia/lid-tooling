@@ -8,10 +8,10 @@
 use lid_core::{DocStore, LidRepo};
 use tokio::sync::OnceCell;
 use tower_lsp::lsp_types::{
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, Hover,
-    HoverParams, HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams,
-    MessageType, ServerCapabilities, ServerInfo, TextDocumentSyncCapability, TextDocumentSyncKind,
-    Url,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, HoverProviderCapability,
+    InitializeParams, InitializeResult, InitializedParams, MessageType, OneOf, ServerCapabilities,
+    ServerInfo, TextDocumentSyncCapability, TextDocumentSyncKind, Url,
 };
 use tower_lsp::{Client, LanguageServer, jsonrpc::Result};
 
@@ -71,6 +71,7 @@ impl LanguageServer for LidServer {
         let capabilities = ServerCapabilities {
             text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
+            definition_provider: Some(OneOf::Left(true)),
             ..ServerCapabilities::default()
         };
 
@@ -128,6 +129,24 @@ impl LanguageServer for LidServer {
             return Ok(None);
         };
         Ok(handlers::hover::hover_at_position(
+            repo, &doc.text, position,
+        ))
+    }
+
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+
+        let Some(doc) = self.store.get(uri.as_str()) else {
+            return Ok(None);
+        };
+        let Some(repo) = self.ensure_repo(&uri).await else {
+            return Ok(None);
+        };
+        Ok(handlers::definition::definition_at_position(
             repo, &doc.text, position,
         ))
     }
