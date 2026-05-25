@@ -1,0 +1,67 @@
+{
+  "name": "lid",
+  "displayName": "LID — Linked-Intent Development",
+  "description": "Editor support for the LID methodology: hover, go-to-definition, find references, rename, completion, and real-time diagnostics for @spec citations.",
+  "version": "0.1.0",
+  "publisher": "lid-tools",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zainalpour/lid-tools.git",
+    "directory": "extensions/vscode"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "lid",
+    "linked-intent",
+    "ears",
+    "spec-driven development",
+    "sdd"
+  ],
+  "activationEvents": [
+    "workspaceContains:docs/arrows/index.yaml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "LID",
+      "properties": {
+        "lid.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the lid-lsp binary. When empty, the bundled binary is used."
+        },
+        "lid.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Verbosity of LSP message tracing in the Output panel."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "tsc -p ./ --noEmit",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "typescript": "^5.4.0"
+  }
+}
