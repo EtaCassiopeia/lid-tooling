@@ -9,11 +9,11 @@ use lid_core::{DocStore, LidRepo};
 use tokio::sync::OnceCell;
 use tower_lsp::lsp_types::{
     CompletionOptions, CompletionParams, CompletionResponse, DidChangeTextDocumentParams,
-    DidCloseTextDocumentParams, DidOpenTextDocumentParams, GotoDefinitionParams,
-    GotoDefinitionResponse, Hover, HoverParams, HoverProviderCapability, InitializeParams,
-    InitializeResult, InitializedParams, Location, MessageType, OneOf, PrepareRenameResponse,
-    ReferenceParams, RenameOptions, RenameParams, ServerCapabilities, ServerInfo,
-    SymbolInformation, TextDocumentPositionParams, TextDocumentSyncCapability,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, HoverProviderCapability,
+    InitializeParams, InitializeResult, InitializedParams, Location, MessageType, OneOf,
+    PrepareRenameResponse, ReferenceParams, RenameOptions, RenameParams, ServerCapabilities,
+    ServerInfo, SymbolInformation, TextDocumentPositionParams, TextDocumentSyncCapability,
     TextDocumentSyncKind, Url, WorkDoneProgressOptions, WorkspaceEdit, WorkspaceSymbolParams,
 };
 use tower_lsp::{Client, LanguageServer, jsonrpc::Result};
@@ -158,6 +158,16 @@ impl LanguageServer for LidServer {
         let _ = self.store.remove(uri.as_str());
         // Clear any diagnostics we'd previously published for this URI.
         self.client.publish_diagnostics(uri, Vec::new(), None).await;
+    }
+
+    async fn did_save(&self, params: DidSaveTextDocumentParams) {
+        // `didChange` already kept the store and diagnostics current
+        // for unsaved edits; saving doesn't add new information.
+        // The handler exists primarily to suppress tower-lsp's
+        // "notification not implemented" log line in the editor's
+        // output channel.
+        let uri = params.text_document.uri;
+        tracing::debug!(uri = %uri, "did_save");
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
