@@ -9,6 +9,31 @@ real-time diagnostics for `@spec` citations and spec definitions.
 Early development. The extension auto-activates in any workspace
 containing `docs/arrows/index.yaml`.
 
+## Installing the language server
+
+The extension shells out to a `lid-lsp` binary. For v0.1 the binary
+isn't bundled inside the `.vsix` — install it once via:
+
+```sh
+cargo install lid-lsp     # crates.io (once published)
+# or, from a clone:
+cargo install --path crates/lid-lsp
+```
+
+Then either ensure `lid-lsp` is on your `$PATH`, or point the
+extension at the binary explicitly:
+
+```jsonc
+// .vscode/settings.json
+{
+  "lid.serverPath": "/absolute/path/to/lid-lsp"
+}
+```
+
+A bundled-binary `.vsix` (one per platform, no separate install
+step) lands in v0.2 once `cargo-dist` produces the per-target
+artifacts.
+
 ## Features (planned)
 
 - **Hover** — see a spec's text and status by pointing at any
