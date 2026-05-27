@@ -9,23 +9,23 @@
 //! 1. resolves the spec ID at the cursor (citation or definition),
 //! 2. validates the new name (`SpecId::parse`) and rejects collisions
 //!    with an existing spec,
-//! 3. reads every affected file from disk to compute precise byte
+//! 3. reads every affected file (preferring the editor buffer in
+//!    `DocStore`, falling back to disk) to compute precise byte
 //!    ranges, and
 //! 4. returns a `WorkspaceEdit` keyed by URI for the editor to apply.
 //!
-//! Limitation: edits are computed against on-disk content. Unsaved
-//! buffer changes elsewhere aren't reflected — the editor will refuse
-//! to apply edits to a dirty buffer that no longer matches, which is
-//! the safe default.
+//! Reading from `DocStore` first matters: VS Code applies the
+//! workspace edit to the editor's *buffer*, not the disk file, so
+//! offsets derived from stale disk content would corrupt buffers
+//! with unsaved changes.
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::Path;
 
-use lid_core::LidRepo;
 use lid_core::parse::markdown::find_spec_line_match;
 use lid_core::parse::source::find_citations_in_line;
-use lid_core::{SpecId, model::SpecCitation};
+use lid_core::{DocStore, LidRepo, SpecId, model::SpecCitation};
 use thiserror::Error;
 use tower_lsp::lsp_types::{Position, PrepareRenameResponse, Range, TextEdit, Url, WorkspaceEdit};
 
@@ -79,6 +79,7 @@ pub fn prepare_rename_at_position(text: &str, position: Position) -> Option<Prep
 ///   spec in the repository.
 pub fn rename_at_position(
     repo: &LidRepo,
+    store: &DocStore,
     text: &str,
     position: Position,
     new_name: &str,
@@ -104,35 +105,29 @@ pub fn rename_at_position(
 
     let mut changes: HashMap<Url, Vec<TextEdit>> = HashMap::new();
 
-    // Edit the spec definition site(s) — re-read the file to find the
-    // byte range of the `**SPEC-ID**` span on each known spec line.
+    // Edit the spec definition site(s). For each candidate spec
+    // file, fetch the current content — buffer first via DocStore,
+    // then disk — and scan every line for spec definitions matching
+    // `old_id`. We deliberately *don't* trust `SpecLine.line` from
+    // `repo.specs`: that number was captured at discovery time
+    // against the on-disk content, and the buffer may have shifted
+    // since. Scanning fresh content is the only way the edit's
+    // line/byte ranges match what the editor will apply against.
     for spec_file in &repo.specs {
-        let matching: Vec<usize> = spec_file
-            .specs
-            .iter()
-            .filter(|s| s.id == old_id)
-            .map(|s| s.line)
-            .collect();
-        if matching.is_empty() {
+        let needed = spec_file.specs.iter().any(|s| s.id == old_id);
+        if !needed {
             continue;
         }
-        let Ok(content) = fs::read_to_string(&spec_file.path) else {
+        let Some((uri, content)) = read_path(store, &spec_file.path) else {
             continue;
         };
-        let Ok(uri) = Url::from_file_path(&spec_file.path) else {
-            continue;
-        };
-        let lines: Vec<&str> = content.lines().collect();
-        for one_based in matching {
-            let Some(line_idx) = one_based.checked_sub(1) else {
-                continue;
-            };
-            let Some(line) = lines.get(line_idx) else {
-                continue;
-            };
+        for (line_idx, line) in content.lines().enumerate() {
             let Some(m) = find_spec_line_match(line) else {
                 continue;
             };
+            if m.id != old_id {
+                continue;
+            }
             changes.entry(uri.clone()).or_default().push(TextEdit {
                 range: byte_range_to_lsp_range(
                     u32::try_from(line_idx).unwrap_or(u32::MAX),
@@ -143,7 +138,7 @@ pub fn rename_at_position(
         }
     }
 
-    // Edit every citation site. Group by file so we re-read each file
+    // Edit every citation site. Group by file so we read each file
     // once, then scan its lines for matches against `old_id`.
     let citation_files: BTreeSet<&Path> = repo
         .citations
@@ -153,10 +148,7 @@ pub fn rename_at_position(
         .collect();
     // BTreeSet collects in path order so iteration over files is deterministic.
     for path in citation_files {
-        let Ok(content) = fs::read_to_string(path) else {
-            continue;
-        };
-        let Ok(uri) = Url::from_file_path(path) else {
+        let Some((uri, content)) = read_path(store, path) else {
             continue;
         };
         let mut edits = Vec::new();
@@ -185,6 +177,19 @@ pub fn rename_at_position(
     })
 }
 
+/// Resolve `path` to `(uri, content)` for rename use, preferring the
+/// editor's in-memory buffer (via `DocStore`) over disk. Returns
+/// `None` when the URI can't be constructed or neither source is
+/// readable.
+fn read_path(store: &DocStore, path: &Path) -> Option<(Url, String)> {
+    let uri = Url::from_file_path(path).ok()?;
+    if let Some(doc) = store.get(uri.as_str()) {
+        return Some((uri, (*doc.text).clone()));
+    }
+    let content = fs::read_to_string(path).ok()?;
+    Some((uri, content))
+}
+
 fn byte_range_to_lsp_range(line: u32, byte_range: &std::ops::Range<usize>) -> Range {
     Range {
         start: Position {
@@ -199,7 +204,7 @@ fn byte_range_to_lsp_range(line: u32, byte_range: &std::ops::Range<usize>) -> Ra
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::panic)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use std::collections::BTreeMap;
 
@@ -305,8 +310,15 @@ mod tests {
         let (_dir, repo) = make_repo_on_disk(spec, 3, source, 1);
 
         let cursor_text = "// @spec AUTH-001\n";
-        let edit =
-            rename_at_position(&repo, cursor_text, position(0, 12), "AUTH-LOGIN-001").unwrap();
+        let store = DocStore::new();
+        let edit = rename_at_position(
+            &repo,
+            &store,
+            cursor_text,
+            position(0, 12),
+            "AUTH-LOGIN-001",
+        )
+        .unwrap();
         let changes = edit.changes.unwrap();
         assert_eq!(changes.len(), 2, "spec file + source file");
 
@@ -324,8 +336,10 @@ mod tests {
     fn rename_to_same_name_is_a_noop() {
         let spec = "- [x] **AUTH-001**: text\n";
         let (_dir, repo) = make_repo_on_disk(spec, 1, "fn x() {}\n", 1);
+        let store = DocStore::new();
         let edit = rename_at_position(
             &repo,
+            &store,
             "- [x] **AUTH-001**: text\n",
             position(0, 10),
             "AUTH-001",
@@ -338,8 +352,10 @@ mod tests {
     fn rename_to_invalid_name_returns_error() {
         let spec = "- [x] **AUTH-001**: text\n";
         let (_dir, repo) = make_repo_on_disk(spec, 1, "fn x() {}\n", 1);
+        let store = DocStore::new();
         let err = rename_at_position(
             &repo,
+            &store,
             "- [x] **AUTH-001**: text\n",
             position(0, 10),
             "lowercase",
@@ -388,14 +404,17 @@ mod tests {
             arrow_docs: vec![],
             citations: vec![],
         };
-        let err = rename_at_position(&repo, spec, position(0, 10), "AUTH-002").unwrap_err();
+        let store = DocStore::new();
+        let err = rename_at_position(&repo, &store, spec, position(0, 10), "AUTH-002").unwrap_err();
         assert!(matches!(err, RenameError::Collision { .. }), "{err:?}");
     }
 
     #[test]
     fn rename_with_cursor_outside_spec_errors_not_on_spec() {
         let (_dir, repo) = make_repo_on_disk("- [x] **AUTH-001**: text\n", 1, "fn x() {}\n", 1);
-        let err = rename_at_position(&repo, "fn x() {}\n", position(0, 2), "AUTH-002").unwrap_err();
+        let store = DocStore::new();
+        let err = rename_at_position(&repo, &store, "fn x() {}\n", position(0, 2), "AUTH-002")
+            .unwrap_err();
         assert!(matches!(err, RenameError::NotOnSpec), "{err:?}");
     }
 
@@ -405,8 +424,10 @@ mod tests {
         let source = "// @spec AUTH-001\nfn login() {}\n";
         let (_dir, repo) = make_repo_on_disk(spec, 3, source, 1);
 
+        let store = DocStore::new();
         let edit = rename_at_position(
             &repo,
+            &store,
             "// @spec AUTH-001\n",
             position(0, 12),
             "AUTH-LOGIN-001",
@@ -428,5 +449,50 @@ mod tests {
                 assert_eq!(r.end.character, 17);
             }
         }
+    }
+
+    #[test]
+    fn rename_reads_buffer_content_when_url_is_in_store() {
+        // Set up: disk says AUTH-001 is on line 3. The user has
+        // since edited the buffer in their editor, shifting AUTH-001
+        // to line 5 (added two blank lines above). The DocStore
+        // tracks the buffer content. Rename must use the buffer
+        // offsets, not the stale disk offsets.
+        let on_disk = "# auth\n\n- [x] **AUTH-001**: text\n";
+        let (_dir, repo) = make_repo_on_disk(on_disk, 3, "fn x() {}\n", 1);
+
+        let spec_path = &repo.specs[0].path;
+        let buffer_text = "# auth\n\nan extra paragraph\n\n- [x] **AUTH-001**: text\n";
+        let store = DocStore::new();
+        let _ = store.upsert(
+            Url::from_file_path(spec_path).unwrap().as_str().to_owned(),
+            buffer_text.to_owned(),
+            1,
+        );
+
+        // Pretend the cursor is on AUTH-001 in some other file
+        // (citation text). The rename will resolve to the spec file
+        // edit and must read the BUFFER content for it.
+        let cursor_text = "// @spec AUTH-001\n";
+        let edit = rename_at_position(
+            &repo,
+            &store,
+            cursor_text,
+            position(0, 12),
+            "AUTH-LOGIN-001",
+        )
+        .unwrap();
+        let changes = edit.changes.unwrap();
+        let spec_uri = Url::from_file_path(spec_path).unwrap();
+        let spec_edits = changes
+            .get(&spec_uri)
+            .expect("expected an edit for the spec file");
+        assert_eq!(spec_edits.len(), 1);
+        // In the BUFFER content, AUTH-001 lives on line 5 (0-based:
+        // 4). If the rename had used disk content, the edit would
+        // have targeted line 2 (0-based), corrupting the buffer.
+        assert_eq!(spec_edits[0].range.start.line, 4);
+        assert_eq!(spec_edits[0].range.start.character, 8);
+        assert_eq!(spec_edits[0].range.end.character, 16);
     }
 }

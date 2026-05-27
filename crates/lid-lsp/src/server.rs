@@ -262,7 +262,13 @@ impl LanguageServer for LidServer {
         let Some(repo) = self.ensure_repo(&uri).await else {
             return Ok(None);
         };
-        match handlers::rename::rename_at_position(repo, &doc.text, position, &new_name) {
+        match handlers::rename::rename_at_position(
+            repo,
+            &self.store,
+            &doc.text,
+            position,
+            &new_name,
+        ) {
             Ok(edit) => Ok(Some(edit)),
             Err(e) => Err(tower_lsp::jsonrpc::Error::invalid_params(e.to_string())),
         }
