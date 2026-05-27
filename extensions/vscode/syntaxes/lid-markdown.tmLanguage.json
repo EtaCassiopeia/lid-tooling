@@ -65,7 +65,7 @@
       }
     },
     "ears-keywords": {
-      "match": "\\b(SHALL|WHEN|WHILE|IF|WHERE|THEN)\\b",
+      "match": "(?i)\\b(SHALL|WHEN|WHILE|IF|WHERE|THEN)\\b",
       "name": "keyword.control.lid.ears"
     }
   }
