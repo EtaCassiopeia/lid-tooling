@@ -14,7 +14,7 @@ Set FontSize 14
 Set Width 1200
 Set Height 720
 Set Padding 30
-Set TypingSpeed 50ms
+Set TypingSpeed 75ms
 Set Shell zsh
 
 Hide
@@ -24,38 +24,43 @@ Type "clear"
 Enter
 Show
 
-Sleep 1s
+# Let the viewer settle on the empty prompt for a moment.
+Sleep 1.5s
 
-# 1. Clean baseline
+# 1. Clean baseline — should read as "everything is fine."
 Type "lidc check"
-Sleep 400ms
+Sleep 600ms
 Enter
-Sleep 2s
+Sleep 2.5s
 
-# 2. Plant a reverse-orphan citation
+# 2. Plant a reverse-orphan citation. The echo itself is quick,
+#    but pause briefly so the viewer registers the change before
+#    the check runs.
 Type "echo '// @spec AUTH-999' >> src/login.ts"
 Enter
-Sleep 500ms
+Sleep 1s
 
 Type "lidc check"
-Sleep 400ms
+Sleep 600ms
 Enter
-Sleep 3s
+Sleep 4s
 
-# 3. JSON output for CI consumers
+# 3. JSON output for CI consumers — gives time to read the
+#    summary object.
 Type "lidc check --json | jq '.summary'"
-Sleep 400ms
+Sleep 600ms
 Enter
-Sleep 3s
+Sleep 4.5s
 
-# 4. Filter to a single check
+# 4. Filter to a single check.
 Type "lidc check --only reverse-orphan"
-Sleep 400ms
+Sleep 600ms
+Enter
+Sleep 4s
+
+# 5. Fix the breakage. Final clean run gets a brief hold so the
+#    demo ends on "no findings".
+Type "sed -i '' -e '$d' src/login.ts && lidc check"
+Sleep 600ms
 Enter
 Sleep 3s
-
-# 5. Fix the breakage
-Type "sed -i '' -e '$d' src/login.ts && lidc check"
-Sleep 400ms
-Enter
-Sleep 2s
