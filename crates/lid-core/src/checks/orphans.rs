@@ -138,7 +138,7 @@ mod tests {
         let llds = lld_files
             .iter()
             .map(|f| LldDoc {
-                path: root.join("docs/llds").join(f),
+                path: root.join("docs/intent/auth").join(f),
                 decisions: vec![DecisionRow {
                     decision: "x".into(),
                     chosen: "y".into(),
@@ -151,7 +151,7 @@ mod tests {
         let specs = spec_files
             .iter()
             .map(|f| SpecFile {
-                path: root.join("docs/specs").join(f),
+                path: root.join("docs/intent/auth").join(f),
                 specs: vec![],
                 implementing_artifacts: vec![],
                 lld: None,
@@ -168,7 +168,7 @@ mod tests {
         LidRepo {
             root,
             index: ArrowIndex {
-                schema_version: 1,
+                schema_version: 2,
                 last_updated: None,
                 taxonomy: BTreeMap::new(),
                 arrows,
@@ -184,7 +184,7 @@ mod tests {
     #[test]
     fn lld_referenced_from_arrow_is_not_orphaned() {
         let refs = ArrowReferences {
-            lld: vec!["docs/llds/auth.md".into()],
+            lld: vec!["docs/intent/auth/auth.md".into()],
             ..Default::default()
         };
         let repo = make_repo(&["auth.md"], &[], refs, Unmapped::default());
@@ -224,7 +224,7 @@ mod tests {
     fn lld_in_unmapped_docs_is_not_orphaned() {
         let unmapped = Unmapped {
             docs: UnmappedDocs {
-                llds: vec![PathBuf::from("docs/llds/parked.md")],
+                llds: vec![PathBuf::from("docs/intent/auth/parked.md")],
                 specs: vec![],
             },
         };
