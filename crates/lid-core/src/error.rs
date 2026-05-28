@@ -67,10 +67,7 @@ pub enum LidError {
     ///
     /// Returned by `LidRepo::discover` before any artifact loading so that
     /// callers never receive a partially-loaded repo from an unknown layout.
-    #[error(
-        "schema_version {found} is not supported (supported: {supported:?}); \
-         migrate your project to the required LID version"
-    )]
+    #[error("schema_version {found} is not supported (supported: {supported:?})")]
     UnsupportedSchemaVersion {
         found: u32,
         supported: &'static [u32],
