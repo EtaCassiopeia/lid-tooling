@@ -10,13 +10,27 @@ A Rust core engine plus protocol adapters that bring LID into:
 
 ## Demo
 
+### `lidc check` from the terminal
+
 ![lidc CLI demo](tools/demo/cli.gif)
 
 Above: `lidc check` running against the bundled
-[sample project](examples/sample-project/), going from a clean
-baseline → planted reverse-orphan → JSON summary → filtered check
-→ fix. See [`WALKTHROUGH.md`](WALKTHROUGH.md) for the full
-end-to-end setup (CLI + LSP + VS Code extension).
+[sample project](examples/sample-project/) — clean baseline →
+planted reverse-orphan → JSON summary → filtered check → fix.
+
+### VS Code extension
+
+The companion VS Code extension wraps `lid-lsp` and gives editor
+users hover, go-to-definition, find-references, autocomplete,
+diagnostics, and workspace-wide rename for `@spec` citations:
+
+📹 **[Watch the VS Code demo (tools/demo/vscode.mp4)](tools/demo/vscode.mp4)** — ~85 s, six scenes
+walking through every feature against the sample project.
+
+See [`WALKTHROUGH.md`](WALKTHROUGH.md) for the full end-to-end
+setup (CLI + LSP + VS Code extension) and
+[`tools/demo/README.md`](tools/demo/README.md) for how the demos
+are recorded.
 
 ## Components
 

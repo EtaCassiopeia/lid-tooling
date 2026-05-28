@@ -1,0 +1,12 @@
+{
+  "// purpose": "Demo-specific VS Code workspace settings. Tuned so that Screencast Mode renders cleanly during recording. Not part of LID itself — feel free to delete if you're just opening the sample to read it.",
+  "screencastMode.onlyKeyboardShortcuts": true,
+  "screencastMode.keyboardShortcutsFormat": "keysOnly",
+  "screencastMode.fontSize": 32,
+  "screencastMode.verticalOffset": 8,
+  "screencastMode.keyboardOverlayTimeout": 2200,
+  "screencastMode.mouseIndicatorSize": 28,
+  "screencastMode.mouseIndicatorColor": "#fbbf24",
+  "workbench.statusBar.visible": true,
+  "workbench.activityBar.location": "default"
+}

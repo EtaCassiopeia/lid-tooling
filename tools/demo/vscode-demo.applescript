@@ -1,36 +1,32 @@
 -- AppleScript demo that drives Visual Studio Code through the
 -- LID extension's headline features: hover, go-to-definition,
--- find references, and workspace-wide rename.
+-- find references, autocomplete, diagnostics, and workspace-wide
+-- rename.
 --
--- Run from Script Editor or via osascript:
+-- Run via the shell wrapper:
 --
---   osascript tools/demo/vscode-demo.applescript
+--   tools/demo/record-vscode.sh
 --
 -- Prereqs:
 --   * Build the binaries (`cargo build --release`) and install
 --     the extension per WALKTHROUGH.md.
---   * Open `examples/sample-project` in VS Code beforehand --
---     the script assumes that workspace is already loaded.
---   * Grant Accessibility access: System Settings -> Privacy &
---     Security -> Accessibility -> enable the host that's running
---     `osascript` (Terminal or iTerm).
---   * Start your screen recorder (Cmd+Shift+5) before running.
+--   * The sample project's `.vscode/settings.json` sets Screencast
+--     Mode to keys-only so the overlay reads cleanly.
+--   * Grant Accessibility to whatever shell runs osascript.
 --
--- Pacing notes: every action is followed by an explicit `delay`.
--- The defaults below are tuned for a viewer who's never seen the
--- feature before to actually read what's on screen -- bump them
--- another 25--50% if you're recording at a higher frame rate or
--- on a slow machine. Trim once your first take looks fluent.
+-- Runtime ~80 s. Every spec-ID-aware shortcut is preceded by an
+-- explicit `goToLine` so the LSP always sees the cursor on the
+-- spec ID before processing the request.
 
 on quickOpen(filename)
     tell application "System Events"
         keystroke "p" using {command down}
-        delay 0.8
+        delay 0.9
         keystroke filename
         delay 1.0
         key code 36 -- Return
     end tell
-    delay 1.8
+    delay 2.2
 end quickOpen
 
 on goToLine(spec)
@@ -38,77 +34,148 @@ on goToLine(spec)
     -- (control only, not command -- Cmd+G is Find Next).
     tell application "System Events"
         keystroke "g" using {control down}
-        delay 0.6
+        delay 0.5
         keystroke spec
-        delay 0.6
+        delay 0.4
         key code 36 -- Return
     end tell
-    delay 1.2
+    delay 0.4
 end goToLine
 
 on pressEscape()
     tell application "System Events" to key code 53
-    delay 0.7
+    delay 0.5
 end pressEscape
 
--- == Activate VS Code ===========================================
+on slowType(theText, perCharDelay)
+    tell application "System Events"
+        repeat with i from 1 to length of theText
+            keystroke (character i of theText)
+            delay perCharDelay
+        end repeat
+    end tell
+end slowType
 
-tell application "Visual Studio Code" to activate
-delay 2.5 -- let the viewer recognise the window before anything happens
+on toggleScreencastMode()
+    tell application "System Events"
+        keystroke "p" using {command down, shift down}
+        delay 0.6
+        keystroke "Developer: Toggle Screencast Mode"
+        delay 0.8
+        key code 36 -- Return
+    end tell
+    delay 1.0
+end toggleScreencastMode
 
--- == 1. Hover on @spec AUTH-001 in source =======================
+-- == Setup: focus VS Code and enable Screencast Mode ===========
+
+tell application "Visual Studio Code"
+    activate
+end tell
+delay 2.5
+
+toggleScreencastMode()
+
+-- == Scene 1: Hover on @spec citation (Cmd+K Cmd+I) ============
 
 quickOpen("src/login.ts")
+goToLine("6:12") -- inside `AUTH-001` in `// @spec AUTH-001, AUTH-002`
 
--- Cursor at line 8, column 12 -> inside `AUTH-001` in
--- `// @spec AUTH-001, AUTH-002`
-goToLine("8:12")
-
--- Cmd+K, Cmd+I -> Show Hover
 tell application "System Events"
     keystroke "k" using {command down}
     delay 0.2
     keystroke "i" using {command down}
 end tell
-delay 5 -- pause for the camera to capture the popup (spec text,
-         -- status badge, "Defined at ..." link)
+delay 5.5 -- viewer reads the spec text, status, "Defined at ..."
 
 pressEscape()
 
--- == 2. Go to Definition ========================================
+-- == Scene 2: Go to Definition (F12) ===========================
 
+goToLine("6:12") -- re-anchor on the spec ID
 tell application "System Events" to key code 111 -- F12
-delay 4 -- target file opens; viewer reads the highlighted line
+delay 5.0 -- spec file opens, target line highlighted
 
--- == 3. Find All References on the spec definition ==============
+-- == Scene 3: Find All References (Shift+F12) ==================
 
+-- After F12 the cursor lands at column 0 of the spec line, which
+-- is BEFORE the bold AUTH-001 span. Shift+F12 only returns
+-- references when the cursor is inside a spec ID, so we re-anchor
+-- on column 11 (inside `**AUTH-001**`) first.
+goToLine("11:11")
 tell application "System Events" to key code 111 using {shift down}
-delay 5 -- side panel opens with the citation list
+delay 6.0 -- side panel populates with the citation list
+
+pressEscape()
+pressEscape() -- close the references panel if a second escape is needed
+
+-- == Scene 4: Autocomplete spec IDs ============================
+
+quickOpen("src/login.ts")
+goToLine("32:99") -- past the last character on the last content line
+
+tell application "System Events"
+    key code 36 -- Return: new blank line below
+end tell
+delay 0.6
+
+slowType("// @spec ", 0.12)
+delay 3.5 -- popup shows AUTH-001 .. AUTH-005
+
+slowType("AUTH-", 0.12)
+delay 2.5 -- popup narrowed
+
+pressEscape() -- dismiss popup so the next slowType doesn't insert from it
+
+-- == Scene 5: Diagnostic for an undefined spec =================
+
+slowType("999", 0.18) -- the line now reads `// @spec AUTH-999`
+delay 3.0 -- LSP publishes the reverse-orphan diagnostic; squiggle appears
+
+-- The new line is line 33 (we pressed Return from line 32). Put
+-- the cursor inside `AUTH-999` so Cmd+K Cmd+I surfaces the
+-- diagnostic.
+goToLine("33:12")
+tell application "System Events"
+    keystroke "k" using {command down}
+    delay 0.2
+    keystroke "i" using {command down}
+end tell
+delay 6.0 -- "references a spec ID that is not defined ..."
 
 pressEscape()
 
--- == 4. Rename across the workspace =============================
+-- == Scene 6: Rename a spec across the workspace (F2) ==========
 
--- Re-anchor the cursor on the bold spec ID (Shift+F12 may have
--- shifted focus into the panel).
-quickOpen("docs/specs/auth-specs.md")
-goToLine("11:11") -- inside `**AUTH-001**`
+-- Rename from the source citation site so the cursor is already
+-- in a renameable position. F2 from inside the AUTH-001 token
+-- opens the rename input prefilled with `AUTH-001`.
+goToLine("6:12") -- inside `AUTH-001` in `// @spec AUTH-001, AUTH-002`
 
 tell application "System Events"
     key code 120 -- F2 (rename)
-    delay 1.5 -- rename input pops up
-    keystroke "AUTH-LOGIN-001"
-    delay 1.5 -- viewer reads the new name in the input
-    key code 36 -- Return -> apply rename
 end tell
-delay 5 -- pause so the spec line + the two citation files all
-        -- visibly update before the next action
+delay 1.6 -- rename input pops up preselected
 
--- == 5. Hop into the source file to show the citation updated ==
+slowType("AUTH-LOGIN-001", 0.10)
+delay 1.2
 
+tell application "System Events"
+    key code 36 -- Return: apply the workspace edit
+end tell
+delay 5.5 -- spec file + every citation update simultaneously
+
+-- Show the spec definition has been renamed.
+quickOpen("docs/specs/auth-specs.md")
+goToLine("11:1")
+delay 4.0
+
+-- Closing frame: back to the source file where the citation now
+-- reads AUTH-LOGIN-001.
 quickOpen("src/login.ts")
-delay 4 -- final hold so the rename's effect is the closing frame
+goToLine("6:1")
+delay 4.0
 
--- End of demo. Stop the recorder manually.
--- To reset the project for another take:
---   cd examples/sample-project && git checkout .
+-- == Teardown: disable Screencast Mode =========================
+
+toggleScreencastMode()
