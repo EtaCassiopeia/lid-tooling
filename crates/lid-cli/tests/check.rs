@@ -219,7 +219,7 @@ fn fail_on_warning_promotes_orphan_to_exit_one() {
 }
 
 #[test]
-fn check_exits_two_with_migration_hint_on_schema_v1() {
+fn check_exits_two_on_unsupported_schema_version() {
     let dir = tempfile::tempdir().unwrap();
     fs::create_dir_all(dir.path().join("docs/arrows")).unwrap();
     fs::write(
@@ -235,7 +235,7 @@ fn check_exits_two_with_migration_hint_on_schema_v1() {
         .assert()
         .code(2)
         .stderr(contains("schema_version 1 is not supported"))
-        .stderr(contains("migrate"));
+        .stderr(contains("supported: [2]"));
 }
 
 #[test]
