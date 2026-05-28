@@ -9,17 +9,17 @@
 -- Prereqs:
 --   * Build the binaries (`cargo build --release`) and install
 --     the extension per WALKTHROUGH.md.
---   * Open `examples/sample-project` in VS Code beforehand —
+--   * Open `examples/sample-project` in VS Code beforehand --
 --     the script assumes that workspace is already loaded.
---   * Grant Accessibility access: System Settings → Privacy &
---     Security → Accessibility → enable the host that's running
+--   * Grant Accessibility access: System Settings -> Privacy &
+--     Security -> Accessibility -> enable the host that's running
 --     `osascript` (Terminal or iTerm).
 --   * Start your screen recorder (Cmd+Shift+5) before running.
 --
 -- Pacing notes: every action is followed by an explicit `delay`.
 -- The defaults below are tuned for a viewer who's never seen the
--- feature before to actually read what's on screen — bump them
--- another 25–50% if you're recording at a higher frame rate or
+-- feature before to actually read what's on screen -- bump them
+-- another 25--50% if you're recording at a higher frame rate or
 -- on a slow machine. Trim once your first take looks fluent.
 
 on quickOpen(filename)
@@ -35,7 +35,7 @@ end quickOpen
 
 on goToLine(spec)
     -- VS Code on macOS: "Go to Line/Column..." is Ctrl+G
-    -- (control only, not command — Cmd+G is Find Next).
+    -- (control only, not command -- Cmd+G is Find Next).
     tell application "System Events"
         keystroke "g" using {control down}
         delay 0.6
@@ -51,43 +51,43 @@ on pressEscape()
     delay 0.7
 end pressEscape
 
--- ── Activate VS Code ───────────────────────────────────────────
+-- == Activate VS Code ===========================================
 
 tell application "Visual Studio Code" to activate
 delay 2.5 -- let the viewer recognise the window before anything happens
 
--- ── 1. Hover on @spec AUTH-001 in source ───────────────────────
+-- == 1. Hover on @spec AUTH-001 in source =======================
 
 quickOpen("src/login.ts")
 
--- Cursor at line 8, column 12 → inside `AUTH-001` in
+-- Cursor at line 8, column 12 -> inside `AUTH-001` in
 -- `// @spec AUTH-001, AUTH-002`
 goToLine("8:12")
 
--- Cmd+K, Cmd+I → Show Hover
+-- Cmd+K, Cmd+I -> Show Hover
 tell application "System Events"
     keystroke "k" using {command down}
     delay 0.2
     keystroke "i" using {command down}
 end tell
-delay 5s -- pause for the camera to capture the popup (spec text,
-         -- status badge, "Defined at …" link)
+delay 5 -- pause for the camera to capture the popup (spec text,
+         -- status badge, "Defined at ..." link)
 
 pressEscape()
 
--- ── 2. Go to Definition ────────────────────────────────────────
+-- == 2. Go to Definition ========================================
 
 tell application "System Events" to key code 111 -- F12
-delay 4s -- target file opens; viewer reads the highlighted line
+delay 4 -- target file opens; viewer reads the highlighted line
 
--- ── 3. Find All References on the spec definition ──────────────
+-- == 3. Find All References on the spec definition ==============
 
 tell application "System Events" to key code 111 using {shift down}
-delay 5s -- side panel opens with the citation list
+delay 5 -- side panel opens with the citation list
 
 pressEscape()
 
--- ── 4. Rename across the workspace ─────────────────────────────
+-- == 4. Rename across the workspace =============================
 
 -- Re-anchor the cursor on the bold spec ID (Shift+F12 may have
 -- shifted focus into the panel).
@@ -99,15 +99,15 @@ tell application "System Events"
     delay 1.5 -- rename input pops up
     keystroke "AUTH-LOGIN-001"
     delay 1.5 -- viewer reads the new name in the input
-    key code 36 -- Return → apply rename
+    key code 36 -- Return -> apply rename
 end tell
-delay 5s -- pause so the spec line + the two citation files all
+delay 5 -- pause so the spec line + the two citation files all
         -- visibly update before the next action
 
--- ── 5. Hop into the source file to show the citation updated ──
+-- == 5. Hop into the source file to show the citation updated ==
 
 quickOpen("src/login.ts")
-delay 4s -- final hold so the rename's effect is the closing frame
+delay 4 -- final hold so the rename's effect is the closing frame
 
 -- End of demo. Stop the recorder manually.
 -- To reset the project for another take:
