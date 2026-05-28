@@ -75,6 +75,20 @@ cargo fmt --check
 CI runs the same matrix plus a VS Code-extension build (`npm run
 compile` + `vsce package` smoke test).
 
+## Versioning & Compatibility
+
+lid-tooling reads `schema_version` from `docs/arrows/index.yaml` to determine
+which LID project layout to expect. Version **1.2.x** supports `schema_version: 2`
+(introduced in LID v1.2.0). Projects on earlier schema versions must migrate
+before using these tools — see the [LID changelog](https://github.com/jszmajda/lid/blob/main/CHANGELOG.md).
+
+The tool version mirrors the upstream LID release it was built against.
+`PATCH` increments are for tooling-only fixes with no methodology change.
+
+| lid-tooling | Supported `schema_version` | LID release |
+|-------------|---------------------------|-------------|
+| 1.2.x       | 2                         | v1.2.0+     |
+
 ## License
 
 Dual-licensed under either of
