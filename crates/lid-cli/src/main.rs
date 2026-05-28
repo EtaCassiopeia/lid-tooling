@@ -89,7 +89,7 @@ fn cmd_check(root: Option<&Path>, as_json: bool, args: &CheckArgs) -> Result<Exi
     let repo = LidRepo::discover(&start).map_err(|e| match e {
         LidError::UnsupportedSchemaVersion { found, supported } => anyhow!(
             "schema_version {found} is not supported (supported: {supported:?})\n\
-             hint: migrate your project to LID v1.2.0+ — rename docs/llds/ → docs/intent/\n\
+             hint: migrate your project to the latest LID version — rename docs/llds/ → docs/intent/\n\
              \tand bump schema_version to 2 in docs/arrows/index.yaml\n\
              see:  https://github.com/jszmajda/lid/blob/main/CHANGELOG.md"
         ),
