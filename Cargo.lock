@@ -658,7 +658,7 @@ checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 
 [[package]]
 name = "lid-cli"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -673,7 +673,7 @@ dependencies = [
 
 [[package]]
 name = "lid-core"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "chrono",
  "dashmap 6.2.1",
@@ -690,7 +690,7 @@ dependencies = [
 
 [[package]]
 name = "lid-lsp"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "lid-core",
