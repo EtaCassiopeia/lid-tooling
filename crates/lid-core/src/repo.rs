@@ -236,11 +236,7 @@ arrows:
 
         // README.md should be ignored; _template.md should be ignored.
         fs::write(root.join("docs/arrows/README.md"), "directory README").unwrap();
-        fs::write(
-            root.join("docs/intent/auth/_template.md"),
-            "template",
-        )
-        .unwrap();
+        fs::write(root.join("docs/intent/auth/_template.md"), "template").unwrap();
 
         fs::write(
             root.join("docs/intent/auth/auth-specs.md"),
