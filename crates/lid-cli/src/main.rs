@@ -88,8 +88,10 @@ fn cmd_check(root: Option<&Path>, as_json: bool, args: &CheckArgs) -> Result<Exi
 
     let repo = LidRepo::discover(&start).map_err(|e| match e {
         e @ LidError::UnsupportedSchemaVersion { .. } => anyhow::Error::from(e),
-        other => anyhow::Error::from(other)
-            .context(format!("discovering a LID repo at or above {}", start.display())),
+        other => anyhow::Error::from(other).context(format!(
+            "discovering a LID repo at or above {}",
+            start.display()
+        )),
     })?;
 
     let mut findings = Vec::new();
