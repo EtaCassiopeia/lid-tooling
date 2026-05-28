@@ -75,6 +75,21 @@ cargo fmt --check
 CI runs the same matrix plus a VS Code-extension build (`npm run
 compile` + `vsce package` smoke test).
 
+## Versioning & Compatibility
+
+lid-tooling follows its own [semantic versioning](https://semver.org/) independent
+of the upstream LID project. Compatibility is expressed through `SUPPORTED_SCHEMA_VERSIONS`
+in `lid-core`: the tool hard-errors with a migration hint when it encounters a
+`schema_version` it cannot handle, so you never get a silently broken repo load.
+
+`schema_version` in `docs/arrows/index.yaml` is the machine-readable compatibility
+signal — not the lid-tooling package version.
+
+| lid-tooling | Supported `schema_version` |
+|-------------|---------------------------|
+| 0.2.x       | 2                         |
+| 0.1.x       | —  (pre-release)          |
+
 ## License
 
 Dual-licensed under either of
