@@ -162,7 +162,7 @@ mod tests {
         let repo = LidRepo {
             root,
             index: ArrowIndex {
-                schema_version: 1,
+                schema_version: 2,
                 last_updated: None,
                 taxonomy: BTreeMap::new(),
                 arrows,
@@ -180,16 +180,16 @@ mod tests {
     fn all_present_references_yield_no_findings() {
         let refs = ArrowReferences {
             hld: vec!["docs/high-level-design.md §Auth".into()],
-            lld: vec!["docs/llds/auth.md".into()],
-            ears: vec!["docs/specs/auth-specs.md".into()],
+            lld: vec!["docs/intent/auth/auth-design.md".into()],
+            ears: vec!["docs/intent/auth/auth-specs.md".into()],
             tests: vec!["tests/auth.test.ts".into()],
             code: vec!["src/auth.ts".into()],
         };
         let (_dir, repo) = make_repo(
             &[
                 "docs/high-level-design.md",
-                "docs/llds/auth.md",
-                "docs/specs/auth-specs.md",
+                "docs/intent/auth/auth-design.md",
+                "docs/intent/auth/auth-specs.md",
                 "tests/auth.test.ts",
                 "src/auth.ts",
             ],
@@ -202,7 +202,7 @@ mod tests {
     #[test]
     fn flags_missing_lld_reference() {
         let refs = ArrowReferences {
-            lld: vec!["docs/llds/missing.md".into()],
+            lld: vec!["docs/intent/auth/missing.md".into()],
             ..Default::default()
         };
         let (_dir, repo) = make_repo(&[], refs);
@@ -229,8 +229,8 @@ mod tests {
     fn flags_one_finding_per_missing_reference() {
         let refs = ArrowReferences {
             ears: vec![
-                "docs/specs/missing-a.md".into(),
-                "docs/specs/missing-b.md".into(),
+                "docs/intent/auth/missing-a.md".into(),
+                "docs/intent/auth/missing-b.md".into(),
             ],
             code: vec!["src/missing-c.ts".into()],
             ..Default::default()
@@ -259,10 +259,10 @@ mod tests {
     #[test]
     fn extracts_path_from_backtick_wrapped_bullet() {
         let refs = ArrowReferences {
-            lld: vec!["`docs/llds/auth.md`".into()],
+            lld: vec!["`docs/intent/auth/auth-design.md`".into()],
             ..Default::default()
         };
-        let (_dir, repo) = make_repo(&["docs/llds/auth.md"], refs);
+        let (_dir, repo) = make_repo(&["docs/intent/auth/auth-design.md"], refs);
         let findings = ReferenceCoherenceCheck.run(&repo);
         assert!(findings.is_empty(), "got {findings:?}");
     }
@@ -270,10 +270,10 @@ mod tests {
     #[test]
     fn extracts_path_from_bullet_with_em_dash_trailer() {
         let refs = ArrowReferences {
-            lld: vec!["`docs/llds/auth.md` — this segment's LLD.".into()],
+            lld: vec!["`docs/intent/auth/auth-design.md` — this segment's LLD.".into()],
             ..Default::default()
         };
-        let (_dir, repo) = make_repo(&["docs/llds/auth.md"], refs);
+        let (_dir, repo) = make_repo(&["docs/intent/auth/auth-design.md"], refs);
         let findings = ReferenceCoherenceCheck.run(&repo);
         assert!(findings.is_empty(), "got {findings:?}");
     }
@@ -296,10 +296,10 @@ mod tests {
     fn extracts_path_when_nested_code_span_follows() {
         // `path.md` (12 specs, prefix `AUTH-*`)
         let refs = ArrowReferences {
-            ears: vec!["`docs/specs/auth-specs.md` (12 specs, prefix `AUTH-*`)".into()],
+            ears: vec!["`docs/intent/auth/auth-specs.md` (12 specs, prefix `AUTH-*`)".into()],
             ..Default::default()
         };
-        let (_dir, repo) = make_repo(&["docs/specs/auth-specs.md"], refs);
+        let (_dir, repo) = make_repo(&["docs/intent/auth/auth-specs.md"], refs);
         let findings = ReferenceCoherenceCheck.run(&repo);
         assert!(findings.is_empty(), "got {findings:?}");
     }
