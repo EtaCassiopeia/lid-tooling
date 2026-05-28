@@ -77,17 +77,18 @@ compile` + `vsce package` smoke test).
 
 ## Versioning & Compatibility
 
-lid-tooling reads `schema_version` from `docs/arrows/index.yaml` to determine
-which LID project layout to expect. Version **1.2.x** supports `schema_version: 2`
-(introduced in LID v1.2.0). Projects on earlier schema versions must migrate
-before using these tools — see the [LID changelog](https://github.com/jszmajda/lid/blob/main/CHANGELOG.md).
+lid-tooling follows its own [semantic versioning](https://semver.org/) independent
+of the upstream LID project. Compatibility is expressed through `SUPPORTED_SCHEMA_VERSIONS`
+in `lid-core`: the tool hard-errors with a migration hint when it encounters a
+`schema_version` it cannot handle, so you never get a silently broken repo load.
 
-The tool version mirrors the upstream LID release it was built against.
-`PATCH` increments are for tooling-only fixes with no methodology change.
+`schema_version` in `docs/arrows/index.yaml` is the machine-readable compatibility
+signal — not the lid-tooling package version.
 
-| lid-tooling | Supported `schema_version` | LID release |
-|-------------|---------------------------|-------------|
-| 1.2.x       | 2                         | v1.2.0+     |
+| lid-tooling | Supported `schema_version` |
+|-------------|---------------------------|
+| 0.2.x       | 2                         |
+| 0.1.x       | —  (pre-release)          |
 
 ## License
 
