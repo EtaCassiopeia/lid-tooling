@@ -67,13 +67,19 @@ impl LidRepo {
             });
         }
 
-        let specs = load_md_dir(
-            &root.join("docs").join("specs"),
+        let specs = load_md_tree(
+            &root.join("docs").join("intent"),
+            "-specs.md",
             parse::markdown::load_spec_file,
         )?;
-        let llds = load_md_dir(&root.join("docs").join("llds"), parse::markdown::load_lld)?;
-        let arrow_docs = load_md_dir(
+        let llds = load_md_tree(
+            &root.join("docs").join("intent"),
+            "-design.md",
+            parse::markdown::load_lld,
+        )?;
+        let arrow_docs = load_md_tree(
             &root.join("docs").join("arrows"),
+            ".md",
             parse::markdown::load_arrow_doc,
         )?;
 
@@ -115,13 +121,10 @@ fn find_root(start: &Path) -> Result<PathBuf> {
     }
 }
 
-/// Load every `*.md` file in `dir` via `load`. Files whose name matches
-/// a non-artifact convention (`README*.md`, `_template.md`) are skipped
-/// so a README sitting next to spec files doesn't get parsed as one.
-///
-/// Results are sorted by path so output is deterministic; the test
-/// suites and snapshots rely on stable ordering.
-fn load_md_dir<T, F>(dir: &Path, load: F) -> Result<Vec<T>>
+/// Recursively walk `dir`, loading every `*.md` file whose name ends with
+/// `suffix` (pass `".md"` to match all markdown files). Skips README.md and
+/// `_`-prefixed files. Results are sorted by path for deterministic ordering.
+fn load_md_tree<T, F>(dir: &Path, suffix: &str, load: F) -> Result<Vec<T>>
 where
     F: Fn(&Path) -> Result<T>,
 {
@@ -129,6 +132,16 @@ where
         return Ok(Vec::new());
     }
     let mut paths: Vec<PathBuf> = Vec::new();
+    collect_md_paths(dir, suffix, &mut paths)?;
+    paths.sort();
+    let mut out = Vec::with_capacity(paths.len());
+    for p in paths {
+        out.push(load(&p)?);
+    }
+    Ok(out)
+}
+
+fn collect_md_paths(dir: &Path, suffix: &str, out: &mut Vec<PathBuf>) -> Result<()> {
     for entry in fs::read_dir(dir).map_err(|source| LidError::Io {
         path: dir.to_path_buf(),
         source,
@@ -138,24 +151,20 @@ where
             source,
         })?;
         let path = entry.path();
-        if !path.is_file() {
-            continue;
+        if path.is_dir() {
+            collect_md_paths(&path, suffix, out)?;
+        } else if path.is_file()
+            && path.extension().and_then(|e| e.to_str()) == Some("md")
+            && !is_non_artifact_filename(&path)
+            && path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.ends_with(suffix))
+        {
+            out.push(path);
         }
-        if path.extension().and_then(|e| e.to_str()) != Some("md") {
-            continue;
-        }
-        if is_non_artifact_filename(&path) {
-            continue;
-        }
-        paths.push(path);
     }
-    paths.sort();
-
-    let mut out = Vec::with_capacity(paths.len());
-    for p in paths {
-        out.push(load(&p)?);
-    }
-    Ok(out)
+    Ok(())
 }
 
 fn is_non_artifact_filename(path: &Path) -> bool {
@@ -170,21 +179,21 @@ fn is_non_artifact_filename(path: &Path) -> bool {
 mod tests {
     use super::*;
 
-    /// Build a minimal LID-shaped tempdir for tests.
+    /// Build a minimal schema v2 LID-shaped tempdir for tests.
     ///
     /// Layout:
     /// ```text
     /// {root}/
     ///   docs/
     ///     arrows/
-    ///       index.yaml
+    ///       index.yaml        (schema_version: 2)
     ///       auth.md
-    ///       README.md   (skipped)
-    ///     specs/
-    ///       auth-specs.md
-    ///       _template.md (skipped)
-    ///     llds/
-    ///       auth.md
+    ///       README.md         (skipped)
+    ///     intent/
+    ///       auth/
+    ///         auth-specs.md
+    ///         auth-design.md
+    ///         _template.md    (skipped)
     ///   src/
     ///     auth.rs (with @spec citations)
     /// ```
@@ -192,8 +201,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         fs::create_dir_all(root.join("docs/arrows")).unwrap();
-        fs::create_dir_all(root.join("docs/specs")).unwrap();
-        fs::create_dir_all(root.join("docs/llds")).unwrap();
+        fs::create_dir_all(root.join("docs/intent/auth")).unwrap();
         fs::create_dir_all(root.join("src")).unwrap();
 
         fs::write(
@@ -218,20 +226,24 @@ arrows:
 ## References
 
 ### LLD
-- docs/llds/auth.md
+- docs/intent/auth/auth-design.md
 
 ### EARS
-- docs/specs/auth-specs.md
+- docs/intent/auth/auth-specs.md
 ",
         )
         .unwrap();
 
-        // README.md and _template.md should be ignored.
+        // README.md should be ignored; _template.md should be ignored.
         fs::write(root.join("docs/arrows/README.md"), "directory README").unwrap();
-        fs::write(root.join("docs/specs/_template.md"), "template").unwrap();
+        fs::write(
+            root.join("docs/intent/auth/_template.md"),
+            "template",
+        )
+        .unwrap();
 
         fs::write(
-            root.join("docs/specs/auth-specs.md"),
+            root.join("docs/intent/auth/auth-specs.md"),
             "\
 # auth specs
 
@@ -242,9 +254,9 @@ arrows:
         .unwrap();
 
         fs::write(
-            root.join("docs/llds/auth.md"),
+            root.join("docs/intent/auth/auth-design.md"),
             "\
-# LLD: auth
+# Design: auth
 
 ## Decisions & Alternatives
 
@@ -374,7 +386,7 @@ arrows:
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         fs::create_dir_all(root.join("docs/arrows")).unwrap();
-        fs::create_dir_all(root.join("docs/specs")).unwrap();
+        fs::create_dir_all(root.join("docs/intent/bad")).unwrap();
         fs::write(
             root.join("docs/arrows/index.yaml"),
             "schema_version: 2\narrows: {}\n",
@@ -382,7 +394,7 @@ arrows:
         .unwrap();
         // Spec line with a no-digit ID — must fail parsing.
         fs::write(
-            root.join("docs/specs/bad-specs.md"),
+            root.join("docs/intent/bad/bad-specs.md"),
             "- [x] **A-Z**: missing digit\n",
         )
         .unwrap();

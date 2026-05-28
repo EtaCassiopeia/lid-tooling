@@ -14,14 +14,12 @@ use std::path::Path;
 use assert_cmd::Command;
 use predicates::str::contains;
 
-/// Write a minimal LID layout under `root`. Uses `schema_version: 2` with the
-/// legacy flat file layout (`docs/specs/` + `docs/llds/`) — still loaded by
-/// the current discovery code. Issue #1 + #3 will migrate these to
-/// `docs/intent/`. The optional `extra_yaml` is appended to `index.yaml`.
+/// Write a minimal `schema_version: 2` LID layout under `root`.
+/// Intent documents live under `docs/intent/auth/` (node-as-folder convention).
+/// The optional `extra_yaml` is appended to `index.yaml`.
 fn make_minimal_repo(root: &Path, extra_yaml: &str) {
     fs::create_dir_all(root.join("docs/arrows")).unwrap();
-    fs::create_dir_all(root.join("docs/specs")).unwrap();
-    fs::create_dir_all(root.join("docs/llds")).unwrap();
+    fs::create_dir_all(root.join("docs/intent/auth")).unwrap();
 
     let mut index = String::from(
         "\
@@ -39,13 +37,13 @@ arrows:
 
     fs::write(
         root.join("docs/arrows/auth.md"),
-        "# Arrow: auth\n\n## References\n\n### LLD\n- docs/llds/auth.md\n\n### EARS\n- docs/specs/auth-specs.md\n",
+        "# Arrow: auth\n\n## References\n\n### LLD\n- docs/intent/auth/auth-design.md\n\n### EARS\n- docs/intent/auth/auth-specs.md\n",
     )
     .unwrap();
     fs::write(
-        root.join("docs/llds/auth.md"),
+        root.join("docs/intent/auth/auth-design.md"),
         "\
-# LLD: auth
+# Design: auth
 
 Some prose.
 
@@ -58,7 +56,7 @@ Some prose.
     )
     .unwrap();
     fs::write(
-        root.join("docs/specs/auth-specs.md"),
+        root.join("docs/intent/auth/auth-specs.md"),
         "# auth\n\n- [x] **AUTH-001**: ok.\n",
     )
     .unwrap();
@@ -197,9 +195,14 @@ fn only_filter_runs_just_the_listed_check() {
 fn fail_on_warning_promotes_orphan_to_exit_one() {
     let dir = tempfile::tempdir().unwrap();
     make_minimal_repo(dir.path(), "");
-    // Add an LLD that no arrow doc references — caught by `orphan`,
+    // Add a design doc that no arrow references — caught by `orphan`,
     // which is Warning severity.
-    fs::write(dir.path().join("docs/llds/lonely.md"), "# LLD: lonely\n").unwrap();
+    fs::create_dir_all(dir.path().join("docs/intent/lonely")).unwrap();
+    fs::write(
+        dir.path().join("docs/intent/lonely/lonely-design.md"),
+        "# Design: lonely\n\n## Decisions & Alternatives\n\n| Decision | Chosen | Alternatives | Rationale |\n| --- | --- | --- | --- |\n| Foo | Bar | Baz | Qux |\n",
+    )
+    .unwrap();
 
     // Default `--fail-on error` => exit 0 (only a Warning present).
     Command::cargo_bin("lidc")
