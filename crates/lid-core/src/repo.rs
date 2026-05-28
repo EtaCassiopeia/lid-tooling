@@ -361,10 +361,7 @@ arrows:
         .unwrap();
         let err = LidRepo::discover(root).unwrap_err();
         assert!(
-            matches!(
-                err,
-                LidError::UnsupportedSchemaVersion { found: 1, .. }
-            ),
+            matches!(err, LidError::UnsupportedSchemaVersion { found: 1, .. }),
             "got {err:?}"
         );
     }
