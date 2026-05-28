@@ -14,9 +14,10 @@ use std::path::Path;
 use assert_cmd::Command;
 use predicates::str::contains;
 
-/// Write a minimal LID layout under `root`. The optional `extra_yaml`
-/// is appended to the bottom of `index.yaml` so tests can introduce
-/// schema-level breakage without rewriting the whole file.
+/// Write a minimal LID layout under `root`. Uses `schema_version: 2` with the
+/// legacy flat file layout (`docs/specs/` + `docs/llds/`) — still loaded by
+/// the current discovery code. Issue #1 + #3 will migrate these to
+/// `docs/intent/`. The optional `extra_yaml` is appended to `index.yaml`.
 fn make_minimal_repo(root: &Path, extra_yaml: &str) {
     fs::create_dir_all(root.join("docs/arrows")).unwrap();
     fs::create_dir_all(root.join("docs/specs")).unwrap();
@@ -24,7 +25,7 @@ fn make_minimal_repo(root: &Path, extra_yaml: &str) {
 
     let mut index = String::from(
         "\
-schema_version: 1
+schema_version: 2
 arrows:
   auth:
     status: MAPPED
@@ -215,6 +216,26 @@ fn fail_on_warning_promotes_orphan_to_exit_one() {
         .arg(dir.path())
         .assert()
         .code(1);
+}
+
+#[test]
+fn check_exits_two_on_unsupported_schema_version() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("docs/arrows")).unwrap();
+    fs::write(
+        dir.path().join("docs/arrows/index.yaml"),
+        "schema_version: 1\narrows: {}\n",
+    )
+    .unwrap();
+
+    Command::cargo_bin("lidc")
+        .unwrap()
+        .args(["check", "--root"])
+        .arg(dir.path())
+        .assert()
+        .code(2)
+        .stderr(contains("schema_version 1 is not supported"))
+        .stderr(contains("supported: [2]"));
 }
 
 #[test]

@@ -62,6 +62,16 @@ pub enum LidError {
     /// the starting path during discovery.
     #[error("no LID repository found at or above {start}")]
     NotALidRepo { start: PathBuf },
+
+    /// The project's `schema_version` is not in `SUPPORTED_SCHEMA_VERSIONS`.
+    ///
+    /// Returned by `LidRepo::discover` before any artifact loading so that
+    /// callers never receive a partially-loaded repo from an unknown layout.
+    #[error("schema_version {found} is not supported (supported: {supported:?})")]
+    UnsupportedSchemaVersion {
+        found: u32,
+        supported: &'static [u32],
+    },
 }
 
 /// Convenience alias for results carrying a [`LidError`].

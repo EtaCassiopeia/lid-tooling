@@ -56,12 +56,11 @@ fn read_notification<R: Read>(reader: &mut R, method: &str, deadline: Instant) -
 /// independent.
 fn make_minimal_lid_repo(root: &Path) {
     fs::create_dir_all(root.join("docs/arrows")).unwrap();
-    fs::create_dir_all(root.join("docs/specs")).unwrap();
-    fs::create_dir_all(root.join("docs/llds")).unwrap();
+    fs::create_dir_all(root.join("docs/intent/auth")).unwrap();
     fs::write(
         root.join("docs/arrows/index.yaml"),
         "\
-schema_version: 1
+schema_version: 2
 arrows:
   auth:
     status: MAPPED
@@ -73,16 +72,16 @@ arrows:
     .unwrap();
     fs::write(
         root.join("docs/arrows/auth.md"),
-        "# Arrow: auth\n\n## References\n",
+        "# Arrow: auth\n\n## References\n\n### EARS\n- docs/intent/auth/auth-specs.md\n\n### LLD\n- docs/intent/auth/auth-design.md\n",
     )
     .unwrap();
     fs::write(
-        root.join("docs/specs/auth-specs.md"),
+        root.join("docs/intent/auth/auth-specs.md"),
         "# auth\n\n- [x] **AUTH-001**: requirement text.\n",
     )
     .unwrap();
     fs::write(
-        root.join("docs/llds/auth.md"),
+        root.join("docs/intent/auth/auth-design.md"),
         "\
 # LLD: auth
 

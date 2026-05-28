@@ -13,7 +13,7 @@ use std::process::ExitCode;
 
 use anyhow::{Context, Result, anyhow};
 use clap::{Args, Parser, Subcommand};
-use lid_core::{CheckId, LidRepo, Severity, checks};
+use lid_core::{CheckId, LidError, LidRepo, Severity, checks};
 
 use crate::report::{RenderOptions, json, markdown};
 
@@ -86,8 +86,13 @@ fn cmd_check(root: Option<&Path>, as_json: bool, args: &CheckArgs) -> Result<Exi
         None => std::env::current_dir().context("reading the current directory")?,
     };
 
-    let repo = LidRepo::discover(&start)
-        .with_context(|| format!("discovering a LID repo at or above {}", start.display()))?;
+    let repo = LidRepo::discover(&start).map_err(|e| match e {
+        e @ LidError::UnsupportedSchemaVersion { .. } => anyhow::Error::from(e),
+        other => anyhow::Error::from(other).context(format!(
+            "discovering a LID repo at or above {}",
+            start.display()
+        )),
+    })?;
 
     let mut findings = Vec::new();
     for check in checks::default_checks() {

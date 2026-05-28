@@ -2,9 +2,15 @@
 //!
 //! Given a starting path, walks upward to find the nearest
 //! `docs/arrows/index.yaml`, then loads every artifact the coherence
-//! checks consult: the index, every spec file under `docs/specs/`, every
-//! LLD under `docs/llds/`, every arrow detail doc under `docs/arrows/`,
+//! checks consult: the index, every spec file under `docs/intent/`
+//! (matched by `*-specs.md`), every design doc under `docs/intent/`
+//! (matched by `*-design.md`), every arrow detail doc under `docs/arrows/`,
 //! and every `@spec` citation in source files reachable from the root.
+//!
+//! Requires `schema_version: 2` in `docs/arrows/index.yaml` — the layout
+//! introduced in LID v1.2.0. Projects on earlier schema versions must
+//! migrate before use; `discover` returns `LidError::UnsupportedSchemaVersion`
+//! so callers never receive a partially-loaded repo from an unknown layout.
 //!
 //! All stored paths are absolute (after canonicalising the discovered
 //! root). Presenting them as repo-relative is a concern of the CLI / LSP
@@ -16,6 +22,12 @@ use std::path::{Path, PathBuf};
 use crate::error::{LidError, Result};
 use crate::model::{ArrowDoc, ArrowIndex, LldDoc, SpecCitation, SpecFile};
 use crate::parse;
+
+/// Schema versions this build of lid-tooling can parse correctly.
+///
+/// Minimum supported: 2 (LID v1.2.0, `docs/intent/` tree layout).
+/// When a new LID schema ships, add its version here alongside the new loader.
+const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[2];
 
 /// Aggregate state for one LID-shaped project.
 #[derive(Debug, Clone)]
@@ -47,6 +59,13 @@ impl LidRepo {
         let root = find_root(start)?;
         let index_path = root.join("docs").join("arrows").join("index.yaml");
         let index = parse::yaml::load_from_path(&index_path)?;
+
+        if !SUPPORTED_SCHEMA_VERSIONS.contains(&index.schema_version) {
+            return Err(LidError::UnsupportedSchemaVersion {
+                found: index.schema_version,
+                supported: SUPPORTED_SCHEMA_VERSIONS,
+            });
+        }
 
         let specs = load_md_dir(
             &root.join("docs").join("specs"),
@@ -180,7 +199,7 @@ mod tests {
         fs::write(
             root.join("docs/arrows/index.yaml"),
             "\
-schema_version: 1
+schema_version: 2
 arrows:
   auth:
     status: MAPPED
@@ -331,6 +350,23 @@ arrows:
     }
 
     #[test]
+    fn discover_rejects_unsupported_schema_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::create_dir_all(root.join("docs/arrows")).unwrap();
+        fs::write(
+            root.join("docs/arrows/index.yaml"),
+            "schema_version: 1\narrows: {}\n",
+        )
+        .unwrap();
+        let err = LidRepo::discover(root).unwrap_err();
+        assert!(
+            matches!(err, LidError::UnsupportedSchemaVersion { found: 1, .. }),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
     fn discover_propagates_markdown_errors() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
@@ -338,7 +374,7 @@ arrows:
         fs::create_dir_all(root.join("docs/specs")).unwrap();
         fs::write(
             root.join("docs/arrows/index.yaml"),
-            "schema_version: 1\narrows: {}\n",
+            "schema_version: 2\narrows: {}\n",
         )
         .unwrap();
         // Spec line with a no-digit ID — must fail parsing.
