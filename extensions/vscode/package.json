@@ -2,7 +2,7 @@
   "name": "lid",
   "displayName": "LID — Linked-Intent Development",
   "description": "Editor support for the LID methodology: hover, go-to-definition, find references, rename, completion, and real-time diagnostics for @spec citations.",
-  "version": "1.2.0",
+  "version": "0.2.0",
   "publisher": "lid-tools",
   "license": "MIT OR Apache-2.0",
   "repository": {
