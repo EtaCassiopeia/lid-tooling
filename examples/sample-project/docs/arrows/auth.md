@@ -8,11 +8,11 @@
 
 ### LLD
 
-- docs/llds/auth.md
+- docs/intent/auth/auth-design.md
 
 ### EARS
 
-- docs/specs/auth-specs.md
+- docs/intent/auth/auth-specs.md
 
 ### Tests
 

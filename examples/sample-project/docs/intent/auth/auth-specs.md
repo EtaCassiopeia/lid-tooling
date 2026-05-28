@@ -1,6 +1,6 @@
 # auth specs
 
-**LLD**: docs/llds/auth.md
+**LLD**: docs/intent/auth/auth-design.md
 
 Status markers: `[x]` implemented · `[ ]` active gap · `[D]` deferred
 
