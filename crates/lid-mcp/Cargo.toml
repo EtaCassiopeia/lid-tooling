@@ -1,0 +1,35 @@
+[package]
+name = "lid-mcp"
+description = "MCP server for LID projects — lets AI agents navigate and modify LID artifacts with the same integrity guarantees as the LSP."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "lid-mcp"
+path = "src/main.rs"
+
+[lib]
+name = "lid_mcp"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1"
+lid-core = { path = "../lid-core" }
+rmcp = { version = "1.7", features = ["server", "macros", "transport-io", "schemars"] }
+schemars = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml_ng = "0.10"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "sync", "fs"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tempfile = "3"
