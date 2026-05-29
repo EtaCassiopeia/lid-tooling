@@ -44,11 +44,18 @@ impl LidServer {
     /// Compute and publish diagnostics for `uri` using the buffer `text`
     /// as the source of truth (rather than what's on disk). Silently
     /// no-ops when no LID repository is reachable from the URI.
+    ///
+    /// Routes to the spec-file producer for `*-specs.md` buffers and to
+    /// the source-file producer for everything else.
     async fn publish_diagnostics_for(&self, uri: Url, version: Option<i32>, text: &str) {
         let Some(repo) = self.ensure_repo(&uri).await else {
             return;
         };
-        let diagnostics = handlers::diagnostics::diagnostics_for_buffer(repo, text);
+        let diagnostics = if uri.path().ends_with("-specs.md") {
+            handlers::diagnostics::diagnostics_for_spec_buffer(repo, text)
+        } else {
+            handlers::diagnostics::diagnostics_for_buffer(repo, text)
+        };
         self.client
             .publish_diagnostics(uri, diagnostics, version)
             .await;
