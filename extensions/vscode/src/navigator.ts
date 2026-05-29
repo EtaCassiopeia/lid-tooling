@@ -99,12 +99,18 @@ export class NavigatorPanel {
             (msg: WebviewMessage) => {
                 if (msg.type !== 'open') return;
                 const entry = this._indexEntry(msg.segmentId);
-                const docPath = entry?.detail
-                    ? path.join(this._workspaceRoot, entry.detail)
-                    : path.join(this._workspaceRoot, 'docs', 'arrows', `${msg.segmentId}.md`);
-                vscode.workspace
-                    .openTextDocument(docPath)
-                    .then((doc) => vscode.window.showTextDocument(doc));
+                // detail is a filename relative to docs/arrows/ (e.g. "marketing-site.md")
+                const detailFile = entry?.detail ?? `${msg.segmentId}.md`;
+                const docPath = path.join(this._workspaceRoot, 'docs', 'arrows', detailFile);
+                void Promise.resolve(vscode.workspace.openTextDocument(docPath))
+                    .then((doc) =>
+                        vscode.window.showTextDocument(doc, vscode.ViewColumn.One),
+                    )
+                    .catch((err: unknown) => {
+                        void vscode.window.showErrorMessage(
+                            `LID Navigator: could not open ${docPath} — ${String(err)}`,
+                        );
+                    });
             },
             null,
             this._disposables,
