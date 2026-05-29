@@ -21,10 +21,24 @@ jobs:
         include:
           - os: macos-14
             target: aarch64-apple-darwin
+            ext: ''
+            archive: tar.gz
+            sha_cmd: shasum -a 256
           - os: macos-13
             target: x86_64-apple-darwin
+            ext: ''
+            archive: tar.gz
+            sha_cmd: shasum -a 256
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            ext: ''
+            archive: tar.gz
+            sha_cmd: sha256sum
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: .exe
+            archive: zip
+            sha_cmd: sha256sum
 
     steps:
       - uses: actions/checkout@v4
@@ -39,27 +53,51 @@ jobs:
         with:
           key: release-${{ matrix.target }}
 
-      - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }} --bin lidc
+      - name: Build release binaries
+        run: cargo build --release --target ${{ matrix.target }} --bin lidc --bin lid-lsp
 
-      - name: Package binary
+      - name: Package binaries
+        shell: bash
         run: |
           set -euo pipefail
           ref="${GITHUB_REF_NAME}"
-          dir="lidc-${ref}-${{ matrix.target }}"
-          mkdir -p "dist/${dir}"
-          cp "target/${{ matrix.target }}/release/lidc" "dist/${dir}/"
-          cp README.md LICENSE-MIT LICENSE-APACHE "dist/${dir}/"
-          tar -czf "dist/${dir}.tar.gz" -C dist "${dir}"
-          ( cd dist && shasum -a 256 "${dir}.tar.gz" > "${dir}.tar.gz.sha256" )
+          base="lid-${ref}-${{ matrix.target }}"
+          bin_dir="target/${{ matrix.target }}/release"
+          mkdir -p "dist/${base}"
+
+          cp "${bin_dir}/lidc${{ matrix.ext }}"    "dist/${base}/"
+          cp "${bin_dir}/lid-lsp${{ matrix.ext }}" "dist/${base}/"
+          cp README.md LICENSE-MIT LICENSE-APACHE  "dist/${base}/"
+
+          # Standalone lid-lsp binary — consumed by the VSIX bundler and
+          # Homebrew formula without needing to unpack the full archive.
+          cp "${bin_dir}/lid-lsp${{ matrix.ext }}" \
+             "dist/lid-lsp-${{ matrix.target }}${{ matrix.ext }}"
+
+          # Create archive (zip for Windows, tar.gz for everything else).
+          if [[ "${{ matrix.archive }}" == "zip" ]]; then
+            ( cd dist && zip -r "${base}.zip" "${base}" )
+            ( cd dist && ${{ matrix.sha_cmd }} "${base}.zip" > "${base}.zip.sha256" )
+          else
+            tar -czf "dist/${base}.tar.gz" -C dist "${base}"
+            ( cd dist && ${{ matrix.sha_cmd }} "${base}.tar.gz" > "${base}.tar.gz.sha256" )
+          fi
+
+          # Checksum for the standalone lid-lsp binary.
+          ( cd dist && ${{ matrix.sha_cmd }} \
+              "lid-lsp-${{ matrix.target }}${{ matrix.ext }}" \
+              > "lid-lsp-${{ matrix.target }}${{ matrix.ext }}.sha256" )
+
           ls -la dist/
 
       - uses: actions/upload-artifact@v4
         with:
-          name: lidc-${{ matrix.target }}
+          name: release-${{ matrix.target }}
           path: |
             dist/*.tar.gz
+            dist/*.zip
             dist/*.sha256
+            dist/lid-lsp-*
           if-no-files-found: error
           retention-days: 7
 
@@ -78,7 +116,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-assets
-          find artifacts -type f \( -name '*.tar.gz' -o -name '*.sha256' \) -exec cp {} release-assets/ \;
+          find artifacts -type f \
+            \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.sha256' -o -name 'lid-lsp-*' \) \
+            -exec cp {} release-assets/ \;
           ls -la release-assets/
 
       - name: Publish release
