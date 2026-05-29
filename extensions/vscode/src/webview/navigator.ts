@@ -19,6 +19,11 @@ interface SpecCounts {
     deferred: number;
 }
 
+interface SpecItem {
+    marker: 'done' | 'open' | 'deferred';
+    text: string;
+}
+
 interface GraphNode {
     id: string;
     label: string;
@@ -28,6 +33,7 @@ interface GraphNode {
     sampled?: string;
     audited?: string;
     specs?: SpecCounts;
+    specItems?: SpecItem[];
     specFile?: string;
     lldFile?: string;
 }
@@ -66,7 +72,6 @@ function trunc(s: string, n: number): string {
     return s.length <= n ? s : s.slice(0, n) + '…';
 }
 
-// Strip ISO time suffix: "2026-04-25T00:00:00.000Z" → "2026-04-25"
 function fmtDate(s: string | undefined): string {
     if (!s) return '—';
     return s.replace(/T.*$/, '');
@@ -127,7 +132,6 @@ function render(payload: GraphPayload): void {
     cy = cytoscape({
         container: document.getElementById('cy'),
         elements,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         style: [
             {
                 selector: 'node',
@@ -148,8 +152,6 @@ function render(payload: GraphPayload): void {
                     'border-width': 0,
                 },
             },
-            // Colored border indicators: amber = has drift, blue = has next.
-            // Drift overrides next (defined later → higher specificity in Cytoscape).
             {
                 selector: 'node[?hasNext]',
                 style: { 'border-width': 3, 'border-color': '#60a5fa' },
@@ -160,7 +162,6 @@ function render(payload: GraphPayload): void {
             },
             {
                 selector: 'node:selected',
-                // Slightly thicker so selection is distinct from drift/next border.
                 style: { 'border-width': 4, 'border-color': '#ffffff' },
             },
             {
@@ -249,32 +250,110 @@ function hideTooltip(): void {
     tooltip.style.display = 'none';
 }
 
+// ── Neighbourhood focus ───────────────────────────────────────────────────────
+
+let focusedId: string | null = null;
+const btnFocus = document.getElementById('btn-focus') as HTMLButtonElement;
+
+function applyFocus(id: string): void {
+    if (!cy) return;
+    focusedId = id;
+    const node = cy.getElementById(id);
+    // Full ancestry + full descendancy chain (all nodes that can reach this, and
+    // all nodes reachable from this), plus connecting edges within the set.
+    const ancestors   = node.predecessors('node') as cytoscape.NodeCollection;
+    const descendants = node.successors('node')   as cytoscape.NodeCollection;
+    const focusedNodes = ancestors.union(descendants).union(node);
+    const focusedEdges = focusedNodes.edgesWith(focusedNodes);
+    cy.batch(() => {
+        cy!.elements().addClass('dimmed');
+        focusedNodes.union(focusedEdges).removeClass('dimmed');
+    });
+    btnFocus.classList.add('active');
+    btnFocus.textContent = 'Unfocus';
+}
+
+function clearFocus(): void {
+    if (!focusedId) return;
+    focusedId = null;
+    cy?.elements().removeClass('dimmed');
+    applyFilter();
+    btnFocus.classList.remove('active');
+    btnFocus.textContent = 'Focus';
+}
+
+btnFocus.addEventListener('click', () => {
+    if (focusedId) {
+        clearFocus();
+    } else if (currentPanelNode) {
+        applyFocus(currentPanelNode.id);
+    }
+});
+
 // ── Sidebar panel ────────────────────────────────────────────────────────────
 
-const sidePanel   = document.getElementById('panel')!;
-const panelTitle  = document.getElementById('panel-title')!;
-const panelBody   = document.getElementById('panel-body')!;
-const panelClose  = document.getElementById('panel-close')!;
-const cyContainer = document.getElementById('cy')!;
+const sidePanel  = document.getElementById('panel')!;
+const panelTitle = document.getElementById('panel-title')!;
+const panelBody  = document.getElementById('panel-body')!;
 
-panelClose.addEventListener('click', closePanel);
+document.getElementById('panel-close')!.addEventListener('click', closePanel);
+
+let currentPanelNode: GraphNode | null = null;
+
+// Navigate to a node by ID: animate viewport, then refresh sidebar.
+function navigateToNode(id: string): void {
+    if (!cy) return;
+    const node = cy.getElementById(id);
+    if (!node.length) return;
+    cy.animate({ center: { eles: node }, zoom: cy.zoom() }, { duration: 250 });
+    openPanel(node.data('nodeData') as GraphNode);
+}
 
 function openPanel(node: GraphNode): void {
-    const { id, status, specs, specFile, lldFile, sampled, audited, next, drift } = node;
+    currentPanelNode = node;
+    const { id, status, specs, specItems, specFile, lldFile, sampled, audited, next, drift } = node;
 
     panelTitle.textContent = id;
 
     const color = colorForStatus(status);
     let html = `<span class="badge" style="background:${color}">${esc(status)}</span>`;
 
+    // ── Dependency chips ─────────────────────────────────────────────────────
+    const predecessors = cy?.getElementById(id).incomers('node') as cytoscape.NodeCollection | undefined;
+    const successors   = cy?.getElementById(id).outgoers('node') as cytoscape.NodeCollection | undefined;
+
+    if ((predecessors?.length ?? 0) > 0 || (successors?.length ?? 0) > 0) {
+        html += `<div class="sec">`;
+        if ((predecessors?.length ?? 0) > 0) {
+            html += `<div class="sec-title">Blocked by</div><div class="chips">`;
+            predecessors!.forEach((n) => {
+                html += `<button class="chip" data-nav="${esc(n.id())}">${esc(n.id())}</button>`;
+            });
+            html += `</div>`;
+        }
+        if ((successors?.length ?? 0) > 0) {
+            html += `<div class="sec-title"${predecessors?.length ? ' style="margin-top:8px"' : ''}>Blocks</div><div class="chips">`;
+            successors!.forEach((n) => {
+                html += `<button class="chip" data-nav="${esc(n.id())}">${esc(n.id())}</button>`;
+            });
+            html += `</div>`;
+        }
+        html += `</div>`;
+    }
+
+    // ── Spec progress + expandable list ──────────────────────────────────────
     if (specs) {
         const { implemented, open, deferred } = specs;
         const total = implemented + open + deferred;
         if (total > 0) {
             const pct = Math.round((implemented / total) * 100);
             const barColor = open > 0 ? '#f59e0b' : '#22c55e';
+            const hasItems = specItems && specItems.length > 0;
             html += `<div class="sec">
-              <div class="sec-title">Specs</div>
+              <div class="sec-title-row">
+                <span class="sec-title">Specs</span>
+                ${hasItems ? `<button class="spec-toggle" data-count="${specItems!.length}">▾ ${specItems!.length} items</button>` : ''}
+              </div>
               <div class="prog-wrap">
                 <div class="prog-fill" style="width:${pct}%;background:${barColor}"></div>
               </div>
@@ -283,11 +362,21 @@ function openPanel(node: GraphNode): void {
                 <span>○&nbsp;${open}</span>
                 <span>⊘&nbsp;${deferred}</span>
                 <span style="margin-left:auto">${implemented}/${total}</span>
-              </div>
-            </div>`;
+              </div>`;
+            if (hasItems) {
+                html += `<div class="spec-list" style="display:none">`;
+                for (const item of specItems!) {
+                    const cls = item.marker === 'done' ? 'si-done' : item.marker === 'open' ? 'si-open' : 'si-def';
+                    const sym = item.marker === 'done' ? '✓' : item.marker === 'open' ? '○' : '⊘';
+                    html += `<div class="si"><span class="si-m ${cls}">${sym}</span><span class="si-t">${esc(trunc(item.text, 120))}</span></div>`;
+                }
+                html += `</div>`;
+            }
+            html += `</div>`;
         }
     }
 
+    // ── Metadata ─────────────────────────────────────────────────────────────
     if (sampled || audited) {
         html += `<div class="sec"><div class="meta">
           <span class="meta-k">Sampled</span><span>${esc(fmtDate(sampled))}</span>
@@ -295,43 +384,53 @@ function openPanel(node: GraphNode): void {
         </div></div>`;
     }
 
+    // ── Action buttons ────────────────────────────────────────────────────────
     html += `<div class="sec">
       <button class="btn-open" data-action="open-arrow">Open Arrow Doc</button>`;
-    if (specFile) {
-        html += `<button class="btn-open" data-action="open-spec">Open Spec File</button>`;
-    }
-    if (lldFile) {
-        html += `<button class="btn-open" data-action="open-lld">Open LLD</button>`;
-    }
+    if (specFile) html += `<button class="btn-open" data-action="open-spec">Open Spec File</button>`;
+    if (lldFile)  html += `<button class="btn-open" data-action="open-lld">Open LLD</button>`;
     html += `</div>`;
 
-    if (next) {
-        html += `<div class="sec"><div class="sec-title">Next</div><div class="prose">${esc(next)}</div></div>`;
-    }
-    if (drift) {
-        html += `<div class="sec"><div class="sec-title">Drift</div><div class="prose">${esc(drift)}</div></div>`;
-    }
+    // ── Next / Drift ──────────────────────────────────────────────────────────
+    if (next)  html += `<div class="sec"><div class="sec-title">Next</div><div class="prose">${esc(next)}</div></div>`;
+    if (drift) html += `<div class="sec"><div class="sec-title">Drift</div><div class="prose">${esc(drift)}</div></div>`;
 
     panelBody.innerHTML = html;
-
-    panelBody.querySelectorAll<HTMLButtonElement>('.btn-open').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const action = btn.dataset['action'];
-            if (action === 'open-arrow') {
-                vscode.postMessage({ type: 'open', segmentId: id });
-            } else if (action === 'open-spec' && specFile) {
-                vscode.postMessage({ type: 'openFile', path: specFile });
-            } else if (action === 'open-lld' && lldFile) {
-                vscode.postMessage({ type: 'openFile', path: lldFile });
-            }
-        });
-    });
-
     sidePanel.classList.add('open');
     cy?.resize();
 }
 
+// Single delegated click handler for the whole panel body.
+panelBody.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+
+    const chip = t.closest<HTMLButtonElement>('.chip[data-nav]');
+    if (chip?.dataset['nav']) { navigateToNode(chip.dataset['nav']); return; }
+
+    const btn = t.closest<HTMLButtonElement>('.btn-open[data-action]');
+    if (btn?.dataset['action']) {
+        const node = currentPanelNode;
+        if (!node) return;
+        const action = btn.dataset['action'];
+        if (action === 'open-arrow') vscode.postMessage({ type: 'open', segmentId: node.id });
+        else if (action === 'open-spec' && node.specFile) vscode.postMessage({ type: 'openFile', path: node.specFile });
+        else if (action === 'open-lld'  && node.lldFile)  vscode.postMessage({ type: 'openFile', path: node.lldFile });
+        return;
+    }
+
+    const toggle = t.closest<HTMLButtonElement>('.spec-toggle');
+    if (toggle) {
+        const list = panelBody.querySelector<HTMLElement>('.spec-list');
+        if (!list) return;
+        const open = list.style.display === 'none';
+        list.style.display = open ? 'block' : 'none';
+        toggle.textContent = `${open ? '▴' : '▾'} ${toggle.dataset['count'] ?? ''} items`;
+    }
+});
+
 function closePanel(): void {
+    currentPanelNode = null;
+    clearFocus();
     sidePanel.classList.remove('open');
     cy?.resize();
 }
@@ -350,7 +449,6 @@ function showCtxMenu(clientX: number, clientY: number, node: GraphNode): void {
     ctxNode = node;
     ctxSpec.classList.toggle('hidden', !node.specFile);
     ctxLld.classList.toggle('hidden', !node.lldFile);
-
     ctxMenu.style.display = 'block';
     const vw = document.documentElement.clientWidth;
     const vh = document.documentElement.clientHeight;
@@ -413,9 +511,7 @@ function applyFilter(): void {
         });
 
         cy!.edges().forEach((e) => {
-            const srcDimmed = e.source().hasClass('dimmed');
-            const tgtDimmed = e.target().hasClass('dimmed');
-            e.toggleClass('dimmed', srcDimmed || tgtDimmed);
+            e.toggleClass('dimmed', e.source().hasClass('dimmed') || e.target().hasClass('dimmed'));
         });
     });
 }
@@ -435,39 +531,33 @@ document.getElementById('btn-fit')!.addEventListener('click', () => cy?.fit());
 function wireInteractions(): void {
     if (!cy) return;
 
-    // Hover tooltip
     cy.on('mouseover', 'node', (evt) => {
         const node = evt.target.data('nodeData') as GraphNode;
         const me = evt.originalEvent as MouseEvent;
         showTooltip(me.clientX, me.clientY, node);
     });
     cy.on('mousemove', 'node', (evt) => {
-        const me = evt.originalEvent as MouseEvent;
-        positionTooltip(me.clientX, me.clientY);
+        positionTooltip((evt.originalEvent as MouseEvent).clientX, (evt.originalEvent as MouseEvent).clientY);
     });
     cy.on('mouseout', 'node', hideTooltip);
 
-    // Click → sidebar. Dual listener (tap + click) for macOS trackpad inside WebView.
-    // Debounced so both events from the same gesture don't fire twice.
+    // Dual tap + click for macOS trackpad inside WebView; debounced to avoid double-fire.
     let lastOpenTs = 0;
     const openSidebar = (evt: cytoscape.EventObject) => {
         const now = Date.now();
         if (now - lastOpenTs < 100) return;
         lastOpenTs = now;
-        const node = evt.target.data('nodeData') as GraphNode;
         hideCtxMenu();
         hideTooltip();
-        openPanel(node);
+        openPanel(evt.target.data('nodeData') as GraphNode);
     };
     cy.on('tap',   'node', openSidebar);
     cy.on('click', 'node', openSidebar);
 
-    // Right-click → context menu
     cy.on('cxttap', 'node', (evt) => {
-        const node = evt.target.data('nodeData') as GraphNode;
         const me = evt.originalEvent as MouseEvent;
         hideTooltip();
-        showCtxMenu(me.clientX, me.clientY, node);
+        showCtxMenu(me.clientX, me.clientY, evt.target.data('nodeData') as GraphNode);
     });
 }
 
