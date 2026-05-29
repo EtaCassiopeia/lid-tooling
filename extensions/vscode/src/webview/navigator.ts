@@ -21,7 +21,9 @@ interface SpecCounts {
 
 interface SpecItem {
     marker: 'done' | 'open' | 'deferred';
+    id?: string;
     text: string;
+    line?: number;
 }
 
 interface GraphNode {
@@ -399,7 +401,10 @@ function openPanel(node: GraphNode): void {
                 for (const item of specItems!) {
                     const cls = item.marker === 'done' ? 'si-done' : item.marker === 'open' ? 'si-open' : 'si-def';
                     const sym = item.marker === 'done' ? '✓' : item.marker === 'open' ? '○' : '⊘';
-                    html += `<div class="si"><span class="si-m ${cls}">${sym}</span><span class="si-t">${esc(trunc(item.text, 120))}</span></div>`;
+                    const idBtn = item.id && item.line !== undefined && node.specFile
+                        ? `<button class="si-id" data-path="${esc(node.specFile)}" data-line="${item.line}">${esc(item.id)}</button>`
+                        : '';
+                    html += `<div class="si"><span class="si-m ${cls}">${sym}</span>${idBtn}<span class="si-t">${esc(trunc(item.text, 100))}</span></div>`;
                 }
                 html += `</div>`;
             }
@@ -437,6 +442,12 @@ panelBody.addEventListener('click', (e) => {
 
     const chip = t.closest<HTMLButtonElement>('.chip[data-nav]');
     if (chip?.dataset['nav']) { navigateToNode(chip.dataset['nav']); return; }
+
+    const specIdBtn = t.closest<HTMLButtonElement>('.si-id');
+    if (specIdBtn?.dataset['path']) {
+        vscode.postMessage({ type: 'openFile', path: specIdBtn.dataset['path'], line: parseInt(specIdBtn.dataset['line'] ?? '0', 10) });
+        return;
+    }
 
     const btn = t.closest<HTMLButtonElement>('.btn-open[data-action]');
     if (btn?.dataset['action']) {
