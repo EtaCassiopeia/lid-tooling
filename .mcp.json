@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "lid": {
+      "type": "stdio",
+      "command": "/Users/gangof3/Projects/lid-tooling/target/release/lid-mcp",
+      "env": { "RUST_LOG": "warn" }
+    }
+  }
+}

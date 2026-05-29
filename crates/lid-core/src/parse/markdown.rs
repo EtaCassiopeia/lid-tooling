@@ -95,6 +95,49 @@ pub fn find_spec_line_match(line: &str) -> Option<SpecLineMatch> {
     })
 }
 
+/// Replace the status marker on the line that defines `spec_id`.
+///
+/// Returns the updated file content, or `None` if `spec_id` is not found.
+#[must_use]
+pub fn update_spec_status_in_text(
+    content: &str,
+    spec_id: &SpecId,
+    new_status: SpecStatus,
+) -> Option<String> {
+    let marker = match new_status {
+        SpecStatus::Implemented => 'x',
+        SpecStatus::Open => ' ',
+        SpecStatus::Deferred => 'D',
+    };
+    let target = spec_id.as_ref();
+    let mut found = false;
+    let updated = content
+        .lines()
+        .map(|line| {
+            if !found {
+                if let Some(m) = find_spec_line_match(line) {
+                    if m.id.as_ref() == target {
+                        found = true;
+                        return format!("- [{marker}] **{target}**: {}", m.text);
+                    }
+                }
+            }
+            line.to_owned()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    if found {
+        // Preserve trailing newline if original had one.
+        if content.ends_with('\n') {
+            Some(updated + "\n")
+        } else {
+            Some(updated)
+        }
+    } else {
+        None
+    }
+}
+
 /// Load and parse an EARS spec file.
 ///
 /// # Errors
@@ -792,5 +835,36 @@ Some prose.
         assert_eq!(d.decisions[0].decision, "short");
         assert!(d.decisions[0].alternatives.is_empty());
         assert_eq!(d.decisions[1].decision, "Valid");
+    }
+
+    #[test]
+    fn update_spec_status_replaces_marker() {
+        let content =
+            "- [ ] **AUTH-001**: users shall log in.\n- [x] **AUTH-002**: sessions expire.\n";
+        let id = SpecId::parse("AUTH-001").unwrap();
+        let updated = update_spec_status_in_text(content, &id, SpecStatus::Implemented).unwrap();
+        assert!(updated.contains("- [x] **AUTH-001**: users shall log in."));
+        assert!(updated.contains("- [x] **AUTH-002**: sessions expire."));
+        assert!(updated.ends_with('\n'));
+    }
+
+    #[test]
+    fn update_spec_status_returns_none_when_id_not_found() {
+        let content = "- [ ] **AUTH-001**: text.\n";
+        let id = SpecId::parse("AUTH-999").unwrap();
+        assert!(update_spec_status_in_text(content, &id, SpecStatus::Open).is_none());
+    }
+
+    #[test]
+    fn update_spec_status_preserves_trailing_newline() {
+        let with_newline = "- [ ] **AUTH-001**: text.\n";
+        let without_newline = "- [ ] **AUTH-001**: text.";
+        let id = SpecId::parse("AUTH-001").unwrap();
+        let updated_with =
+            update_spec_status_in_text(with_newline, &id, SpecStatus::Deferred).unwrap();
+        let updated_without =
+            update_spec_status_in_text(without_newline, &id, SpecStatus::Deferred).unwrap();
+        assert!(updated_with.ends_with('\n'));
+        assert!(!updated_without.ends_with('\n'));
     }
 }
