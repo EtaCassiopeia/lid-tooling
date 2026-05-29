@@ -12,10 +12,10 @@ The conversion and orientation surface — the four-page Eleventy site at `site/
 - `docs/high-level-design.md` § Goal 5 (legibility for non-users); § Goal 3 (meet teams where they are); § Architecture / Distribution
 
 ### LLD
-- `docs/llds/marketing-site.md`
+- `docs/intent/marketing-site/marketing-site-design.md`
 
 ### EARS
-- `docs/specs/marketing-site-specs.md` (51 specs, prefix `MKT-SITE-*`)
+- `docs/intent/marketing-site/marketing-site-specs.md` (51 specs, prefix `MKT-SITE-*`)
 
 ### Tests / Build checks
 - Build-time structural checks (link-check, mermaid render, markdown lint) — declared in the LLD § *Content Maintenance and Review*; CI workflow scope per `MKT-SITE-*` build specs.

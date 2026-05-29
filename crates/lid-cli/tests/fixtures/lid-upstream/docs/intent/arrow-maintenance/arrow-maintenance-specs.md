@@ -1,6 +1,6 @@
 # arrow-maintenance command-mode specs
 
-**LLD**: docs/llds/arrow-maintenance.md
+**LLD**: docs/intent/arrow-maintenance/arrow-maintenance-design.md
 **Implementing artifacts**:
 - plugins/arrow-maintenance/skills/arrow-maintenance/SKILL.md
 - plugins/arrow-maintenance/skills/arrow-maintenance/references/index-schema.md

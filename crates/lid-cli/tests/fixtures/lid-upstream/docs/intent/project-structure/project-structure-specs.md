@@ -1,6 +1,6 @@
 # Project Structure Specs
 
-**LLD**: docs/llds/project-structure.md
+**LLD**: docs/intent/project-structure/project-structure-design.md
 **Implementing artifacts**:
 - CONTRIBUTING.md
 - AGENTS.md (with CLAUDE.md symlink)

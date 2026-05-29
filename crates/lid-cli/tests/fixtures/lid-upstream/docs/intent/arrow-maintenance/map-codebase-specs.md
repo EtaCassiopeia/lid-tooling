@@ -1,6 +1,6 @@
 # map-codebase specs
 
-**LLD**: docs/llds/arrow-maintenance.md
+**LLD**: docs/intent/arrow-maintenance/arrow-maintenance-design.md
 **Implementing artifacts**:
 - plugins/arrow-maintenance/skills/map-codebase/SKILL.md
 - plugins/arrow-maintenance/skills/map-codebase/references/brownfield-bootstrap.md

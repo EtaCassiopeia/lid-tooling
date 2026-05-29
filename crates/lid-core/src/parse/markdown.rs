@@ -259,7 +259,12 @@ pub fn parse_arrow_doc(content: &str, source_path: &Path) -> ArrowDoc {
                 }
                 in_item = false;
             }
-            Event::Text(t) | Event::Code(t) if in_item => item_buf.push_str(&t),
+            Event::Text(t) if in_item => item_buf.push_str(&t),
+            Event::Code(t) if in_item => {
+                item_buf.push('`');
+                item_buf.push_str(&t);
+                item_buf.push('`');
+            }
             Event::SoftBreak | Event::HardBreak if in_item => item_buf.push(' '),
             _ => {}
         }

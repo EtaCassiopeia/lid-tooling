@@ -1,6 +1,6 @@
 # Marketing Site Specs
 
-**LLD**: docs/llds/marketing-site.md
+**LLD**: docs/intent/marketing-site/marketing-site-design.md
 **Implementing artifacts**:
 - site/src/**
 - site/_site/** (build output)

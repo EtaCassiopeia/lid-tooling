@@ -12,7 +12,7 @@ The opt-in third plugin — a structural container for novel LID capabilities un
 - `docs/high-level-design.md` § Architecture / Plugins (lid-experimental, opt-in); § Key Design Decisions / Experimental features as a separate plugin
 
 ### LLD
-- `docs/llds/lid-experimental.md` (container)
+- `docs/intent/lid-experimental/lid-experimental-design.md` (container)
 
 ### EARS
 - None on the container itself. Per the LLD: *"This LLD is structural and currently has no behavioral surface of its own — the plugin is a container, and EARS coverage attaches to individual experiments."*
