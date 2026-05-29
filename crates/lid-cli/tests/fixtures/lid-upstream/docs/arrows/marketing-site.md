@@ -17,11 +17,11 @@ The conversion and orientation surface — the four-page Eleventy site at `site/
 ### EARS
 - `docs/intent/marketing-site/marketing-site-specs.md` (51 specs, prefix `MKT-SITE-*`)
 
-### Tests / Build checks
+### Tests
 - Build-time structural checks (link-check, mermaid render, markdown lint) — declared in the LLD § *Content Maintenance and Review*; CI workflow scope per `MKT-SITE-*` build specs.
 - No skill-creator evals (content artifact, not a skill).
 
-### Code (site sources)
+### Code
 - `site/.eleventy.js` — Eleventy config
 - `site/package.json`, `site/package-lock.json`
 - `site/src/` — page templates, content, assets, styles

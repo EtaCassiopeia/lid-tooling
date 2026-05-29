@@ -18,17 +18,17 @@ The first `lid-experimental` experiment — audits EARS↔code coherence by spaw
 ### EARS
 - `docs/intent/bidirectional-differential/bidirectional-differential-specs.md` (22 specs, prefix `BIDIFF-*`)
 
-### Tests / Evals
+### Tests
 - `plugins/lid-experimental/skills/bidirectional-differential/evals/evals.json` (3 baseline fixtures: `bd-coherent-bounded-matrix`, `bidirectional-drift-missing-subdecision`, `b-only-drift-unstated-invariant`)
 - `plugins/lid-experimental/skills/bidirectional-differential-workspace/iteration-1/` — workspace runs against the three eval fixtures
 
-### Code (skill prompt and references)
+### Code
 - `plugins/lid-experimental/skills/bidirectional-differential/SKILL.md`
 - `plugins/lid-experimental/skills/bidirectional-differential/references/` — `audit-protocol.md` (full six-step protocol; includes stripping rules and split-result mechanics referenced from individual specs), `classification-codes.md`, `scoping-conversation.md`, `audit-report-template.md`
 - `plugins/lid-experimental/commands/differential-audit.md` (plugin-level command stub)
 
-### Reserved output namespace
-- `docs/arrows/experiments/bidirectional-differential/{segment-name}/{EARS-ID}.md` — per-EARS audit records produced by `/differential-audit` runs. Currently unpopulated in this repo.
+### Code
+- (Unpopulated) per-EARS audit records — stored under docs/arrows/_experiments/bidirectional-differential/ when /differential-audit runs produce output; one subdir per segment, one MD per EARS ID.
 
 ## Architecture
 
@@ -37,7 +37,7 @@ The first `lid-experimental` experiment — audits EARS↔code coherence by spaw
 **Key Components:**
 1. Scoping conversation — natural-language → arrow → EARS mapping; cost-estimate confirmation before spawning subprocesses.
 2. Six-step audit protocol — input resolution, identifier stripping, parallel `claude -p` spawns (N runs per direction, default 3), classification, per-EARS audit-record write.
-3. Reserved output subtree — `docs/arrows/experiments/bidirectional-differential/` (sanctioned namespace per `arrow-maintenance` LLD § *Experiment-produced artifacts*).
+3. Reserved output subtree — `docs/arrows/_experiments/bidirectional-differential/` (sanctioned namespace per `arrow-maintenance` LLD § *Experiment-produced artifacts*).
 
 ## Spec Coverage
 
@@ -51,7 +51,7 @@ The first `lid-experimental` experiment — audits EARS↔code coherence by spaw
 
 1. **BIDIFF-007 spec text points at a non-existent reference file.** The spec says *"strip leaky identifiers from the code input per `references/stripping-rules.md`"*, but the stripping-rule content was consolidated into `references/audit-protocol.md` § *Step 2 / Stripping rule categories*. The behavior is implemented; the spec prose is stale. Recommended fix: reword BIDIFF-007 to reference `references/audit-protocol.md §Stripping rule categories`. Not auto-rewriting because spec edits should walk the LID arrow cascade with user confirmation.
 2. **Hard precondition exercised in this session.** Invoking `/differential-audit` with no overlay aborted with the prescribed message (BIDIFF-005, BIDIFF-019) and spawned no `claude -p` sessions — observable evidence the precondition behavior is correct.
-3. **Output namespace unused.** `docs/arrows/experiments/bidirectional-differential/` does not yet exist in this repo. First real audit run will create it.
+3. **Output namespace unused.** `docs/arrows/_experiments/bidirectional-differential/` does not yet exist in this repo. First real audit run will create it.
 4. **No skill-creator eval verification yet for this repo.** The three eval fixtures in `evals/evals.json` exist but have not been run against the current state. Workspace runs in `bidirectional-differential-workspace/iteration-1/` are from the implementation landing, not a post-spec-reconciliation run.
 
 ## Work Required

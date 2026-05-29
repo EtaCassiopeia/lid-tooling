@@ -12,7 +12,7 @@ Four principles shape every design choice below:
 
 1. **Scope is a user choice, not a heuristic.** The skill opens with a conversation because deciding what to audit is the user's judgment call — no auto-selection or prior-driven recommendation is applied. The conversation interprets natural-language descriptions ("the login flow") into concrete arrows and confirms alignment before spawning anything.
 2. **Arrow-maintenance is a hard precondition.** This skill is heavier maintenance than arrow-maintenance itself. A project without the discipline to keep arrow overlays clean will not act on differential audit findings either. The hard abort protects users from adopting this layer before the layer beneath it is in place.
-3. **Experiment artifacts live in a reserved sibling subtree.** Audit records land under `docs/arrows/experiments/bidirectional-differential/` — they do not mutate existing arrow overlay files. Retirement is `rm -rf`; promotion is a single move.
+3. **Experiment artifacts live in a reserved sibling subtree.** Audit records land under `docs/arrows/_experiments/bidirectional-differential/` — they do not mutate existing arrow overlay files. Retirement is `rm -rf`; promotion is a single move.
 4. **Repair walks the full arrow.** The audit technique compares EARS and code, but the LID arrow is HLD → LLD → EARS → Tests → Code. When drift is found, the recommended repair path always starts by validating the discovered intent with the user, then checks LLD coherence, then cascades EARS → Tests → Code. Tests are a first-class layer; the skill does not recommend a code change without first ensuring tests exist to assert the intended behavior.
 
 **Tool dependency.** The protocol shells out to `claude -p` for context-free subagent sessions. First-iteration support is Claude-Code-only; porting to other agentic coding tools depends on each tool exposing an equivalent one-shot mode.
@@ -80,7 +80,7 @@ The skill checks for `docs/arrows/index.yaml` + per-arrow overlay files on invoc
 
 > *Bidirectional differential audits attach to the arrow-maintenance overlay. Run /update-lid and then /arrow-maintenance first to establish the arrow surface this skill extends.*
 
-Audit records live in a reserved sibling subtree at `docs/arrows/experiments/bidirectional-differential/`. They do not mutate existing per-arrow overlay files. This keeps arrow-maintenance's audit loop hands-off the experiment's artifacts. The reserved-namespace convention is documented in `docs/llds/arrow-maintenance.md` §"Experiment-produced artifacts (reserved namespace)".
+Audit records live in a reserved sibling subtree at `docs/arrows/_experiments/bidirectional-differential/`. They do not mutate existing per-arrow overlay files. This keeps arrow-maintenance's audit loop hands-off the experiment's artifacts. The reserved-namespace convention is documented in `docs/llds/arrow-maintenance.md` §"Experiment-produced artifacts (reserved namespace)".
 
 `docs/arrows/index.yaml` is not extended today. The key `arrows.<segment>.experiments` is reserved for future metadata tracking.
 
@@ -94,7 +94,7 @@ Audit records live in a reserved sibling subtree at `docs/arrows/experiments/bid
    3. **Spawn N A-direction sessions** via `claude -p`. Each gets only the EARS text + a one-line codebase description. Task: produce naive implementation.
    4. **Spawn N B-direction sessions** in parallel. Each gets only the stripped code + a one-line EARS-syntax reminder. Task: produce reconstructed EARS.
    5. **Compare and classify** (§Classification codes). Within-direction variance first; between-direction alignment second. Apply split-result rule at 2-vs-1.
-   6. **Write per-EARS audit record** to `docs/arrows/experiments/bidirectional-differential/<segment-name>/<EARS-ID>.md`.
+   6. **Write per-EARS audit record** to `docs/arrows/_experiments/bidirectional-differential/<segment-name>/<EARS-ID>.md`.
 4. **Surface summary** to the user: per-arrow classification counts, top-priority drift findings, recommended actions.
 
 ### Stripping rules
@@ -114,7 +114,7 @@ The goal is a B-direction session that cannot cheat by reading the EARS out of i
 Audit records live at:
 
 ```
-docs/arrows/experiments/bidirectional-differential/<segment-name>/<EARS-ID>.md
+docs/arrows/_experiments/bidirectional-differential/<segment-name>/<EARS-ID>.md
 ```
 
 Record structure:
@@ -236,7 +236,7 @@ Promotion, retirement, and community feedback are governed by the parent LLD (§
 | Name | `bidirectional-differential` | `ears-code-differential`, `blind-audit` | Names the mechanism clearly — two directions (EARS→code and code→EARS), a differential between them. |
 | Variant | Dual-mode (command + ambient) | Pure-prose; command-only; ambient-only | Command mode supports exploratory and forensic use; ambient mode integrates with LID's phase cadence. Scoping conversation applies to both. |
 | Arrow-maintenance dependency | Hard abort on missing overlay | Soft warn + bootstrap in-skill; independent overlay | Audit reports live under `docs/arrows/`; bootstrapping that surface in-skill duplicates arrow-maintenance's job and lets projects adopt the heavy layer before the light one. |
-| Audit-record location | `docs/arrows/experiments/bidirectional-differential/<segment>/<EARS-ID>.md` | Augment existing arrow overlay files; parallel `docs/audits/` tree; inside-skill DB | Reserved sibling subtree keeps arrow-maintenance hands-off, makes retirement `rm -rf`, makes promotion a single move, preserves segment locality. |
+| Audit-record location | `docs/arrows/_experiments/bidirectional-differential/<segment>/<EARS-ID>.md` | Augment existing arrow overlay files; parallel `docs/audits/` tree; inside-skill DB | Reserved sibling subtree keeps arrow-maintenance hands-off, makes retirement `rm -rf`, makes promotion a single move, preserves segment locality. |
 | Ambient trigger phase | Phase 6 (code complete) | Phase 3 (post-EARS draft); Phase 5 (tests first) | The audit's strongest claim requires both EARS and code in final shape. Earlier phases audit incomplete arrows. |
 | Ambient prompt shape | One batched prompt per change | One prompt per touched EARS | Habituation: per-EARS prompting trains users to reflex-skip. Batched prompt respects attention budget. |
 | Runs per direction (default) | N=3, split-rule re-run to N=5 | N=1; N=5 always; N=2 | Cost-vs-confidence: N=3 catches most non-determinism cheaply; the 2-vs-1 re-run rule handles borderline cases without paying N=5 every time. |

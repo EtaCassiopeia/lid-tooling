@@ -17,11 +17,11 @@ The repo-meta segment — owns the artifacts that describe the project itself ra
 ### EARS
 - `docs/intent/project-structure/project-structure-specs.md` (42 specs, prefix `PROJ-STRUCT-*`)
 
-### Tests / Build checks
+### Tests
 - Build-time structural checks (link-check on `CONTRIBUTING.md` and `docs/setup.md`, JSON validity on `marketplace.json`, symlink integrity on `CLAUDE.md`, plugin-source-path validity in `marketplace.json`) — declared in the LLD § *Component Variant*; CI workflow scope deferred (see `PROJ-STRUCT-039` through `PROJ-STRUCT-041`).
 - No skill-creator evals (content artifact, not a skill).
 
-### Code (owned artifacts)
+### Code
 - `CONTRIBUTING.md` — contributor onboarding
 - `AGENTS.md` — agent bootstrap (canonical)
 - `CLAUDE.md` — symlink to `AGENTS.md`

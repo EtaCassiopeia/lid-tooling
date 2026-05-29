@@ -78,7 +78,7 @@ fn check_category(
         let Some(resolved) = resolve_arrow_ref(repo, raw) else {
             continue;
         };
-        if !resolved.is_file() {
+        if !resolved.exists() {
             findings.push(Finding {
                 check: CheckId::ReferenceCoherence,
                 severity: Severity::Error,
@@ -301,6 +301,52 @@ mod tests {
             ..Default::default()
         };
         let (_dir, repo) = make_repo(&["docs/intent/auth/auth-specs.md"], refs);
+        let findings = ReferenceCoherenceCheck.run(&repo);
+        assert!(findings.is_empty(), "got {findings:?}");
+    }
+
+    #[test]
+    fn directory_reference_passes_when_directory_exists() {
+        // Bullets pointing at directories (workspace outputs, skill dirs, site
+        // source trees) are valid as long as the directory exists.
+        let refs = ArrowReferences {
+            tests: vec!["`plugins/my-skill/workspace/iteration-1/` — eval outputs".into()],
+            ..Default::default()
+        };
+        // Create the directory (no file inside needed).
+        let dir = tempfile::tempdir().unwrap();
+        let root = std::fs::canonicalize(dir.path()).unwrap();
+        std::fs::create_dir_all(root.join("plugins/my-skill/workspace/iteration-1")).unwrap();
+
+        use std::collections::BTreeMap;
+        use std::path::PathBuf;
+        use crate::model::{ArrowIndex, Segment, SegmentId, Status, Unmapped};
+        let mut arrows = BTreeMap::new();
+        arrows.insert(
+            SegmentId::parse("auth").unwrap(),
+            Segment {
+                status: Status::Mapped,
+                sampled: None, audited: None, audited_sha: None,
+                blocks: vec![], blocked_by: vec![],
+                detail: PathBuf::from("auth.md"),
+                next: None, drift: None, merged_into: None,
+            },
+        );
+        let repo = LidRepo {
+            root,
+            index: ArrowIndex {
+                schema_version: 2, last_updated: None,
+                taxonomy: BTreeMap::new(), arrows,
+                unmapped: Unmapped::default(),
+            },
+            specs: vec![], llds: vec![],
+            arrow_docs: vec![ArrowDoc {
+                path: PathBuf::from("docs/arrows/auth.md"),
+                references: refs,
+                unrecognized_reference_sections: vec![],
+            }],
+            citations: vec![],
+        };
         let findings = ReferenceCoherenceCheck.run(&repo);
         assert!(findings.is_empty(), "got {findings:?}");
     }

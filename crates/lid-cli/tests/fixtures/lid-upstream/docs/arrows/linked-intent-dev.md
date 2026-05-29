@@ -19,10 +19,10 @@ The mandatory core LID workflow plugin — the pure-prose `linked-intent-dev` wo
 
 The pure-prose `linked-intent-dev` skill carries no EARS — it is verified by dogfooding per the HLD's pure-prose variant.
 
-### Tests / Evals
+### Tests
 - `plugins/linked-intent-dev/skills/update-lid-workspace/` (skill-creator iteration outputs; latest: iteration-1, three evals)
 
-### Code (skill prompts and references)
+### Code
 - `plugins/linked-intent-dev/.claude-plugin/plugin.json`
 - `plugins/linked-intent-dev/skills/linked-intent-dev/SKILL.md` + `references/`
 - `plugins/linked-intent-dev/skills/update-lid/SKILL.md` + `references/`

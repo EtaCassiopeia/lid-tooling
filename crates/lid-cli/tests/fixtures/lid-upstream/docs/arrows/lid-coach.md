@@ -20,11 +20,11 @@ Advisory principle-review skill for LID projects. Reads a project's LID artifact
 ### EARS
 - `docs/intent/lid-coach/lid-coach-specs.md` (52 specs, prefix `LID-COACH-*`)
 
-### Tests / Evals
+### Tests
 - `plugins/linked-intent-dev/skills/lid-coach/evals/evals.json` — eight prompt fixtures with assertions (unconfigured-project handoff, healthy full-project posture/scorecard/voice, HLD bloat, accumulation antipattern, scoped missing scope, advisory posture, lid-shaped-without-directives, index.yaml-driven arrow sampling).
 - skill-creator iteration-1 at `lid-coach-workspace/iteration-1/` (run 2026-05-15): with-skill 38/38 assertions (100%, ±0), baseline 83% (±19). evals 0/3/4/5 are non-discriminating (baseline already passes) — candidates to strengthen in iteration-2.
 
-### Code (skill prompts and bundled content)
+### Code
 - `plugins/linked-intent-dev/skills/lid-coach/SKILL.md` — embedded principle body (description + *why it matters* + audit signal per principle), dispatch table, scorecard format, coach-voice guidance, advisory posture, cold-read pass directive, conversational-mode pointer.
 - `plugins/linked-intent-dev/skills/lid-coach/references/lid-faq.md` — load-on-demand conversational guidance covering multi-repo organization, PRDs upstream of HLD, mode-fit changes, the upstream-ownership reframe, and arrow-segment splitting.
 

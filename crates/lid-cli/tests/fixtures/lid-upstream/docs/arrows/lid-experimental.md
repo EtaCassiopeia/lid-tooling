@@ -17,10 +17,10 @@ The opt-in third plugin — a structural container for novel LID capabilities un
 ### EARS
 - None on the container itself. Per the LLD: *"This LLD is structural and currently has no behavioral surface of its own — the plugin is a container, and EARS coverage attaches to individual experiments."*
 
-### Tests / Evals
+### Tests
 - None on the container.
 
-### Code (plugin scaffolding)
+### Code
 - `plugins/lid-experimental/.claude-plugin/plugin.json` — manifest with the opt-in description
 - `plugins/lid-experimental/skills/` — one subdirectory per experiment (currently: `bidirectional-differential/`)
 
