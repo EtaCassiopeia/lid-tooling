@@ -161,6 +161,7 @@ mod tests {
         let arrow_doc = ArrowDoc {
             path: root.join("docs/arrows/auth.md"),
             references: arrow_refs,
+            unrecognized_reference_sections: vec![],
         };
         let mut arrows = BTreeMap::new();
         arrows.insert(seg_id("auth"), minimal_segment("auth.md"));

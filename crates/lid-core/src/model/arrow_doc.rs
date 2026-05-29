@@ -10,6 +10,13 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+/// The canonical `### {Kind}` subsection names recognised under `## References`.
+///
+/// Any H3 heading under `## References` that is not in this list is
+/// collected as an `unrecognized_reference_sections` entry and surfaced
+/// by the `arrow-doc-structure` check as an `Info` finding.
+pub const KNOWN_REFERENCE_SECTIONS: &[&str] = &["HLD", "LLD", "EARS", "Tests", "Code"];
+
 /// Bullets under `## References / ### {Kind}` in an arrow doc, grouped by
 /// the H3 subsection.
 ///
@@ -37,4 +44,9 @@ pub struct ArrowDoc {
     /// Path on disk, repo-relative when produced by `LidRepo::discover`.
     pub path: PathBuf,
     pub references: ArrowReferences,
+    /// H3 heading names found under `## References` that don't match any
+    /// entry in [`KNOWN_REFERENCE_SECTIONS`]. Populated by the parser;
+    /// surfaced by the `arrow-doc-structure` check as `Info` findings.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unrecognized_reference_sections: Vec<String>,
 }

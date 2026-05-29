@@ -24,7 +24,8 @@ use regex::Regex;
 
 use crate::error::{LidError, Result};
 use crate::model::{
-    ArrowDoc, ArrowReferences, DecisionRow, LldDoc, SpecFile, SpecId, SpecLine, SpecStatus,
+    ArrowDoc, ArrowReferences, DecisionRow, KNOWN_REFERENCE_SECTIONS, LldDoc, SpecFile, SpecId,
+    SpecLine, SpecStatus,
 };
 
 /// Matches `- [x] **AUTH-001**: text` and its `[ ]`/`[D]` variants.
@@ -204,6 +205,7 @@ pub fn load_arrow_doc(path: &Path) -> Result<ArrowDoc> {
 #[must_use]
 pub fn parse_arrow_doc(content: &str, source_path: &Path) -> ArrowDoc {
     let mut refs = ArrowReferences::default();
+    let mut unrecognized: Vec<String> = Vec::new();
     let mut in_references = false;
     let mut h3_name = String::new();
     let mut collecting_heading: Option<HeadingLevel> = None;
@@ -226,7 +228,12 @@ pub fn parse_arrow_doc(content: &str, source_path: &Path) -> ArrowDoc {
                         in_references = text == "References";
                         h3_name.clear();
                     }
-                    HeadingLevel::H3 if in_references => h3_name = text,
+                    HeadingLevel::H3 if in_references => {
+                        if !KNOWN_REFERENCE_SECTIONS.contains(&text.as_str()) {
+                            unrecognized.push(text.clone());
+                        }
+                        h3_name = text;
+                    }
                     HeadingLevel::H3 => h3_name.clear(),
                     _ => {}
                 }
@@ -261,6 +268,7 @@ pub fn parse_arrow_doc(content: &str, source_path: &Path) -> ArrowDoc {
     ArrowDoc {
         path: source_path.to_path_buf(),
         references: refs,
+        unrecognized_reference_sections: unrecognized,
     }
 }
 
