@@ -12,6 +12,7 @@
 pub mod arrow_doc_structure;
 pub mod coverage;
 pub mod dag;
+pub mod implementing_artifacts;
 pub mod lld_decisions;
 pub mod orphans;
 pub mod references;
@@ -23,6 +24,7 @@ pub mod spec_status_counts;
 pub use arrow_doc_structure::ArrowDocStructureCheck;
 pub use coverage::CoverageCheck;
 pub use dag::DagCheck;
+pub use implementing_artifacts::ImplementingArtifactsCheck;
 pub use lld_decisions::LldDecisionsCheck;
 pub use orphans::OrphanCheck;
 pub use references::ReferenceCoherenceCheck;
@@ -49,6 +51,7 @@ pub fn default_checks() -> Vec<Box<dyn Check>> {
         Box::new(SpecStatusCountsCheck),
         Box::new(LldDecisionsCheck),
         Box::new(DagCheck),
+        Box::new(ImplementingArtifactsCheck),
     ]
 }
 
@@ -76,6 +79,7 @@ pub enum CheckId {
     SpecStatusCounts,
     LldDecisions,
     Dag,
+    ImplementingArtifacts,
 }
 
 impl CheckId {
@@ -95,6 +99,7 @@ impl CheckId {
             Self::SpecStatusCounts => "spec-status-counts",
             Self::LldDecisions => "lld-decisions",
             Self::Dag => "dag",
+            Self::ImplementingArtifacts => "implementing-artifacts",
         }
     }
 }
@@ -119,6 +124,7 @@ impl std::str::FromStr for CheckId {
             Self::SpecStatusCounts,
             Self::LldDecisions,
             Self::Dag,
+            Self::ImplementingArtifacts,
         ] {
             if id.as_str() == s {
                 return Ok(id);
@@ -375,6 +381,7 @@ mod tests {
             CheckId::SpecStatusCounts,
             CheckId::LldDecisions,
             CheckId::Dag,
+            CheckId::ImplementingArtifacts,
         ] {
             let serde_form = serde_json::to_string(&id).unwrap();
             let serde_form = serde_form.trim_matches('"');
@@ -400,6 +407,7 @@ mod tests {
             CheckId::SpecStatusCounts,
             CheckId::LldDecisions,
             CheckId::Dag,
+            CheckId::ImplementingArtifacts,
         ] {
             let back: CheckId = id.as_str().parse().unwrap();
             assert_eq!(back, id);

@@ -30,6 +30,7 @@ interface ArrowEntry {
 
 interface ArrowIndex {
     arrows?: Record<string, ArrowEntry>;
+    taxonomy?: Record<string, string[]>;
 }
 
 interface SpecCounts {
@@ -77,6 +78,7 @@ interface GraphEdge {
 interface GraphPayload {
     nodes: GraphNode[];
     edges: GraphEdge[];
+    clusters: Record<string, string[]>;
 }
 
 type WebviewMessage =
@@ -259,7 +261,12 @@ export class NavigatorPanel {
     }
 
     private _buildPayload(): GraphPayload {
-        const arrows = this._loadIndex().arrows ?? {};
+        const index = this._loadIndex();
+        const arrows = index.arrows ?? {};
+        const clusters: Record<string, string[]> = {};
+        for (const [name, ids] of Object.entries(index.taxonomy ?? {})) {
+            clusters[name] = ids;
+        }
         const specInfo = this._buildSpecInfo();
 
         const nodes: GraphNode[] = Object.entries(arrows).map(([id, entry]) => {
@@ -300,7 +307,7 @@ export class NavigatorPanel {
             }
         }
 
-        return { nodes, edges };
+        return { nodes, edges, clusters };
     }
 
     private _postGraph(): void {
@@ -545,6 +552,11 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
         <option value="AUDITED">AUDITED</option>
         <option value="OK">OK</option>
         <option value="MERGED">MERGED</option>
+      </select>
+    </label>
+    <label>Cluster
+      <select id="filter-cluster">
+        <option value="">All</option>
       </select>
     </label>
     <label>Search

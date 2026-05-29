@@ -51,6 +51,7 @@ interface GraphEdge {
 interface GraphPayload {
     nodes: GraphNode[];
     edges: GraphEdge[];
+    clusters: Record<string, string[]>;
 }
 
 // ── Status colours ───────────────────────────────────────────────────────────
@@ -86,6 +87,8 @@ function fmtDate(s: string | undefined): string {
 
 let cy: cytoscape.Core | undefined;
 
+let _clusters: Record<string, string[]> = {};
+
 const LAYOUT_OPTIONS = {
     name: 'dagre',
     rankDir: 'TB',
@@ -103,6 +106,20 @@ function buildLabel(n: GraphNode): string {
 }
 
 function render(payload: GraphPayload): void {
+    _clusters = payload.clusters ?? {};
+    const clusterSel = document.getElementById('filter-cluster') as HTMLSelectElement;
+    if (clusterSel) {
+        const prev = clusterSel.value;
+        while (clusterSel.options.length > 1) clusterSel.remove(1);
+        for (const name of Object.keys(_clusters).sort()) {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            clusterSel.appendChild(opt);
+        }
+        clusterSel.value = prev in _clusters ? prev : '';
+    }
+
     const elements: ElementDefinition[] = [
         ...payload.nodes.map((n) => ({
             data: {
@@ -527,23 +544,27 @@ document.addEventListener('keydown', (e) => {
 
 // ── Toolbar: filter + search ─────────────────────────────────────────────────
 
-const filterStatus = document.getElementById('filter-status') as HTMLSelectElement;
-const searchInput  = document.getElementById('search') as HTMLInputElement;
+const filterStatus  = document.getElementById('filter-status')  as HTMLSelectElement;
+const filterCluster = document.getElementById('filter-cluster') as HTMLSelectElement;
+const searchInput   = document.getElementById('search') as HTMLInputElement;
 
 function applyFilter(): void {
     if (!cy) return;
-    const status = filterStatus.value;
+    const status  = filterStatus.value;
+    const cluster = filterCluster.value;
     const q = searchInput.value.trim().toLowerCase();
+    const clusterIds = cluster ? new Set(_clusters[cluster] ?? []) : null;
 
     cy.batch(() => {
         cy!.nodes().forEach((n) => {
             const ns = (n.data('status') as string) ?? '';
-            const id = n.id().toLowerCase();
-            const statusOk = !status || ns === status;
-            const searchOk = !q || id.includes(q);
+            const id = n.id();
+            const statusOk  = !status  || ns === status;
+            const clusterOk = !cluster || clusterIds!.has(id);
+            const searchOk  = !q || id.toLowerCase().includes(q);
 
             n.removeClass('dimmed highlighted');
-            if (!statusOk) {
+            if (!statusOk || !clusterOk) {
                 n.addClass('dimmed');
             } else if (q && !searchOk) {
                 n.addClass('dimmed');
@@ -559,6 +580,7 @@ function applyFilter(): void {
 }
 
 filterStatus.addEventListener('change', applyFilter);
+filterCluster.addEventListener('change', applyFilter);
 searchInput.addEventListener('input', applyFilter);
 
 document.getElementById('btn-clear')!.addEventListener('click', () => {

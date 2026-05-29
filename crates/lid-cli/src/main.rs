@@ -1,18 +1,21 @@
 //! `lidc` — coherence checker for the LID methodology.
 //!
-//! Today the binary supports one operation: `lidc check` discovers a
-//! LID repo, runs the registered checks (filtered by `--only`) against
-//! it, prints findings via the markdown renderer (default) or the JSON
-//! renderer (`--json`), and exits with a code that respects `--fail-on`.
+//! Subcommands:
+//! * `lidc check` — discover a LID repo, run the registered checks, report
+//!   findings, exit 1 when severity crosses `--fail-on` threshold.
+//! * `lidc status` — print a quick health dashboard (segment counts, spec
+//!   coverage, drift/next counts); always exits 0.
 
 mod report;
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::{Context, Result, anyhow};
 use clap::{Args, Parser, Subcommand};
+use lid_core::model::SpecStatus;
 use lid_core::{CheckId, LidError, LidRepo, Severity, checks};
 
 use crate::report::{RenderOptions, json, markdown};
@@ -39,6 +42,8 @@ struct Cli {
 enum Cmd {
     /// Run the coherence checks against a LID repository.
     Check(CheckArgs),
+    /// Print a health dashboard: segment counts, spec coverage, drift/next.
+    Status,
 }
 
 #[derive(Args)]
@@ -70,8 +75,10 @@ fn main() -> ExitCode {
 
 fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
-    let Cmd::Check(args) = &cli.cmd;
-    cmd_check(cli.root.as_deref(), cli.json, args)
+    match &cli.cmd {
+        Cmd::Check(args) => cmd_check(cli.root.as_deref(), cli.json, args),
+        Cmd::Status => cmd_status(cli.root.as_deref(), cli.json),
+    }
 }
 
 fn cmd_check(root: Option<&Path>, as_json: bool, args: &CheckArgs) -> Result<ExitCode> {
@@ -119,6 +126,115 @@ fn cmd_check(root: Option<&Path>, as_json: bool, args: &CheckArgs) -> Result<Exi
     } else {
         ExitCode::SUCCESS
     })
+}
+
+fn cmd_status(root: Option<&Path>, as_json: bool) -> Result<ExitCode> {
+    let start = match root {
+        Some(p) => p.to_path_buf(),
+        None => std::env::current_dir().context("reading the current directory")?,
+    };
+
+    let repo = LidRepo::discover(&start).map_err(|e| match e {
+        e @ LidError::UnsupportedSchemaVersion { .. } => anyhow::Error::from(e),
+        other => anyhow::Error::from(other).context(format!(
+            "discovering a LID repo at or above {}",
+            start.display()
+        )),
+    })?;
+
+    let mut by_status: BTreeMap<String, usize> = BTreeMap::new();
+    for seg in repo.index.arrows.values() {
+        let key = format!("{:?}", seg.status).to_uppercase();
+        *by_status.entry(key).or_default() += 1;
+    }
+    let total_segments = repo.index.arrows.len();
+
+    let all_specs: Vec<_> = repo.specs.iter().flat_map(|f| f.specs.iter()).collect();
+    let total_specs = all_specs.len();
+    let implemented = all_specs
+        .iter()
+        .filter(|s| s.status == SpecStatus::Implemented)
+        .count();
+    let open = all_specs
+        .iter()
+        .filter(|s| s.status == SpecStatus::Open)
+        .count();
+    let deferred = all_specs
+        .iter()
+        .filter(|s| s.status == SpecStatus::Deferred)
+        .count();
+
+    let drift_count = repo
+        .index
+        .arrows
+        .values()
+        .filter(|s| s.drift.is_some())
+        .count();
+    let next_count = repo
+        .index
+        .arrows
+        .values()
+        .filter(|s| s.next.is_some())
+        .count();
+
+    if as_json {
+        let json = serde_json::json!({
+            "root": repo.root,
+            "schema_version": repo.index.schema_version,
+            "segments": {
+                "total": total_segments,
+                "by_status": by_status,
+            },
+            "specs": {
+                "total": total_specs,
+                "implemented": implemented,
+                "open": open,
+                "deferred": deferred,
+            },
+            "drift_count": drift_count,
+            "next_count": next_count,
+        });
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json).context("serialising status JSON")?
+        );
+    } else {
+        println!(
+            "LID repo: {}   schema v{}",
+            repo.root.display(),
+            repo.index.schema_version
+        );
+        println!();
+        println!("Segments   {total_segments} total");
+        for (status, count) in &by_status {
+            println!("  {status:<12} {count}");
+        }
+        println!();
+        let pct = if total_specs == 0 {
+            0
+        } else {
+            implemented * 100 / total_specs
+        };
+        println!("Specs      {total_specs} total");
+        println!(
+            "  [x] {implemented} implemented   [ ] {open} open   [D] {deferred} deferred   ({pct} % covered)"
+        );
+        println!();
+        println!(
+            "Drift       {drift_count} segment{} {} drift notes",
+            if drift_count == 1 { "" } else { "s" },
+            if drift_count == 1 { "has" } else { "have" }
+        );
+        println!(
+            "Next        {next_count} segment{} {} active next-work entries",
+            if next_count == 1 { "" } else { "s" },
+            if next_count == 1 { "has" } else { "have" }
+        );
+        println!();
+        println!("Run `lidc check` for full coherence findings.");
+    }
+
+    Ok(ExitCode::SUCCESS)
 }
 
 fn parse_only(values: &[String]) -> Result<Option<BTreeSet<CheckId>>> {
