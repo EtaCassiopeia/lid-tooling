@@ -58,20 +58,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             }
         }),
         vscode.commands.registerCommand(COMMAND_SHOW_NAVIGATOR, () => {
-            // Prefer the workspace folder that contains the active editor so
-            // the correct repo is shown in multi-root workspaces.
             const activeUri = vscode.window.activeTextEditor?.document.uri;
             const folder = activeUri
                 ? vscode.workspace.getWorkspaceFolder(activeUri)
                 : vscode.workspace.workspaceFolders?.[0];
-            const workspaceRoot = folder?.uri.fsPath;
-            if (!workspaceRoot) {
+            const wsRoot = folder?.uri.fsPath;
+            if (!wsRoot) {
                 vscode.window.showWarningMessage(
                     'LID: open a workspace folder first.',
                 );
                 return;
             }
-            NavigatorPanel.createOrShow(context.extensionUri, workspaceRoot);
+            // Walk upward from the active file to find the nearest ancestor
+            // that contains docs/arrows/index.yaml (the LID project root).
+            // This handles sub-projects that live inside a workspace root.
+            const startDir = activeUri ? path.dirname(activeUri.fsPath) : wsRoot;
+            const projectRoot = findLidProjectRoot(startDir, wsRoot) ?? wsRoot;
+            NavigatorPanel.createOrShow(context.extensionUri, projectRoot);
         }),
     );
 
@@ -212,4 +215,20 @@ function formatError(err: unknown): string {
         return err.message;
     }
     return String(err);
+}
+
+// Walk upward from startDir (inclusive) to stopDir (inclusive), returning the
+// first directory that contains docs/arrows/index.yaml. Returns undefined if
+// no such ancestor exists within the bounds.
+function findLidProjectRoot(startDir: string, stopDir: string): string | undefined {
+    let dir = startDir;
+    while (true) {
+        if (fs.existsSync(path.join(dir, 'docs', 'arrows', 'index.yaml'))) {
+            return dir;
+        }
+        if (dir === stopDir || dir === path.dirname(dir)) {
+            return undefined;
+        }
+        dir = path.dirname(dir);
+    }
 }
