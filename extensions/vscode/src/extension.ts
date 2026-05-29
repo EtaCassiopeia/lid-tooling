@@ -18,8 +18,11 @@ import {
     TransportKind,
 } from 'vscode-languageclient/node';
 
+import { NavigatorPanel, NavigatorPanelSerializer } from './navigator';
+
 const COMMAND_RESTART_SERVER = 'lid.restartServer';
 const COMMAND_SHOW_OUTPUT = 'lid.showOutputChannel';
+const COMMAND_SHOW_NAVIGATOR = 'lid.showIntentNavigator';
 
 let client: LanguageClient | undefined;
 let statusBarItem: vscode.StatusBarItem | undefined;
@@ -54,6 +57,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 setStatusError(err);
             }
         }),
+        vscode.commands.registerCommand(COMMAND_SHOW_NAVIGATOR, () => {
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            if (!workspaceRoot) {
+                vscode.window.showWarningMessage(
+                    'LID: open a workspace folder first.',
+                );
+                return;
+            }
+            NavigatorPanel.createOrShow(context.extensionUri, workspaceRoot);
+        }),
+    );
+
+    vscode.window.registerWebviewPanelSerializer(
+        'lid.intentNavigator',
+        new NavigatorPanelSerializer(context.extensionUri),
     );
 
     await startServer(context);

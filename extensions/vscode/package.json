@@ -60,6 +60,11 @@
         "command": "lid.showOutputChannel",
         "title": "Show Output Channel",
         "category": "LID"
+      },
+      {
+        "command": "lid.showIntentNavigator",
+        "title": "Show Intent Navigator",
+        "category": "LID"
       }
     ],
     "grammars": [
@@ -92,19 +97,28 @@
     ]
   },
   "scripts": {
-    "compile": "tsc -p ./",
+    "build:webview": "esbuild src/webview/navigator.ts --bundle --outfile=media/navigator.js --platform=browser --format=iife",
+    "build:webview:prod": "esbuild src/webview/navigator.ts --bundle --outfile=media/navigator.js --platform=browser --format=iife --minify",
+    "compile": "tsc -p ./ && npm run build:webview",
     "watch": "tsc -watch -p ./",
     "lint": "tsc -p ./ --noEmit",
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "tsc -p ./ && npm run build:webview:prod",
     "package": "vsce package"
   },
   "dependencies": {
+    "js-yaml": "^4.1.1",
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
+    "@types/cytoscape": "^3.21.9",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^2.24.0",
+    "cytoscape": "^3.33.4",
+    "cytoscape-dagre": "^3.0.0",
+    "dagre": "^0.8.5",
+    "esbuild": "^0.28.0",
     "typescript": "^5.4.0"
   }
 }
