@@ -100,12 +100,14 @@
     ]
   },
   "scripts": {
+    "build:extension": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --platform=node --format=cjs",
+    "build:extension:prod": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --platform=node --format=cjs --minify",
     "build:webview": "esbuild src/webview/navigator.ts --bundle --outfile=media/navigator.js --platform=browser --format=iife",
     "build:webview:prod": "esbuild src/webview/navigator.ts --bundle --outfile=media/navigator.js --platform=browser --format=iife --minify",
-    "compile": "tsc -p ./ && npm run build:webview",
+    "compile": "tsc -p ./ --noEmit && npm run build:extension && npm run build:webview",
     "watch": "tsc -watch -p ./",
     "lint": "tsc -p ./ --noEmit",
-    "vscode:prepublish": "tsc -p ./ && npm run build:webview:prod",
+    "vscode:prepublish": "npm run build:extension:prod && npm run build:webview:prod",
     "package": "vsce package"
   },
   "dependencies": {
