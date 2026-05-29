@@ -1,16 +1,25 @@
 //! Markdown parsers for LID artifacts.
 //!
 //! The methodology's structured artifacts (EARS spec files, arrow docs,
-//! LLDs) all live in markdown with conventional patterns rather than a
-//! formal grammar. This module uses tight line-level regexes for the
-//! patterns it consumes; we reach for `pulldown-cmark` only when we need
-//! to walk tables or section trees (which is for the arrow-doc and LLD
-//! parsers in later commits, not for the spec-line parser here).
+//! LLDs) all live in Markdown with conventional patterns rather than a
+//! formal grammar. The approach per artifact:
+//!
+//! - **EARS spec files** (`parse_spec_file`): line-level regex scanner.
+//!   Spec lines require 1-based line numbers for LSP hover and the `[D]`
+//!   deferred marker isn't a `CommonMark` task-list item, so staying at the
+//!   line level is simpler and more precise.
+//! - **Arrow detail docs** (`parse_arrow_doc`): `pulldown-cmark` event
+//!   stream. Section trees (`## References` / `### LLD`) need structural
+//!   heading detection that is fragile with prefix matching.
+//! - **LLD design docs** (`parse_lld`): `pulldown-cmark` event stream with
+//!   `ENABLE_TABLES`. GFM table parsing handles column alignment, escaped
+//!   pipes in cells, and varying column counts correctly.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
+use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use regex::Regex;
 
 use crate::error::{LidError, Result};
@@ -189,44 +198,69 @@ pub fn load_arrow_doc(path: &Path) -> Result<ArrowDoc> {
 /// Captures bullets under `## References` grouped by `### {Kind}`
 /// subheading (`HLD`, `LLD`, `EARS`, `Tests`, `Code`). Unknown subsection
 /// names are ignored so that future additions to the methodology don't
-/// fail parsing.
+/// fail parsing. Bullet text is collected from all inline events (plain
+/// text, inline code) so that both `` `path.md` `` and `path.md §Section`
+/// forms are preserved verbatim for later path resolution.
 #[must_use]
 pub fn parse_arrow_doc(content: &str, source_path: &Path) -> ArrowDoc {
-    let mut references = ArrowReferences::default();
-    let mut current_h2: Option<String> = None;
-    let mut current_h3: Option<String> = None;
+    let mut refs = ArrowReferences::default();
+    let mut in_references = false;
+    let mut h3_name = String::new();
+    let mut collecting_heading: Option<HeadingLevel> = None;
+    let mut heading_buf = String::new();
+    let mut in_item = false;
+    let mut item_buf = String::new();
 
-    for raw_line in content.lines() {
-        if let Some(rest) = raw_line.strip_prefix("## ") {
-            current_h2 = Some(rest.trim().to_owned());
-            current_h3 = None;
-            continue;
-        }
-        if let Some(rest) = raw_line.strip_prefix("### ") {
-            current_h3 = Some(rest.trim().to_owned());
-            continue;
-        }
-
-        if current_h2.as_deref() != Some("References") {
-            continue;
-        }
-        let Some(rest) = raw_line.strip_prefix("- ") else {
-            continue;
-        };
-        let bullet = rest.trim().to_owned();
-        match current_h3.as_deref() {
-            Some("HLD") => references.hld.push(bullet),
-            Some("LLD") => references.lld.push(bullet),
-            Some("EARS") => references.ears.push(bullet),
-            Some("Tests") => references.tests.push(bullet),
-            Some("Code") => references.code.push(bullet),
+    for event in Parser::new(content) {
+        match event {
+            Event::Start(Tag::Heading { level, .. }) => {
+                collecting_heading = Some(level);
+                heading_buf.clear();
+                in_item = false;
+            }
+            Event::End(TagEnd::Heading(level)) => {
+                let text = heading_buf.trim().to_owned();
+                collecting_heading = None;
+                match level {
+                    HeadingLevel::H2 => {
+                        in_references = text == "References";
+                        h3_name.clear();
+                    }
+                    HeadingLevel::H3 if in_references => h3_name = text,
+                    HeadingLevel::H3 => h3_name.clear(),
+                    _ => {}
+                }
+            }
+            Event::Text(t) | Event::Code(t) if collecting_heading.is_some() => {
+                heading_buf.push_str(&t);
+            }
+            Event::Start(Tag::Item) if in_references => {
+                in_item = true;
+                item_buf.clear();
+            }
+            Event::End(TagEnd::Item) if in_item => {
+                let bullet = item_buf.trim().to_owned();
+                if !bullet.is_empty() {
+                    match h3_name.as_str() {
+                        "HLD" => refs.hld.push(bullet),
+                        "LLD" => refs.lld.push(bullet),
+                        "EARS" => refs.ears.push(bullet),
+                        "Tests" => refs.tests.push(bullet),
+                        "Code" => refs.code.push(bullet),
+                        _ => {}
+                    }
+                }
+                in_item = false;
+            }
+            Event::Text(t) | Event::Code(t) if in_item => item_buf.push_str(&t),
+            Event::SoftBreak | Event::HardBreak if in_item => item_buf.push(' '),
             _ => {}
         }
     }
 
     ArrowDoc {
         path: source_path.to_path_buf(),
-        references,
+        references: refs,
     }
 }
 
@@ -245,66 +279,73 @@ pub fn load_lld(path: &Path) -> Result<LldDoc> {
 /// Parse an LLD from an in-memory string, extracting rows of the
 /// `Decisions & Alternatives` table when present.
 ///
-/// Rows are detected once both the column-header row and the GFM
-/// separator row (`| --- | --- | …`) have been seen under the
-/// `## Decisions & Alternatives` heading. Cells with fewer than four
-/// columns are skipped silently — a four-column table is the methodology's
-/// canonical shape (Decision, Chosen, Alternatives, Rationale).
+/// Uses `pulldown-cmark` with GFM table support so that escaped pipes
+/// inside cells (`` `key: a \| b` ``) and alignment markers are handled
+/// correctly. The header row (column names) and separator row are emitted
+/// as a `TableHead` event and are skipped; only `TableRow` events
+/// contribute `DecisionRow` values. The methodology's canonical shape is
+/// four columns (Decision, Chosen, Alternatives, Rationale); any row with
+/// fewer typed cells is padded with empty strings by the parser.
 #[must_use]
 pub fn parse_lld(content: &str, source_path: &Path) -> LldDoc {
     let mut decisions: Vec<DecisionRow> = Vec::new();
-    let mut in_decisions_section = false;
-    let mut header_row_seen = false;
-    let mut separator_row_seen = false;
+    let mut in_decisions_h2 = false;
+    let mut collecting_h2 = false;
+    let mut h2_buf = String::new();
+    let mut in_table = false;
+    let mut is_header_row = false;
+    let mut current_row: Vec<String> = Vec::new();
+    let mut in_cell = false;
+    let mut cell_buf = String::new();
 
-    for raw_line in content.lines() {
-        if let Some(rest) = raw_line.strip_prefix("## ") {
-            in_decisions_section = matches!(
-                rest.trim(),
-                "Decisions & Alternatives" | "Decisions and Alternatives"
-            );
-            header_row_seen = false;
-            separator_row_seen = false;
-            continue;
+    for event in Parser::new_ext(content, Options::ENABLE_TABLES) {
+        match event {
+            Event::Start(Tag::Heading {
+                level: HeadingLevel::H2,
+                ..
+            }) => {
+                collecting_h2 = true;
+                h2_buf.clear();
+                in_table = false;
+            }
+            Event::Text(t) if collecting_h2 => h2_buf.push_str(&t),
+            Event::End(TagEnd::Heading(HeadingLevel::H2)) => {
+                collecting_h2 = false;
+                in_decisions_h2 = matches!(
+                    h2_buf.trim(),
+                    "Decisions & Alternatives" | "Decisions and Alternatives"
+                );
+            }
+            Event::Start(Tag::Table(_)) if in_decisions_h2 => in_table = true,
+            Event::End(TagEnd::Table) => in_table = false,
+            Event::Start(Tag::TableHead) => is_header_row = true,
+            Event::End(TagEnd::TableHead) => is_header_row = false,
+            Event::Start(Tag::TableRow) => current_row.clear(),
+            Event::End(TagEnd::TableRow) if in_table && !is_header_row => {
+                let inferred = current_row.iter().any(|c| c.contains("[inferred]"));
+                decisions.push(DecisionRow {
+                    decision: current_row.first().cloned().unwrap_or_default(),
+                    chosen: current_row.get(1).cloned().unwrap_or_default(),
+                    alternatives: current_row.get(2).cloned().unwrap_or_default(),
+                    rationale: current_row.get(3).cloned().unwrap_or_default(),
+                    inferred,
+                });
+                current_row.clear();
+            }
+            Event::Start(Tag::TableCell) if in_table => {
+                in_cell = true;
+                cell_buf.clear();
+            }
+            Event::End(TagEnd::TableCell) if in_table && !is_header_row => {
+                current_row.push(std::mem::take(&mut cell_buf).trim().to_owned());
+                in_cell = false;
+            }
+            Event::End(TagEnd::TableCell) if in_table => in_cell = false,
+            Event::Text(t) | Event::Code(t) if in_cell && !is_header_row => {
+                cell_buf.push_str(&t);
+            }
+            _ => {}
         }
-
-        if !in_decisions_section {
-            continue;
-        }
-
-        let trimmed = raw_line.trim();
-        if !trimmed.starts_with('|') {
-            continue;
-        }
-
-        if !header_row_seen {
-            header_row_seen = true;
-            continue;
-        }
-        if !separator_row_seen {
-            // Canonical separator is `| --- | --- | … |`; accept any pipe
-            // row that's mostly dashes/colons/spaces.
-            separator_row_seen = true;
-            continue;
-        }
-
-        let cells: Vec<String> = trimmed
-            .trim_start_matches('|')
-            .trim_end_matches('|')
-            .split('|')
-            .map(|c| c.trim().to_owned())
-            .collect();
-        if cells.len() < 4 {
-            continue;
-        }
-        let inferred = cells.iter().any(|c| c.contains("[inferred]"));
-        decisions.push(DecisionRow {
-            decision: cells[0].clone(),
-            chosen: cells[1].clone(),
-            alternatives: cells[2].clone(),
-            rationale: cells[3].clone(),
-            inferred,
-        });
     }
 
     LldDoc {
@@ -721,7 +762,10 @@ Some prose.
     }
 
     #[test]
-    fn lld_skips_rows_with_too_few_columns() {
+    fn lld_pads_short_rows_to_column_count() {
+        // pulldown-cmark pads rows that have fewer cells than the header
+        // to match the header column count (GFM spec §4.10). A two-cell
+        // row in a four-column table becomes ["short", "row", "", ""].
         let content = "\
 ## Decisions & Alternatives
 
@@ -731,7 +775,9 @@ Some prose.
 | Valid | Row | Yes | Indeed |
 ";
         let d = lld(content);
-        assert_eq!(d.decisions.len(), 1);
-        assert_eq!(d.decisions[0].decision, "Valid");
+        assert_eq!(d.decisions.len(), 2);
+        assert_eq!(d.decisions[0].decision, "short");
+        assert!(d.decisions[0].alternatives.is_empty());
+        assert_eq!(d.decisions[1].decision, "Valid");
     }
 }
