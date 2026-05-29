@@ -26,7 +26,10 @@
     "sdd"
   ],
   "activationEvents": [
-    "workspaceContains:docs/arrows/index.yaml"
+    "workspaceContains:docs/arrows/index.yaml",
+    "onCommand:lid.showIntentNavigator",
+    "onCommand:lid.restartServer",
+    "onCommand:lid.showOutputChannel"
   ],
   "main": "./out/extension.js",
   "contributes": {
