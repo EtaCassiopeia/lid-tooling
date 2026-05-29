@@ -56,8 +56,11 @@ pub struct Segment {
     #[serde(default, rename = "blockedBy")]
     pub blocked_by: Vec<SegmentId>,
 
-    /// Relative filename of the segment's detail doc, e.g.
-    /// `linked-intent-dev.md` (relative to `docs/arrows/`).
+    /// Path to the segment's detail document. For leaf segments this is
+    /// a path relative to `docs/arrows/` (e.g. `linked-intent-dev/core.md`).
+    /// For parent segments it is typically a path relative to `docs/arrows/`
+    /// that traverses the intent tree (e.g.
+    /// `../intent/linked-intent-dev/linked-intent-dev-design.md`).
     pub detail: PathBuf,
 
     #[serde(default)]
@@ -70,17 +73,35 @@ pub struct Segment {
     /// that state; absent otherwise.
     #[serde(default)]
     pub merged_into: Option<SegmentId>,
+
+    /// Child segment IDs for hierarchical arrow trees (PR #12 layout).
+    /// Present only on parent segments; absent on leaves.
+    #[serde(default)]
+    pub children: Vec<SegmentId>,
+
+    /// Parent segment ID for child segments in a hierarchical arrow tree.
+    /// Present only on children; absent on root/top-level segments.
+    #[serde(default)]
+    pub parent: Option<SegmentId>,
 }
 
-/// Orphans — files known to exist under `docs/llds/` or `docs/specs/` but
+/// Orphans — files known to exist under the intent tree or spec files but
 /// not yet attached to any arrow segment.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnmappedDocs {
+    /// Legacy field (pre-PR #12 layout). Kept for backward compatibility.
     #[serde(default)]
     pub llds: Vec<PathBuf>,
 
+    /// Legacy field (pre-PR #12 layout). Kept for backward compatibility.
     #[serde(default)]
     pub specs: Vec<PathBuf>,
+
+    /// Intent-tree files (design docs, spec files) that exist but are not
+    /// yet referenced from any arrow segment. Used in the PR #12 layout
+    /// where both LLDs and specs live under `docs/intent/`.
+    #[serde(default)]
+    pub intent: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -151,6 +172,8 @@ mod tests {
             next: None,
             drift: None,
             merged_into: None,
+            children: vec![],
+            parent: None,
         };
         assert_eq!(s.status, Status::Unmapped);
     }
@@ -174,6 +197,8 @@ mod tests {
                 next: None,
                 drift: None,
                 merged_into: None,
+                children: vec![],
+                parent: None,
             },
         );
         let idx = ArrowIndex {
@@ -215,6 +240,8 @@ mod tests {
                 next: Some("write tests".into()),
                 drift: None,
                 merged_into: None,
+                children: vec![],
+                parent: None,
             },
         );
         let idx = ArrowIndex {
