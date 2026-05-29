@@ -58,7 +58,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             }
         }),
         vscode.commands.registerCommand(COMMAND_SHOW_NAVIGATOR, () => {
-            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            // Prefer the workspace folder that contains the active editor so
+            // the correct repo is shown in multi-root workspaces.
+            const activeUri = vscode.window.activeTextEditor?.document.uri;
+            const folder = activeUri
+                ? vscode.workspace.getWorkspaceFolder(activeUri)
+                : vscode.workspace.workspaceFolders?.[0];
+            const workspaceRoot = folder?.uri.fsPath;
             if (!workspaceRoot) {
                 vscode.window.showWarningMessage(
                     'LID: open a workspace folder first.',
