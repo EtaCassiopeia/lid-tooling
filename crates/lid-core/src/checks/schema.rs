@@ -79,6 +79,8 @@ impl Check for SchemaCheck {
                         Some(format!("ensure `{target}` exists under `arrows`")),
                     ));
                 }
+                // Valid: MERGED status with a known merged_into target — no finding.
+                (Some(_), Status::Merged) => {}
                 (Some(target), other_status) => {
                     findings.push(warning_at(
                         format!(

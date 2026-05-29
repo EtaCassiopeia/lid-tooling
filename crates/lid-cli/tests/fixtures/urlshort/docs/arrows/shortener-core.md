@@ -1,10 +1,10 @@
 # Arrow: shortener-core
 
-Domain logic for URL shortening — alias generation, collision handling, and idempotency contract. Stateless; depends on `storage` interface for persistence.
+Domain logic for URL shortening — alias generation, collision handling, and the idempotency contract. Stateless; depends on the `storage` interface for persistence.
 
 ## Status
 
-**UNMAPPED** — LLD and EARS authored; implementation not started.
+**MAPPED** — alias generation and basic collision done; validation and storage-interaction specs still open.
 
 ## References
 
@@ -18,13 +18,17 @@ Domain logic for URL shortening — alias generation, collision handling, and id
 - `docs/intent/shortener-core/shortener-core-specs.md` (13 specs, prefix `USH-CORE-*`)
 
 ### Tests
-- (none yet)
+- `tests/shortener_core_test.rs`
 
 ### Code
-- (none yet)
+- `src/shortener_core.rs`
 
 ## Spec Coverage
 
 | Category | Spec range | Implemented | Active gap | Deferred |
 |---|---|---|---|---|
-| All USH-CORE | USH-CORE-001..013 | 0 | 13 | 0 |
+| Alias generation | USH-CORE-001..002 | 2 | 0 | 0 |
+| Collision handling | USH-CORE-003..005 | 2 | 1 | 0 |
+| Validation | USH-CORE-006..008 | 0 | 3 | 0 |
+| Resolution | USH-CORE-009..010 | 1 | 1 | 0 |
+| Storage interaction | USH-CORE-011..013 | 0 | 3 | 0 |
