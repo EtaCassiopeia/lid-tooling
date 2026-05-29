@@ -79,6 +79,14 @@ impl DocStore {
     pub fn is_empty(&self) -> bool {
         self.docs.is_empty()
     }
+
+    /// Snapshot every open document as a `Vec`. Safe to call from async
+    /// code — collects under the `DashMap` sharded locks then releases them
+    /// before returning, so no lock is held across an `.await` point.
+    #[must_use]
+    pub fn snapshot_all(&self) -> Vec<Arc<Document>> {
+        self.docs.iter().map(|e| Arc::clone(e.value())).collect()
+    }
 }
 
 #[cfg(test)]

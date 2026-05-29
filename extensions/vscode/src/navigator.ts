@@ -93,6 +93,7 @@ export class NavigatorPanel {
     private readonly _panel: vscode.WebviewPanel;
     private readonly _workspaceRoot: string;
     private readonly _disposables: vscode.Disposable[] = [];
+    private _refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
     // ── Public factory methods ──────────────────────────────────────────────
 
@@ -152,14 +153,17 @@ export class NavigatorPanel {
             this._disposables,
         );
 
-        // Re-post graph whenever index.yaml changes on disk.
-        const watcher = vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(workspaceRoot, 'docs/arrows/index.yaml'),
-        );
-        const repost = () => this._postGraph();
-        watcher.onDidChange(repost, null, this._disposables);
-        watcher.onDidCreate(repost, null, this._disposables);
-        this._disposables.push(watcher);
+        // Re-post graph whenever index.yaml or any intent file changes on disk.
+        const repost = () => this._scheduleRefresh();
+        for (const glob of ['docs/arrows/index.yaml', 'docs/intent/**/*.md']) {
+            const watcher = vscode.workspace.createFileSystemWatcher(
+                new vscode.RelativePattern(workspaceRoot, glob),
+            );
+            watcher.onDidChange(repost, null, this._disposables);
+            watcher.onDidCreate(repost, null, this._disposables);
+            watcher.onDidDelete(repost, null, this._disposables);
+            this._disposables.push(watcher);
+        }
 
         setTimeout(() => this._postGraph(), 150);
     }
@@ -310,8 +314,27 @@ export class NavigatorPanel {
         return { nodes, edges, clusters };
     }
 
+    // Debounce rapid file-system events (e.g. agent writing multiple files, mid-keystroke saves).
+    // The 400 ms window lets a flurry of saves settle before we re-read disk.
+    private _scheduleRefresh(): void {
+        if (this._refreshTimer !== undefined) {
+            clearTimeout(this._refreshTimer);
+        }
+        this._refreshTimer = setTimeout(() => {
+            this._refreshTimer = undefined;
+            this._postGraph();
+        }, 400);
+    }
+
     private _postGraph(): void {
-        const payload = this._buildPayload();
+        let payload: GraphPayload;
+        try {
+            payload = this._buildPayload();
+        } catch {
+            // Transient filesystem state (half-written file, missing dir).
+            // Keep the webview unchanged until the next stable read.
+            return;
+        }
         void this._panel.webview.postMessage({ type: 'graph', payload });
     }
 
@@ -319,6 +342,10 @@ export class NavigatorPanel {
 
     public dispose(): void {
         NavigatorPanel.currentPanel = undefined;
+        if (this._refreshTimer !== undefined) {
+            clearTimeout(this._refreshTimer);
+            this._refreshTimer = undefined;
+        }
         this._panel.dispose();
         for (const d of this._disposables) {
             d.dispose();
