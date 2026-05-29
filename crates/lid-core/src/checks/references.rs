@@ -157,6 +157,8 @@ mod tests {
                 next: None,
                 drift: None,
                 merged_into: None,
+                children: vec![],
+                parent: None,
             },
         );
 
@@ -335,6 +337,8 @@ mod tests {
                 next: None,
                 drift: None,
                 merged_into: None,
+                children: vec![],
+                parent: None,
             },
         );
         let repo = LidRepo {

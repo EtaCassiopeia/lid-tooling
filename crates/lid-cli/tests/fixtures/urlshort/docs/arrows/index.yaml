@@ -1,0 +1,28 @@
+schema_version: 2
+last_updated: 2026-05-29
+
+taxonomy:
+  core:
+    - shortener-core
+    - api
+    - storage
+
+arrows:
+  shortener-core:
+    status: UNMAPPED
+    detail: shortener-core.md
+    blocks: [api, storage]
+
+  api:
+    status: UNMAPPED
+    detail: api.md
+    blockedBy: [shortener-core]
+
+  storage:
+    status: UNMAPPED
+    detail: storage.md
+    blockedBy: [shortener-core]
+
+unmapped:
+  docs:
+    intent: []

@@ -100,18 +100,42 @@ impl Check for SchemaCheck {
                 (None, _) => {}
             }
 
-            if !known_arrow_doc_files.contains(&seg.detail) {
+            let detail_path = arrows_dir.join(&seg.detail);
+            if !known_arrow_doc_files.contains(&seg.detail) && !detail_path.exists() {
                 findings.push(error_at(
                     format!(
-                        "segment `{seg_id}` detail file `{}` not found under `docs/arrows/`",
+                        "segment `{seg_id}` detail file `{}` not found",
                         seg.detail.display()
                     ),
-                    &arrows_dir.join(&seg.detail),
+                    &detail_path,
                     Some(format!(
-                        "create `docs/arrows/{}` or update `{seg_id}.detail`",
+                        "create `docs/arrows/{}` (or the intent-tree path it resolves to) or update `{seg_id}.detail`",
                         seg.detail.display()
                     )),
                 ));
+            }
+
+            for child in &seg.children {
+                if !known.contains(child) {
+                    findings.push(error_at(
+                        format!("segment `{seg_id}` lists unknown child `{child}`"),
+                        &index_yaml_path,
+                        Some(format!(
+                            "add `{child}` under `arrows` or remove it from `{seg_id}.children`"
+                        )),
+                    ));
+                }
+            }
+            if let Some(parent_id) = &seg.parent {
+                if !known.contains(parent_id) {
+                    findings.push(error_at(
+                        format!("segment `{seg_id}` references unknown parent `{parent_id}`"),
+                        &index_yaml_path,
+                        Some(format!(
+                            "add `{parent_id}` under `arrows` or remove `parent` from `{seg_id}`"
+                        )),
+                    ));
+                }
             }
         }
 
@@ -186,6 +210,8 @@ mod tests {
             next: None,
             drift: None,
             merged_into: None,
+            children: vec![],
+            parent: None,
         }
     }
 
@@ -324,6 +350,44 @@ mod tests {
             f[0].message
                 .contains("taxonomy cluster `core` references unknown segment `nonexistent`")
         );
+    }
+
+    #[test]
+    fn flags_unknown_child_segment() {
+        let mut arrows = BTreeMap::new();
+        let mut parent = minimal_segment("parent.md");
+        parent.children = vec![seg_id("ghost-child")];
+        arrows.insert(seg_id("parent"), parent);
+        let repo = repo_with(arrows, BTreeMap::new(), &["parent.md"]);
+        let f = SchemaCheck.run(&repo);
+        assert_eq!(f.len(), 1);
+        assert!(f[0].message.contains("unknown child `ghost-child`"));
+    }
+
+    #[test]
+    fn flags_unknown_parent_segment() {
+        let mut arrows = BTreeMap::new();
+        let mut child = minimal_segment("child.md");
+        child.parent = Some(seg_id("ghost-parent"));
+        arrows.insert(seg_id("child"), child);
+        let repo = repo_with(arrows, BTreeMap::new(), &["child.md"]);
+        let f = SchemaCheck.run(&repo);
+        assert_eq!(f.len(), 1);
+        assert!(f[0].message.contains("unknown parent `ghost-parent`"));
+    }
+
+    #[test]
+    fn valid_children_and_parent_produce_no_findings() {
+        let mut arrows = BTreeMap::new();
+        let mut parent = minimal_segment("parent.md");
+        parent.children = vec![seg_id("child")];
+        let mut child = minimal_segment("child.md");
+        child.parent = Some(seg_id("parent"));
+        arrows.insert(seg_id("parent"), parent);
+        arrows.insert(seg_id("child"), child);
+        let repo = repo_with(arrows, BTreeMap::new(), &["parent.md", "child.md"]);
+        let f = SchemaCheck.run(&repo);
+        assert!(f.is_empty(), "got {f:?}");
     }
 
     #[test]

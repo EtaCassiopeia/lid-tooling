@@ -124,6 +124,8 @@ mod tests {
             next: None,
             drift: None,
             merged_into: None,
+            children: vec![],
+            parent: None,
         }
     }
 
@@ -227,6 +229,7 @@ mod tests {
             docs: UnmappedDocs {
                 llds: vec![PathBuf::from("docs/intent/auth/parked.md")],
                 specs: vec![],
+                intent: vec![],
             },
         };
         let repo = make_repo(&["parked.md"], &[], ArrowReferences::default(), unmapped);
