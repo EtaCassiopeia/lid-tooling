@@ -140,10 +140,15 @@ function render(payload: GraphPayload): void {
         maxZoom: 3,
     });
 
-    cy.on('tap', 'node', (event) => {
-        const id = event.target.id() as string;
+    // 'tap' is Cytoscape's unified click/touch event, but on macOS trackpads
+    // inside a VS Code WebView the synthetic tap can be swallowed. Listen to
+    // both 'tap' and the raw 'click' event so either path fires navigation.
+    const openNode = (event: cytoscape.EventObject) => {
+        const id = (event.target as cytoscape.NodeSingular).id();
         vscode.postMessage({ type: 'open', segmentId: id });
-    });
+    };
+    cy.on('tap', 'node', openNode);
+    cy.on('click', 'node', openNode);
 }
 
 // ── Message bridge ───────────────────────────────────────────────────────────
