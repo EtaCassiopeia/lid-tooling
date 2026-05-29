@@ -36,8 +36,14 @@ interface SpecCounts {
     deferred: number;
 }
 
+interface SpecItem {
+    marker: 'done' | 'open' | 'deferred';
+    text: string;
+}
+
 interface SpecInfo {
     counts: SpecCounts;
+    items: SpecItem[];
     specFile?: string;
     lldFile?: string;
 }
@@ -51,6 +57,7 @@ interface GraphNode {
     sampled?: string;
     audited?: string;
     specs?: SpecCounts;
+    specItems?: SpecItem[];
     specFile?: string;
     lldFile?: string;
 }
@@ -199,6 +206,8 @@ export class NavigatorPanel {
             let implemented = 0, open = 0, deferred = 0;
             let specFile: string | undefined;
             let lldFile: string | undefined;
+            const items: SpecItem[] = [];
+            const SPEC_RE = /^\s*-\s+\[([xX D])\]\s*(.*)/;
 
             for (const f of files) {
                 if (!f.isFile()) continue;
@@ -207,9 +216,20 @@ export class NavigatorPanel {
                     if (!specFile) specFile = fullPath;
                     try {
                         for (const line of fs.readFileSync(fullPath, 'utf8').split('\n')) {
-                            if (/^\s*-\s+\[x\]/i.test(line)) implemented++;
-                            else if (/^\s*-\s+\[ \]/.test(line)) open++;
-                            else if (/^\s*-\s+\[D\]/i.test(line)) deferred++;
+                            const m = SPEC_RE.exec(line);
+                            if (!m) continue;
+                            const ch = m[1]!;
+                            const text = (m[2] ?? '').trim();
+                            if (ch === 'x' || ch === 'X') {
+                                implemented++;
+                                items.push({ marker: 'done', text });
+                            } else if (ch === ' ') {
+                                open++;
+                                items.push({ marker: 'open', text });
+                            } else {
+                                deferred++;
+                                items.push({ marker: 'deferred', text });
+                            }
                         }
                     } catch {
                         // skip unreadable file
@@ -221,6 +241,7 @@ export class NavigatorPanel {
 
             result.set(segmentId, {
                 counts: { implemented, open, deferred },
+                items,
                 specFile,
                 lldFile,
             });
@@ -244,6 +265,7 @@ export class NavigatorPanel {
                 sampled: entry.sampled,
                 audited: entry.audited,
                 specs: info?.counts,
+                specItems: info?.items,
                 specFile: info?.specFile,
                 lldFile: info?.lldFile,
             };
@@ -408,6 +430,44 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
       font-size: 11px; line-height: 1.55; opacity: 0.88;
       white-space: pre-wrap; word-break: break-word;
     }
+    /* ── Dependency chips ── */
+    .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+    .chip {
+      padding: 2px 9px; border-radius: 10px; font-size: 10px; cursor: pointer;
+      background: var(--vscode-badge-background, #4d4d4d);
+      color: var(--vscode-badge-foreground, #fff);
+      border: none; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .chip:hover { background: var(--vscode-list-hoverBackground, #2a2d2e); outline: 1px solid var(--vscode-focusBorder, #007fd4); }
+    /* ── Spec list ── */
+    .sec-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .spec-toggle {
+      background: none; border: none; font-size: 10px; opacity: 0.55; cursor: pointer; padding: 0;
+      color: inherit;
+    }
+    .spec-toggle:hover { opacity: 0.9; }
+    .spec-list {
+      margin-top: 6px; max-height: 200px; overflow-y: auto;
+      border-top: 1px solid var(--vscode-editorGroup-border, #3c3c3c); padding-top: 4px;
+    }
+    .si { display: flex; gap: 6px; padding: 2px 0; font-size: 10px; align-items: flex-start; }
+    .si-m { flex-shrink: 0; width: 14px; text-align: center; }
+    .si-done { color: #22c55e; }
+    .si-open { color: #f59e0b; }
+    .si-def  { color: #6b7280; }
+    .si-t { opacity: 0.85; word-break: break-word; line-height: 1.5; }
+    /* ── Focus button ── */
+    .btn-focus {
+      background: none;
+      border: 1px solid var(--vscode-editorGroup-border, #444);
+      color: var(--vscode-descriptionForeground, #9d9d9d);
+      border-radius: 3px; padding: 1px 7px; font-size: 10px; cursor: pointer; flex-shrink: 0;
+    }
+    .btn-focus:hover:not(.active) { color: var(--vscode-foreground, #d4d4d4); border-color: var(--vscode-focusBorder, #007fd4); }
+    .btn-focus.active {
+      background: var(--vscode-button-background, #0e639c);
+      color: var(--vscode-button-foreground, #fff); border-color: transparent;
+    }
     /* ── Tooltip ── */
     #tooltip {
       position: fixed; pointer-events: none;
@@ -479,6 +539,7 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
     <div id="panel">
       <div class="ph">
         <span class="ph-title" id="panel-title">—</span>
+        <button class="btn-focus" id="btn-focus">Focus</button>
         <span class="ph-close" id="panel-close">✕</span>
       </div>
       <div class="pb" id="panel-body"></div>
