@@ -504,8 +504,8 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
       <span class="sw" style="background:#9ca3af"></span>MERGED
     </div>
     <div class="leg-row" style="margin-top:3px;opacity:0.8">
-      <span class="sw" style="background:#f59e0b"></span>has drift &nbsp;
-      <span class="sw" style="background:#3b82f6"></span>has next
+      <span class="sw" style="background:transparent;border:2px solid #f59e0b;border-radius:3px"></span>has drift &nbsp;
+      <span class="sw" style="background:transparent;border:2px solid #60a5fa;border-radius:3px"></span>has next
     </div>
   </div>
 
