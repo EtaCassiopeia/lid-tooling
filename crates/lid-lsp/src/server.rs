@@ -196,7 +196,10 @@ impl LanguageServer for LidServer {
             return Ok(None);
         };
         Ok(handlers::completion::completions_at_position(
-            repo, &doc.text, position,
+            repo,
+            uri.as_str(),
+            &doc.text,
+            position,
         ))
     }
 
