@@ -2,26 +2,113 @@ schema_version: 2
 last_updated: 2026-05-29
 
 taxonomy:
-  core:
-    - shortener-core
-    - api
-    - storage
+  infrastructure: [storage, store-interface, in-memory-store, redis-store, auth, rate-limiter]
+  domain: [shortener-core, alias-gen, collision, url-validator]
+  presentation: [api, shorten-endpoint, redirect-endpoint, health-endpoint]
+  future: [analytics, redis-store]
 
 arrows:
-  shortener-core:
-    status: UNMAPPED
-    detail: shortener-core.md
-    blocks: [api, storage]
-
-  api:
-    status: UNMAPPED
-    detail: api.md
-    blockedBy: [shortener-core]
-
+  # ── Storage layer ────────────────────────────────────────────────────────────
   storage:
-    status: UNMAPPED
+    status: MAPPED
+    sampled: 2026-04-10
+    audited: 2026-04-15
     detail: storage.md
-    blockedBy: [shortener-core]
+    blocks: [shortener-core]
+    children: [store-interface, in-memory-store, redis-store]
+    next: "provision Redis cluster; promote redis-store to MAPPED after infrastructure is ready"
+
+  store-interface:
+    status: AUDITED
+    parent: storage
+    sampled: 2026-04-10
+    audited: 2026-04-15
+    detail: storage/store-interface.md
+
+  in-memory-store:
+    status: OK
+    parent: storage
+    audited: 2026-04-22
+    detail: storage/in-memory-store.md
+
+  redis-store:
+    status: UNMAPPED
+    parent: storage
+    detail: storage/redis-store.md
+    next: "design Redis key schema and TTL policy; target Q3 2026"
+
+  # ── Domain layer ─────────────────────────────────────────────────────────────
+  shortener-core:
+    status: MAPPED
+    sampled: 2026-04-20
+    detail: shortener-core.md
+    blocks: [api]
+    children: [alias-gen, collision]
+
+  alias-gen:
+    status: OK
+    parent: shortener-core
+    sampled: 2026-04-20
+    audited: 2026-04-28
+    detail: shortener-core/alias-gen.md
+
+  collision:
+    status: MAPPED
+    parent: shortener-core
+    sampled: 2026-04-20
+    detail: shortener-core/collision.md
+    next: "add exponential back-off; USH-COLL-004 and USH-COLL-005 still open"
+
+  url-validator:
+    status: MERGED
+    merged_into: shortener-core
+    detail: url-validator.md
+
+  # ── HTTP layer ───────────────────────────────────────────────────────────────
+  api:
+    status: MAPPED
+    sampled: 2026-05-10
+    detail: api.md
+    children: [shorten-endpoint, redirect-endpoint, health-endpoint]
+
+  shorten-endpoint:
+    status: MAPPED
+    parent: api
+    sampled: 2026-05-10
+    detail: api/shorten-endpoint.md
+
+  redirect-endpoint:
+    status: MAPPED
+    parent: api
+    sampled: 2026-05-10
+    detail: api/redirect-endpoint.md
+
+  health-endpoint:
+    status: OK
+    parent: api
+    audited: 2026-05-12
+    detail: api/health-endpoint.md
+
+  # ── Cross-cutting concerns ────────────────────────────────────────────────────
+  auth:
+    status: UNMAPPED
+    detail: auth.md
+    blocks: [api]
+    next: "implement HMAC-SHA256 API-key middleware; wire into axum Router before shorten-endpoint and redirect-endpoint"
+
+  rate-limiter:
+    status: MAPPED
+    sampled: 2026-05-01
+    detail: rate-limiter.md
+    blocks: [api]
+    drift: "sliding-window algorithm adopted in PR #42, but USH-RATE-003 describes token-bucket — spec and implementation are out of sync"
+    next: "update USH-RATE-003 to match sliding-window; verify USH-RATE-004 and USH-RATE-005 still hold"
+
+  # ── Future ───────────────────────────────────────────────────────────────────
+  analytics:
+    status: UNMAPPED
+    detail: analytics.md
+    next: "evaluate ClickHouse vs TimescaleDB for click aggregation; write HLD section and EARS before implementation"
 
 unmapped:
   docs:

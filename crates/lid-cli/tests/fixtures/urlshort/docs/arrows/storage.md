@@ -1,15 +1,15 @@
 # Arrow: storage
 
-Persistence abstraction for alias→URL pairs. Defines the `Store` trait that `shortener-core` depends on; provides an `InMemoryStore` implementation for v1.
+Persistence abstraction for alias→URL pairs. Owns the `Store` trait and its implementations. `shortener-core` depends on this interface; concrete implementations are injected at startup.
 
 ## Status
 
-**UNMAPPED** — LLD and EARS authored; implementation not started.
+**MAPPED** — interface designed and audited; `InMemoryStore` shipped. `RedisStore` planned for Q3 2026.
 
 ## References
 
 ### HLD
-- `docs/high-level-design.md` § Approach / storage; § Key Design Decisions / Storage interface ownership; § Goal 2
+- `docs/high-level-design.md` § Approach / storage; § Key Design Decisions / Storage interface ownership
 
 ### LLD
 - `docs/intent/storage/storage-design.md`
@@ -18,13 +18,15 @@ Persistence abstraction for alias→URL pairs. Defines the `Store` trait that `s
 - `docs/intent/storage/storage-specs.md` (10 specs, prefix `USH-STORE-*`)
 
 ### Tests
-- (none yet)
+- `tests/storage_test.rs`
 
 ### Code
-- (none yet)
+- `src/storage.rs`
 
 ## Spec Coverage
 
 | Category | Spec range | Implemented | Active gap | Deferred |
 |---|---|---|---|---|
-| All USH-STORE | USH-STORE-001..010 | 0 | 10 | 0 |
+| Interface contract | USH-STORE-001..004 | 4 | 0 | 0 |
+| InMemoryStore | USH-STORE-005..008 | 2 | 2 | 0 |
+| Interface isolation | USH-STORE-009..010 | 0 | 2 | 0 |

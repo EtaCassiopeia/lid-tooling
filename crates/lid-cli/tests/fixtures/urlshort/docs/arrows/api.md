@@ -1,10 +1,10 @@
 # Arrow: api
 
-HTTP surface for the URL shortener — POST /shorten and GET /:alias endpoints, input validation, and error mapping. No business logic; delegates all domain decisions to `shortener-core`.
+HTTP surface for the URL shortener — POST /shorten, GET /:alias, and GET /health. Input validation, error mapping, and middleware integration. No domain logic; delegates all decisions to `shortener-core`.
 
 ## Status
 
-**UNMAPPED** — LLD and EARS authored; implementation not started.
+**MAPPED** — all three endpoints specified; shorten and redirect partially implemented.
 
 ## References
 
@@ -18,13 +18,15 @@ HTTP surface for the URL shortener — POST /shorten and GET /:alias endpoints, 
 - `docs/intent/api/api-specs.md` (14 specs, prefix `USH-API-*`)
 
 ### Tests
-- (none yet)
+- `tests/api_test.rs`
 
 ### Code
-- (none yet)
+- `src/api.rs`
 
 ## Spec Coverage
 
 | Category | Spec range | Implemented | Active gap | Deferred |
 |---|---|---|---|---|
-| All USH-API | USH-API-001..014 | 0 | 14 | 0 |
+| POST /shorten | USH-API-001..008 | 6 | 2 | 0 |
+| GET /:alias | USH-API-009..011 | 2 | 1 | 0 |
+| Error responses | USH-API-012..014 | 0 | 3 | 0 |
