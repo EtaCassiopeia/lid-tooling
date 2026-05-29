@@ -11,7 +11,7 @@ pub mod lld;
 pub mod spec;
 
 pub use arrow::{ArrowIndex, Edge, EdgeKind, Segment, Status, Unmapped, UnmappedDocs};
-pub use arrow_doc::{ArrowDoc, ArrowReferences};
+pub use arrow_doc::{ArrowDoc, ArrowReferences, KNOWN_REFERENCE_SECTIONS};
 pub use citation::{CitationKind, SpecCitation};
 pub use ids::{GitSha, SegmentId, SpecId};
 pub use lld::{DecisionRow, LldDoc};

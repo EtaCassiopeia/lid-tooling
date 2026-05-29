@@ -201,6 +201,7 @@ mod tests {
             .map(|f| ArrowDoc {
                 path: arrows_dir.join(f),
                 references: ArrowReferences::default(),
+                unrecognized_reference_sections: vec![],
             })
             .collect();
         LidRepo {

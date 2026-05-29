@@ -14,6 +14,7 @@ workspace = true
 chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
 dashmap = "6"
 ignore = "0.4"
+pulldown-cmark = { version = "0.12", default-features = false }
 petgraph = { version = "0.6", default-features = false }
 regex = "1"
 serde = { version = "1", features = ["derive"] }

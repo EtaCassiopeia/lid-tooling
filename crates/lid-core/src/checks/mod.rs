@@ -9,6 +9,7 @@
 //! Concrete checks live in submodules; this module owns the trait and
 //! the common report types.
 
+pub mod arrow_doc_structure;
 pub mod coverage;
 pub mod dag;
 pub mod lld_decisions;
@@ -19,6 +20,7 @@ pub mod schema;
 pub mod spec_id_format;
 pub mod spec_status_counts;
 
+pub use arrow_doc_structure::ArrowDocStructureCheck;
 pub use coverage::CoverageCheck;
 pub use dag::DagCheck;
 pub use lld_decisions::LldDecisionsCheck;
@@ -38,6 +40,7 @@ pub use spec_status_counts::SpecStatusCountsCheck;
 pub fn default_checks() -> Vec<Box<dyn Check>> {
     vec![
         Box::new(SchemaCheck),
+        Box::new(ArrowDocStructureCheck),
         Box::new(ReferenceCoherenceCheck),
         Box::new(OrphanCheck),
         Box::new(ReverseOrphanCheck),
@@ -64,6 +67,7 @@ use crate::model::SpecId;
 #[serde(rename_all = "kebab-case")]
 pub enum CheckId {
     Schema,
+    ArrowDocStructure,
     ReferenceCoherence,
     Coverage,
     Orphan,
@@ -82,6 +86,7 @@ impl CheckId {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Schema => "schema",
+            Self::ArrowDocStructure => "arrow-doc-structure",
             Self::ReferenceCoherence => "reference-coherence",
             Self::Coverage => "coverage",
             Self::Orphan => "orphan",
@@ -105,6 +110,7 @@ impl std::str::FromStr for CheckId {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         for id in [
             Self::Schema,
+            Self::ArrowDocStructure,
             Self::ReferenceCoherence,
             Self::Coverage,
             Self::Orphan,
@@ -360,6 +366,7 @@ mod tests {
     fn check_id_as_str_matches_serde_representation() {
         for id in [
             CheckId::Schema,
+            CheckId::ArrowDocStructure,
             CheckId::ReferenceCoherence,
             CheckId::Coverage,
             CheckId::Orphan,
@@ -384,6 +391,7 @@ mod tests {
     fn check_id_from_str_roundtrips() {
         for id in [
             CheckId::Schema,
+            CheckId::ArrowDocStructure,
             CheckId::ReferenceCoherence,
             CheckId::Coverage,
             CheckId::Orphan,

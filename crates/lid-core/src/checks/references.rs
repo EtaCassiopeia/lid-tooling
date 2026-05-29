@@ -140,6 +140,7 @@ mod tests {
         let arrow_doc = ArrowDoc {
             path: arrow_doc_path,
             references: refs,
+            unrecognized_reference_sections: vec![],
         };
 
         let mut arrows = BTreeMap::new();
