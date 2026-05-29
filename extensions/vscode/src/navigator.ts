@@ -40,7 +40,9 @@ interface SpecCounts {
 
 interface SpecItem {
     marker: 'done' | 'open' | 'deferred';
+    id: string;
     text: string;
+    line: number;
 }
 
 interface SpecInfo {
@@ -79,7 +81,7 @@ interface GraphPayload {
 
 type WebviewMessage =
     | { type: 'open'; segmentId: string }
-    | { type: 'openFile'; path: string };
+    | { type: 'openFile'; path: string; line?: number };
 
 // ── NavigatorPanel ────────────────────────────────────────────────────────────
 
@@ -135,7 +137,7 @@ export class NavigatorPanel {
         this._panel.webview.onDidReceiveMessage(
             (msg: WebviewMessage) => {
                 if (msg.type === 'openFile') {
-                    this._openDocAtPath(msg.path);
+                    this._openDocAtPath(msg.path, msg.line);
                 } else {
                     const entry = this._indexEntry(msg.segmentId);
                     const detailFile = entry?.detail ?? `${msg.segmentId}.md`;
@@ -162,9 +164,19 @@ export class NavigatorPanel {
 
     // ── Private helpers ─────────────────────────────────────────────────────
 
-    private _openDocAtPath(docPath: string): void {
+    private _openDocAtPath(docPath: string, line?: number): void {
         void Promise.resolve(vscode.workspace.openTextDocument(docPath))
             .then((doc) => vscode.window.showTextDocument(doc, vscode.ViewColumn.One))
+            .then((editor) => {
+                if (line !== undefined && line > 0) {
+                    const pos = new vscode.Position(line - 1, 0);
+                    editor.revealRange(
+                        new vscode.Range(pos, pos),
+                        vscode.TextEditorRevealType.InCenter,
+                    );
+                    editor.selection = new vscode.Selection(pos, pos);
+                }
+            })
             .catch((err: unknown) => {
                 void vscode.window.showErrorMessage(
                     `LID Navigator: could not open ${docPath} — ${String(err)}`,
@@ -188,7 +200,7 @@ export class NavigatorPanel {
     private _buildSpecInfo(): Map<string, SpecInfo> {
         const intentDir = path.join(this._workspaceRoot, 'docs', 'intent');
         const result = new Map<string, SpecInfo>();
-        const SPEC_RE = /^\s*-\s+\[([xX D])\]\s*(.*)/;
+        const SPEC_RE = /^\s*-\s+\[([xX D])\]\s+\*\*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\*\*:\s*(.*)/;
 
         const ensureEntry = (segId: string): SpecInfo => {
             if (!result.has(segId)) {
@@ -211,22 +223,25 @@ export class NavigatorPanel {
                         const info = ensureEntry(segId);
                         if (!info.specFile) info.specFile = fullPath;
                         try {
-                            for (const line of fs.readFileSync(fullPath, 'utf8').split('\n')) {
-                                const m = SPEC_RE.exec(line);
-                                if (!m) continue;
+                            const lines = fs.readFileSync(fullPath, 'utf8').split('\n');
+                            lines.forEach((rawLine, idx) => {
+                                const m = SPEC_RE.exec(rawLine);
+                                if (!m) return;
                                 const ch = m[1]!;
-                                const text = (m[2] ?? '').trim();
+                                const id = m[2]!;
+                                const text = (m[3] ?? '').trim();
+                                const lineNo = idx + 1;
                                 if (ch === 'x' || ch === 'X') {
                                     info.counts.implemented++;
-                                    info.items.push({ marker: 'done', text });
+                                    info.items.push({ marker: 'done', id, text, line: lineNo });
                                 } else if (ch === ' ') {
                                     info.counts.open++;
-                                    info.items.push({ marker: 'open', text });
+                                    info.items.push({ marker: 'open', id, text, line: lineNo });
                                 } else {
                                     info.counts.deferred++;
-                                    info.items.push({ marker: 'deferred', text });
+                                    info.items.push({ marker: 'deferred', id, text, line: lineNo });
                                 }
-                            }
+                            });
                         } catch {
                             // skip unreadable file
                         }
@@ -453,6 +468,8 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
       border-top: 1px solid var(--vscode-editorGroup-border, #3c3c3c); padding-top: 4px;
     }
     .si { display: flex; gap: 6px; padding: 2px 0; font-size: 10px; align-items: flex-start; }
+    .si-id { font-size: 9px; font-family: var(--vscode-editor-font-family, monospace); color: var(--vscode-textLink-foreground); background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; white-space: nowrap; flex-shrink: 0; }
+    .si-id:hover { opacity: 0.75; }
     .si-m { flex-shrink: 0; width: 14px; text-align: center; }
     .si-done { color: #22c55e; }
     .si-open { color: #f59e0b; }
