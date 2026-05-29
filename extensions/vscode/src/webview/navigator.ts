@@ -36,11 +36,14 @@ interface GraphNode {
     specItems?: SpecItem[];
     specFile?: string;
     lldFile?: string;
+    children?: string[];
+    parent?: string;
 }
 
 interface GraphEdge {
     source: string;
     target: string;
+    kind?: 'blocks' | 'child';
 }
 
 interface GraphPayload {
@@ -110,7 +113,7 @@ function render(payload: GraphPayload): void {
             },
         })),
         ...payload.edges.map((e, i) => ({
-            data: { id: `e${i}`, source: e.source, target: e.target },
+            data: { id: `e${i}`, source: e.source, target: e.target, kind: e.kind ?? 'blocks' },
         })),
     ];
 
@@ -185,6 +188,16 @@ function render(payload: GraphPayload): void {
                     'target-arrow-shape': 'triangle',
                     'curve-style': 'bezier',
                     'arrow-scale': 0.8,
+                },
+            },
+            {
+                selector: 'edge[kind = "child"]',
+                style: {
+                    'width': 1,
+                    'line-color': '#374151',
+                    'line-style': 'dashed',
+                    'target-arrow-shape': 'none',
+                    'curve-style': 'bezier',
                 },
             },
             {
@@ -318,9 +331,27 @@ function openPanel(node: GraphNode): void {
     const color = colorForStatus(status);
     let html = `<span class="badge" style="background:${color}">${esc(status)}</span>`;
 
-    // ── Dependency chips ─────────────────────────────────────────────────────
-    const predecessors = cy?.getElementById(id).incomers('node') as cytoscape.NodeCollection | undefined;
-    const successors   = cy?.getElementById(id).outgoers('node') as cytoscape.NodeCollection | undefined;
+    // ── Hierarchy chips (parent / children) ─────────────────────────────────
+    if (node.parent) {
+        html += `<div class="sec"><div class="sec-title">Parent</div><div class="chips">`;
+        html += `<button class="chip" data-nav="${esc(node.parent)}">${esc(node.parent)}</button>`;
+        html += `</div></div>`;
+    }
+    if (node.children && node.children.length > 0) {
+        html += `<div class="sec"><div class="sec-title">Children</div><div class="chips">`;
+        for (const c of node.children) {
+            html += `<button class="chip" data-nav="${esc(c)}">${esc(c)}</button>`;
+        }
+        html += `</div></div>`;
+    }
+
+    // ── Dependency chips (blocks edges only) ─────────────────────────────────
+    const predecessors = cy?.getElementById(id).incomers('edge')
+        .filter(e => e.data('kind') === 'blocks')
+        .sources();
+    const successors = cy?.getElementById(id).outgoers('edge')
+        .filter(e => e.data('kind') === 'blocks')
+        .targets();
 
     if ((predecessors?.length ?? 0) > 0 || (successors?.length ?? 0) > 0) {
         html += `<div class="sec">`;

@@ -20,6 +20,8 @@ interface ArrowEntry {
     status?: string;
     detail?: string;
     blocks?: string[];
+    children?: string[];
+    parent?: string;
     next?: string;
     drift?: string;
     sampled?: string;
@@ -60,11 +62,14 @@ interface GraphNode {
     specItems?: SpecItem[];
     specFile?: string;
     lldFile?: string;
+    children?: string[];
+    parent?: string;
 }
 
 interface GraphEdge {
     source: string;
     target: string;
+    kind: 'blocks' | 'child';
 }
 
 interface GraphPayload {
@@ -183,70 +188,58 @@ export class NavigatorPanel {
     private _buildSpecInfo(): Map<string, SpecInfo> {
         const intentDir = path.join(this._workspaceRoot, 'docs', 'intent');
         const result = new Map<string, SpecInfo>();
+        const SPEC_RE = /^\s*-\s+\[([xX D])\]\s*(.*)/;
 
-        let dirs: fs.Dirent[];
-        try {
-            dirs = fs.readdirSync(intentDir, { withFileTypes: true });
-        } catch {
-            return result;
-        }
-
-        for (const dir of dirs) {
-            if (!dir.isDirectory()) continue;
-            const segmentId = dir.name;
-            const segmentDir = path.join(intentDir, segmentId);
-
-            let files: fs.Dirent[];
-            try {
-                files = fs.readdirSync(segmentDir, { withFileTypes: true });
-            } catch {
-                continue;
+        const ensureEntry = (segId: string): SpecInfo => {
+            if (!result.has(segId)) {
+                result.set(segId, { counts: { implemented: 0, open: 0, deferred: 0 }, items: [] });
             }
+            return result.get(segId)!;
+        };
 
-            let implemented = 0, open = 0, deferred = 0;
-            let specFile: string | undefined;
-            let lldFile: string | undefined;
-            const items: SpecItem[] = [];
-            const SPEC_RE = /^\s*-\s+\[([xX D])\]\s*(.*)/;
-
-            for (const f of files) {
-                if (!f.isFile()) continue;
-                const fullPath = path.join(segmentDir, f.name);
-                if (f.name.endsWith('-specs.md')) {
-                    if (!specFile) specFile = fullPath;
-                    try {
-                        for (const line of fs.readFileSync(fullPath, 'utf8').split('\n')) {
-                            const m = SPEC_RE.exec(line);
-                            if (!m) continue;
-                            const ch = m[1]!;
-                            const text = (m[2] ?? '').trim();
-                            if (ch === 'x' || ch === 'X') {
-                                implemented++;
-                                items.push({ marker: 'done', text });
-                            } else if (ch === ' ') {
-                                open++;
-                                items.push({ marker: 'open', text });
-                            } else {
-                                deferred++;
-                                items.push({ marker: 'deferred', text });
+        const walkDir = (dir: string) => {
+            let entries: fs.Dirent[];
+            try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+            catch { return; }
+            for (const ent of entries) {
+                const fullPath = path.join(dir, ent.name);
+                if (ent.isDirectory()) {
+                    walkDir(fullPath);
+                } else if (ent.isFile()) {
+                    if (ent.name.endsWith('-specs.md')) {
+                        const segId = ent.name.slice(0, -'-specs.md'.length);
+                        const info = ensureEntry(segId);
+                        if (!info.specFile) info.specFile = fullPath;
+                        try {
+                            for (const line of fs.readFileSync(fullPath, 'utf8').split('\n')) {
+                                const m = SPEC_RE.exec(line);
+                                if (!m) continue;
+                                const ch = m[1]!;
+                                const text = (m[2] ?? '').trim();
+                                if (ch === 'x' || ch === 'X') {
+                                    info.counts.implemented++;
+                                    info.items.push({ marker: 'done', text });
+                                } else if (ch === ' ') {
+                                    info.counts.open++;
+                                    info.items.push({ marker: 'open', text });
+                                } else {
+                                    info.counts.deferred++;
+                                    info.items.push({ marker: 'deferred', text });
+                                }
                             }
+                        } catch {
+                            // skip unreadable file
                         }
-                    } catch {
-                        // skip unreadable file
+                    } else if (ent.name.endsWith('-design.md')) {
+                        const segId = ent.name.slice(0, -'-design.md'.length);
+                        const info = ensureEntry(segId);
+                        if (!info.lldFile) info.lldFile = fullPath;
                     }
-                } else if (f.name.endsWith('-design.md')) {
-                    lldFile = fullPath;
                 }
             }
+        };
 
-            result.set(segmentId, {
-                counts: { implemented, open, deferred },
-                items,
-                specFile,
-                lldFile,
-            });
-        }
-
+        walkDir(intentDir);
         return result;
     }
 
@@ -268,6 +261,8 @@ export class NavigatorPanel {
                 specItems: info?.items,
                 specFile: info?.specFile,
                 lldFile: info?.lldFile,
+                children: entry.children,
+                parent: entry.parent,
             };
         });
 
@@ -275,10 +270,17 @@ export class NavigatorPanel {
         const seen = new Set<string>();
         for (const [id, entry] of Object.entries(arrows)) {
             for (const target of entry.blocks ?? []) {
-                const key = `${id}\x00${target}`;
+                const key = `blocks\x00${id}\x00${target}`;
                 if (!seen.has(key) && target in arrows) {
                     seen.add(key);
-                    edges.push({ source: id, target });
+                    edges.push({ source: id, target, kind: 'blocks' });
+                }
+            }
+            for (const child of entry.children ?? []) {
+                const key = `child\x00${id}\x00${child}`;
+                if (!seen.has(key) && child in arrows) {
+                    seen.add(key);
+                    edges.push({ source: id, target: child, kind: 'child' });
                 }
             }
         }
