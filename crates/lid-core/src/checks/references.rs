@@ -318,28 +318,36 @@ mod tests {
         let root = std::fs::canonicalize(dir.path()).unwrap();
         std::fs::create_dir_all(root.join("plugins/my-skill/workspace/iteration-1")).unwrap();
 
+        use crate::model::{ArrowIndex, Segment, SegmentId, Status, Unmapped};
         use std::collections::BTreeMap;
         use std::path::PathBuf;
-        use crate::model::{ArrowIndex, Segment, SegmentId, Status, Unmapped};
         let mut arrows = BTreeMap::new();
         arrows.insert(
             SegmentId::parse("auth").unwrap(),
             Segment {
                 status: Status::Mapped,
-                sampled: None, audited: None, audited_sha: None,
-                blocks: vec![], blocked_by: vec![],
+                sampled: None,
+                audited: None,
+                audited_sha: None,
+                blocks: vec![],
+                blocked_by: vec![],
                 detail: PathBuf::from("auth.md"),
-                next: None, drift: None, merged_into: None,
+                next: None,
+                drift: None,
+                merged_into: None,
             },
         );
         let repo = LidRepo {
             root,
             index: ArrowIndex {
-                schema_version: 2, last_updated: None,
-                taxonomy: BTreeMap::new(), arrows,
+                schema_version: 2,
+                last_updated: None,
+                taxonomy: BTreeMap::new(),
+                arrows,
                 unmapped: Unmapped::default(),
             },
-            specs: vec![], llds: vec![],
+            specs: vec![],
+            llds: vec![],
             arrow_docs: vec![ArrowDoc {
                 path: PathBuf::from("docs/arrows/auth.md"),
                 references: refs,
