@@ -99,7 +99,10 @@ impl LidServer {
         match result {
             Ok(Ok(repo)) => {
                 tracing::info!(root = ?repo.root, "LID repo discovered");
-                let _ = self.repo_root.get_or_init(|| async { repo.root.clone() }).await;
+                let _ = self
+                    .repo_root
+                    .get_or_init(|| async { repo.root.clone() })
+                    .await;
                 let arc = Arc::new(repo);
                 *self.repo.write().await = Some(Arc::clone(&arc));
                 Some(arc)
@@ -332,7 +335,9 @@ impl LanguageServer for LidServer {
         let Some(repo) = self.get_repo(&uri).await else {
             return Ok(None);
         };
-        Ok(handlers::hover::hover_at_position(&repo, &doc.text, position))
+        Ok(handlers::hover::hover_at_position(
+            &repo, &doc.text, position,
+        ))
     }
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
