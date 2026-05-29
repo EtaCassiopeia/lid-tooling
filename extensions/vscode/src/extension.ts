@@ -113,6 +113,7 @@ async function startServer(context: vscode.ExtensionContext): Promise<void> {
             { scheme: 'file', language: 'cpp' },
             { scheme: 'file', language: 'c' },
             // LID artifact files.
+            { scheme: 'file', pattern: '**/docs/intent/**/*.md' },
             { scheme: 'file', pattern: '**/docs/specs/**/*.md' },
             { scheme: 'file', pattern: '**/docs/llds/**/*.md' },
             { scheme: 'file', pattern: '**/docs/arrows/**/*.md' },
