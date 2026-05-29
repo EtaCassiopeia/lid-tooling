@@ -21,21 +21,25 @@ jobs:
         include:
           - os: macos-14
             target: aarch64-apple-darwin
+            vsce_target: darwin-arm64
             ext: ''
             archive: tar.gz
             sha_cmd: shasum -a 256
           - os: macos-13
             target: x86_64-apple-darwin
+            vsce_target: darwin-x64
             ext: ''
             archive: tar.gz
             sha_cmd: shasum -a 256
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            vsce_target: linux-x64
             ext: ''
             archive: tar.gz
             sha_cmd: sha256sum
           - os: windows-latest
             target: x86_64-pc-windows-msvc
+            vsce_target: win32-x64
             ext: .exe
             archive: zip
             sha_cmd: sha256sum
@@ -90,12 +94,50 @@ jobs:
 
           ls -la dist/
 
+      # ── VS Code extension ────────────────────────────────────────────────
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: extensions/vscode/package-lock.json
+
+      - name: Install extension dependencies
+        working-directory: extensions/vscode
+        run: npm ci
+
+      - name: Compile extension
+        working-directory: extensions/vscode
+        run: npm run compile
+
+      - name: Bundle lid-lsp into extension
+        shell: bash
+        run: |
+          mkdir -p extensions/vscode/server
+          cp "target/${{ matrix.target }}/release/lid-lsp${{ matrix.ext }}" \
+             "extensions/vscode/server/lid-lsp${{ matrix.ext }}"
+
+      - name: Package platform-specific VSIX
+        working-directory: extensions/vscode
+        run: >
+          npx @vscode/vsce package
+          --target ${{ matrix.vsce_target }}
+          --out lid-vscode-${{ matrix.vsce_target }}.vsix
+          --skip-license
+
+      - name: Move VSIX to dist
+        shell: bash
+        run: |
+          cp "extensions/vscode/lid-vscode-${{ matrix.vsce_target }}.vsix" \
+             "dist/lid-vscode-${{ matrix.vsce_target }}.vsix"
+
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.target }}
           path: |
             dist/*.tar.gz
             dist/*.zip
+            dist/*.vsix
             dist/*.sha256
             dist/lid-lsp-*
           if-no-files-found: error
@@ -117,7 +159,8 @@ jobs:
           set -euo pipefail
           mkdir -p release-assets
           find artifacts -type f \
-            \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.sha256' -o -name 'lid-lsp-*' \) \
+            \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.vsix' \
+               -o -name '*.sha256' -o -name 'lid-lsp-*' \) \
             -exec cp {} release-assets/ \;
           ls -la release-assets/
 
