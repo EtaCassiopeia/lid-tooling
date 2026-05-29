@@ -1,6 +1,6 @@
 # update-lid specs
 
-**LLD**: docs/llds/linked-intent-dev.md
+**LLD**: docs/intent/linked-intent-dev/linked-intent-dev-design.md
 **Implementing artifacts**:
 - plugins/linked-intent-dev/skills/update-lid/SKILL.md
 - plugins/linked-intent-dev/skills/update-lid/references/claude-md-template.md

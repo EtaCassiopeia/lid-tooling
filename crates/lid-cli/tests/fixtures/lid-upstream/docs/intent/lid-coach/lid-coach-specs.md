@@ -1,6 +1,6 @@
 # lid-coach specs
 
-**LLD**: docs/llds/lid-coach.md
+**LLD**: docs/intent/lid-coach/lid-coach-design.md
 **Implementing artifacts**:
 - plugins/linked-intent-dev/skills/lid-coach/SKILL.md
 

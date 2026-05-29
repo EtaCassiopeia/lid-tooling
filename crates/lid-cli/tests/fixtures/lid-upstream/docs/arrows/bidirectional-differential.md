@@ -12,11 +12,11 @@ The first `lid-experimental` experiment — audits EARS↔code coherence by spaw
 - `docs/high-level-design.md` § Key Design Decisions / Experimental features as a separate plugin (governs all experiments under `lid-experimental`)
 
 ### LLD
-- `docs/llds/lid-experimental/bidirectional-differential.md` (sub-LLD)
-- `docs/llds/lid-experimental.md` § Active Experiments / bidirectional-differential (parent container's pointer)
+- `docs/intent/bidirectional-differential/bidirectional-differential-design.md` (sub-LLD)
+- `docs/intent/lid-experimental/lid-experimental-design.md` § Active Experiments / bidirectional-differential (parent container's pointer)
 
 ### EARS
-- `docs/specs/lid-experimental-bidirectional-differential-specs.md` (22 specs, prefix `BIDIFF-*`)
+- `docs/intent/bidirectional-differential/bidirectional-differential-specs.md` (22 specs, prefix `BIDIFF-*`)
 
 ### Tests / Evals
 - `plugins/lid-experimental/skills/bidirectional-differential/evals/evals.json` (3 baseline fixtures: `bd-coherent-bounded-matrix`, `bidirectional-drift-missing-subdecision`, `b-only-drift-unstated-invariant`)

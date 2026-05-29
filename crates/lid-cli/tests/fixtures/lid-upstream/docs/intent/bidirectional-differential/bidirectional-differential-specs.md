@@ -1,6 +1,6 @@
 # bidirectional-differential specs
 
-**LLD**: docs/llds/lid-experimental/bidirectional-differential.md
+**LLD**: docs/intent/bidirectional-differential/bidirectional-differential-design.md
 **Implementing artifacts**:
 - plugins/lid-experimental/skills/bidirectional-differential/SKILL.md
 - plugins/lid-experimental/commands/differential-audit.md

@@ -12,10 +12,10 @@ The mandatory core LID workflow plugin — the pure-prose `linked-intent-dev` wo
 - `docs/high-level-design.md` § Architecture / Plugins (linked-intent-dev plugin); § Key Design Decisions / The arrow for LID itself
 
 ### LLD
-- `docs/llds/linked-intent-dev.md` — covers the workflow skill, `update-lid`, and plugin-level concerns shared by all three skills (mode detection, spec ID format, LID-on-LID linkage inversion, eval metadata schema).
+- `docs/intent/linked-intent-dev/linked-intent-dev-design.md` — covers the workflow skill, `update-lid`, and plugin-level concerns shared by all three skills (mode detection, spec ID format, LID-on-LID linkage inversion, eval metadata schema).
 
 ### EARS
-- `docs/specs/update-lid-specs.md` (34 specs, prefix `UPDATE-LID-*`)
+- `docs/intent/linked-intent-dev/update-lid-specs.md` (34 specs, prefix `UPDATE-LID-*`)
 
 The pure-prose `linked-intent-dev` skill carries no EARS — it is verified by dogfooding per the HLD's pure-prose variant.
 

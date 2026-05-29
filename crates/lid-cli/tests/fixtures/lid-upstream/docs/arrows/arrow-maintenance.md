@@ -12,11 +12,11 @@ The optional navigation and audit overlay plugin — the `arrow-maintenance` dua
 - `docs/high-level-design.md` § Architecture / Plugins (arrow-maintenance); § Key Design Decisions / Arrow-maintenance stays a separate plugin; § The arrow for LID itself / Dual-mode skills
 
 ### LLD
-- `docs/llds/arrow-maintenance.md`
+- `docs/intent/arrow-maintenance/arrow-maintenance-design.md`
 
 ### EARS
-- `docs/specs/arrow-maintenance-specs.md` (27 specs, prefix `ARROW-MAINT-*`)
-- `docs/specs/map-codebase-specs.md` (33 specs, prefix `MAP-CODEBASE-*`)
+- `docs/intent/arrow-maintenance/arrow-maintenance-specs.md` (27 specs, prefix `ARROW-MAINT-*`)
+- `docs/intent/arrow-maintenance/map-codebase-specs.md` (33 specs, prefix `MAP-CODEBASE-*`)
 
 ### Tests / Evals
 - `plugins/arrow-maintenance/skills/arrow-maintenance-workspace/iteration-1/` — 1 eval (`bootstrap-overlay-from-lid-docs`)
