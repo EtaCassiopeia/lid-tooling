@@ -66,6 +66,12 @@ function trunc(s: string, n: number): string {
     return s.length <= n ? s : s.slice(0, n) + '…';
 }
 
+// Strip ISO time suffix: "2026-04-25T00:00:00.000Z" → "2026-04-25"
+function fmtDate(s: string | undefined): string {
+    if (!s) return '—';
+    return s.replace(/T.*$/, '');
+}
+
 // ── Cytoscape instance ───────────────────────────────────────────────────────
 
 let cy: cytoscape.Core | undefined;
@@ -140,28 +146,22 @@ function render(payload: GraphPayload): void {
                     'height': 54,
                     'shape': 'round-rectangle',
                     'border-width': 0,
-                    // Pie-arc badges: amber wedge = has drift, blue wedge = has next
-                    // @ts-ignore — pie-* are valid Cytoscape properties not in @types
-                    'pie-size': '100%',
-                    // @ts-ignore
-                    'pie-1-background-color': '#f59e0b',
-                    // @ts-ignore
-                    'pie-1-background-size': 12,
-                    // @ts-ignore
-                    'pie-1-background-opacity': (ele: NodeSingular) =>
-                        (ele.data('hasDrift') as number) ? 0.85 : 0,
-                    // @ts-ignore
-                    'pie-2-background-color': '#3b82f6',
-                    // @ts-ignore
-                    'pie-2-background-size': 12,
-                    // @ts-ignore
-                    'pie-2-background-opacity': (ele: NodeSingular) =>
-                        (ele.data('hasNext') as number) ? 0.85 : 0,
                 },
+            },
+            // Colored border indicators: amber = has drift, blue = has next.
+            // Drift overrides next (defined later → higher specificity in Cytoscape).
+            {
+                selector: 'node[?hasNext]',
+                style: { 'border-width': 3, 'border-color': '#60a5fa' },
+            },
+            {
+                selector: 'node[?hasDrift]',
+                style: { 'border-width': 3, 'border-color': '#f59e0b' },
             },
             {
                 selector: 'node:selected',
-                style: { 'border-width': 3, 'border-color': '#ffffff' },
+                // Slightly thicker so selection is distinct from drift/next border.
+                style: { 'border-width': 4, 'border-color': '#ffffff' },
             },
             {
                 selector: 'node:active',
@@ -224,7 +224,7 @@ function showTooltip(clientX: number, clientY: number, node: GraphNode): void {
     }
 
     if (sampled || audited) {
-        html += `<div class="tt-row">Sampled:&nbsp;${esc(sampled ?? '—')}&nbsp;&nbsp;Audited:&nbsp;${esc(audited ?? '—')}</div>`;
+        html += `<div class="tt-row">Sampled:&nbsp;${esc(fmtDate(sampled))}&nbsp;&nbsp;Audited:&nbsp;${esc(fmtDate(audited))}</div>`;
     }
 
     if (next || drift) {
@@ -290,8 +290,8 @@ function openPanel(node: GraphNode): void {
 
     if (sampled || audited) {
         html += `<div class="sec"><div class="meta">
-          <span class="meta-k">Sampled</span><span>${esc(sampled ?? '—')}</span>
-          <span class="meta-k">Audited</span><span>${esc(audited ?? '—')}</span>
+          <span class="meta-k">Sampled</span><span>${esc(fmtDate(sampled))}</span>
+          <span class="meta-k">Audited</span><span>${esc(fmtDate(audited))}</span>
         </div></div>`;
     }
 
