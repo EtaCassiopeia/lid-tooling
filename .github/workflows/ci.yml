@@ -67,12 +67,12 @@ jobs:
         run: npm run compile
 
       - name: Package extension (smoke test)
-        run: npx vsce package --skip-license
+        run: npx @vscode/vsce package --out lid-vscode-ci-smoke.vsix --skip-license
 
       - name: Upload .vsix
         uses: actions/upload-artifact@v4
         with:
-          name: lid-vsix
-          path: extensions/vscode/*.vsix
+          name: lid-vscode-ci-smoke
+          path: extensions/vscode/lid-vscode-ci-smoke.vsix
           if-no-files-found: error
           retention-days: 7
