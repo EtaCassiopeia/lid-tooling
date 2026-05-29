@@ -18,11 +18,11 @@ The optional navigation and audit overlay plugin — the `arrow-maintenance` dua
 - `docs/intent/arrow-maintenance/arrow-maintenance-specs.md` (27 specs, prefix `ARROW-MAINT-*`)
 - `docs/intent/arrow-maintenance/map-codebase-specs.md` (33 specs, prefix `MAP-CODEBASE-*`)
 
-### Tests / Evals
+### Tests
 - `plugins/arrow-maintenance/skills/arrow-maintenance-workspace/iteration-1/` — 1 eval (`bootstrap-overlay-from-lid-docs`)
 - `plugins/arrow-maintenance/skills/map-codebase-workspace/iteration-1/` — `skill-creator` iteration outputs
 
-### Code (skill prompts, references, optional script)
+### Code
 - `plugins/arrow-maintenance/.claude-plugin/plugin.json`
 - `plugins/arrow-maintenance/skills/arrow-maintenance/SKILL.md` + `references/` (`index-schema.md`, `arrow-doc-template.md`, `audit-checklist.md`, `README-template.md`, `coherence-check.mjs`)
 - `plugins/arrow-maintenance/skills/map-codebase/SKILL.md` + `references/` (subagent prompts, reconciliation templates, skeleton starters)
@@ -50,7 +50,7 @@ The optional navigation and audit overlay plugin — the `arrow-maintenance` dua
 ## Key Findings
 
 1. **First audit pass.** `audited` and `audited_sha` were null before this run; bootstrap created the overlay rather than auditing existing arrow docs. Refreshing them across segments after this pass is the natural next step (ARROW-MAINT-006, ARROW-MAINT-007).
-2. **Reserved experiments subtree exists in the schema.** `docs/arrows/experiments/` is reserved per `docs/llds/arrow-maintenance.md` § *Experiment-produced artifacts*; this skill ignores it during audit. Currently empty — `bidirectional-differential` will populate it on its first run.
+2. **Reserved experiments subtree exists in the schema.** `docs/arrows/_experiments/` is reserved per `docs/llds/arrow-maintenance.md` § *Experiment-produced artifacts*; this skill ignores it during audit. Currently empty — `bidirectional-differential` will populate it on its first run.
 3. **Coherence script bundled but not declared.** `references/coherence-check.mjs` ships with the plugin but no `## LID Tooling` declaration exists in this repo's `CLAUDE.md`. Audit fell back to in-prompt checks (acceptable; the script is opt-in performance acceleration, not a dependency).
 
 ## Work Required

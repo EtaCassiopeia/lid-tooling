@@ -116,7 +116,7 @@ These questions are deliberately left open in the skeleton so the first experime
 
 ### bidirectional-differential
 
-Audits EARS↔code coherence by running two fresh `claude -p` sessions in parallel — one reconstructs code from the EARS (A-direction), the other reconstructs the EARS from stripped code (B-direction) — then classifies drift from the relationship between A's diff and B's diff. Surfaces operational-halo drift, decomposition gaps, missing sub-decisions, and unstated invariants that formal/structural engines (type systems, CodeQL, test-witness, LemmaScript) cannot see. Hard dependency on `arrow-maintenance`: audit records live in a reserved sibling subtree at `docs/arrows/experiments/bidirectional-differential/` so retirement is `rm -rf` and promotion is a single move.
+Audits EARS↔code coherence by running two fresh `claude -p` sessions in parallel — one reconstructs code from the EARS (A-direction), the other reconstructs the EARS from stripped code (B-direction) — then classifies drift from the relationship between A's diff and B's diff. Surfaces operational-halo drift, decomposition gaps, missing sub-decisions, and unstated invariants that formal/structural engines (type systems, CodeQL, test-witness, LemmaScript) cannot see. Hard dependency on `arrow-maintenance`: audit records live in a reserved sibling subtree at `docs/arrows/_experiments/bidirectional-differential/` so retirement is `rm -rf` and promotion is a single move.
 
 - **Sub-LLD**: `docs/llds/lid-experimental/bidirectional-differential.md`
 - **EARS**: `docs/specs/lid-experimental-bidirectional-differential-specs.md` (prefix `BIDIFF`)
@@ -128,6 +128,15 @@ Audits EARS↔code coherence by running two fresh `claude -p` sessions in parall
 This LLD is structural and currently has no behavioral surface of its own — the plugin is a container, and EARS coverage attaches to individual experiments rather than the container. Once experiments are added, spec files are per-experiment (`docs/specs/lid-experimental-{experiment-name}-specs.md`) and tracked from the experiments' design sections.
 
 If, over time, the container itself acquires behavioral surface (for example, an experiment-listing command, or shared eval scaffolding), an EARS file `docs/specs/lid-experimental-specs.md` is created at that point.
+
+## Decisions & Alternatives
+
+| Decision | Chosen | Alternatives considered | Rationale |
+|---|---|---|---|
+| Experiments are opt-in, third plugin | Separate `lid-experimental` plugin | Add experiments directly to `linked-intent-dev` or `arrow-maintenance` | Keeps minimum-system discipline intact for users who don't want experimental surface; avoids coupling stable core plugins to under-validated capabilities |
+| Each experiment is self-contained (no shared code) | Independent subdirectory per experiment | Shared scaffolding library across experiments | Enables promotion and retirement as single-directory operations; avoids coupling between experiments whose promotion timelines may diverge |
+| Sub-LLD layout vs. inline | Inline until experiment outgrows it, then sub-LLD | Always sub-LLD; always inline | Inline is lower overhead for small experiments; the upgrade path to sub-LLD is mechanical and deferred until needed |
+| Promotion is a single merge | All specs, skill, and references move in one change | Phased rollout with deprecation period | Minimum-system reasoning — no dual maintenance of experimental and promoted versions; commit history is the migration record |
 
 ## Open Questions
 
