@@ -29,7 +29,7 @@ LID answers one recurring problem: *you know what the code does, but you've lost
 Search **LID** in the Extensions panel, or run:
 
 ```
-ext install lid-tools.tooling
+ext install lid-tools.vscode
 ```
 
 `lid-lsp` is bundled — nothing else to install.

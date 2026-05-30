@@ -1,5 +1,5 @@
 {
-  "name": "tooling",
+  "name": "vscode",
   "displayName": "LID — Linked-Intent Development",
   "description": "Editor support for the LID methodology: hover, go-to-definition, find references, rename, completion, and real-time diagnostics for @spec citations.",
   "version": "0.2.3",
