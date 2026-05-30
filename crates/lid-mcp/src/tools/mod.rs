@@ -2,6 +2,7 @@ pub mod check;
 pub mod discover;
 pub mod find_refs;
 pub mod get_segment;
+pub mod init;
 pub mod list_segments;
 pub mod list_specs;
 pub mod search;

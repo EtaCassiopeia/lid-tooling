@@ -3,6 +3,86 @@ use std::path::Path;
 
 use lid_mcp::{registry::RepoRegistry, tools};
 
+#[tokio::test]
+async fn init_creates_project_scaffold() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let result = tools::init::lid_init(tools::init::InitInput {
+        path: dir.path().to_string_lossy().into_owned(),
+        segment: "core".to_owned(),
+    })
+    .await
+    .unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+    assert_eq!(json["segment"], "core");
+    assert!(dir.path().join("docs/arrows/index.yaml").exists());
+    assert!(dir.path().join("docs/arrows/core/overview.md").exists());
+    assert!(dir.path().join("docs/intent").is_dir());
+
+    let index = fs::read_to_string(dir.path().join("docs/arrows/index.yaml")).unwrap();
+    assert!(index.contains("schema_version: 2"));
+    assert!(index.contains("core:"));
+}
+
+#[tokio::test]
+async fn init_then_discover_succeeds() {
+    let dir = tempfile::tempdir().unwrap();
+
+    tools::init::lid_init(tools::init::InitInput {
+        path: dir.path().to_string_lossy().into_owned(),
+        segment: "payments".to_owned(),
+    })
+    .await
+    .unwrap();
+
+    let registry = RepoRegistry::new();
+    let result = tools::discover::lid_discover(
+        &registry,
+        tools::discover::DiscoverInput {
+            path: dir.path().to_string_lossy().into_owned(),
+        },
+    )
+    .await
+    .unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+    assert_eq!(json["segment_count"], 1);
+    assert_eq!(json["schema_version"], 2);
+}
+
+#[tokio::test]
+async fn init_rejects_existing_project() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("docs/arrows")).unwrap();
+    fs::write(
+        dir.path().join("docs/arrows/index.yaml"),
+        "schema_version: 2\narrows: {}\n",
+    )
+    .unwrap();
+
+    let result = tools::init::lid_init(tools::init::InitInput {
+        path: dir.path().to_string_lossy().into_owned(),
+        segment: "core".to_owned(),
+    })
+    .await;
+
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn init_rejects_invalid_segment_name() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let result = tools::init::lid_init(tools::init::InitInput {
+        path: dir.path().to_string_lossy().into_owned(),
+        segment: "My Segment".to_owned(),
+    })
+    .await;
+
+    assert!(result.is_err());
+}
+
 fn make_repo(root: &Path) {
     fs::create_dir_all(root.join("docs/arrows")).unwrap();
     fs::create_dir_all(root.join("docs/intent/auth")).unwrap();
