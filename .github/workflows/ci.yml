@@ -21,7 +21,7 @@ jobs:
       matrix:
         kind: [fmt, clippy, test]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -52,11 +52,11 @@ jobs:
       run:
         working-directory: extensions/vscode
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: extensions/vscode/package-lock.json
 
@@ -70,7 +70,7 @@ jobs:
         run: npx @vscode/vsce package --out lid-vscode-ci-smoke.vsix --skip-license
 
       - name: Upload .vsix
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: lid-vscode-ci-smoke
           path: extensions/vscode/lid-vscode-ci-smoke.vsix
