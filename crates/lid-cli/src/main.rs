@@ -278,11 +278,7 @@ fn cmd_status(root: Option<&Path>, as_json: bool) -> Result<ExitCode> {
             println!("  {status:<12} {count}");
         }
         println!();
-        let pct = if total_specs == 0 {
-            0
-        } else {
-            implemented * 100 / total_specs
-        };
+        let pct = (implemented * 100).checked_div(total_specs).unwrap_or(0);
         println!("Specs      {total_specs} total");
         println!(
             "  [x] {implemented} implemented   [ ] {open} open   [D] {deferred} deferred   ({pct} % covered)"
