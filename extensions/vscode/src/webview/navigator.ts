@@ -148,6 +148,11 @@ function render(payload: GraphPayload): void {
             cy.layout(LAYOUT_OPTIONS as Parameters<cytoscape.Core['layout']>[0]).run();
             cy.fit();
         }
+        // Refresh sidebar with updated node data if it's open
+        if (currentPanelNode && sidePanel.classList.contains('open')) {
+            const updated = payload.nodes.find(n => n.id === currentPanelNode!.id);
+            if (updated) openPanel(updated, editMode);
+        }
         return;
     }
 
@@ -282,6 +287,32 @@ function hideTooltip(): void {
     tooltip.style.display = 'none';
 }
 
+// ── Edit mode state ──────────────────────────────────────────────────────────
+
+let editMode = false;
+const btnEdit = document.getElementById('btn-edit') as HTMLButtonElement;
+
+btnEdit.addEventListener('click', () => {
+    if (!currentPanelNode) return;
+    editMode = !editMode;
+    btnEdit.textContent = editMode ? '● Done' : '✎ Edit';
+    btnEdit.classList.toggle('active', editMode);
+    openPanel(currentPanelNode, editMode);
+});
+
+// ── Mutation feedback banner ──────────────────────────────────────────────────
+
+const mutBanner = document.getElementById('mut-banner')!;
+let mutBannerTimer: ReturnType<typeof setTimeout> | undefined;
+
+function showMutBanner(ok: boolean, message: string): void {
+    clearTimeout(mutBannerTimer);
+    mutBanner.textContent = message;
+    mutBanner.className = ok ? 'ok' : 'err';
+    mutBanner.style.display = 'block';
+    mutBannerTimer = setTimeout(() => { mutBanner.style.display = 'none'; }, 3000);
+}
+
 // ── Neighbourhood focus ───────────────────────────────────────────────────────
 
 let focusedId: string | null = null;
@@ -338,17 +369,26 @@ function navigateToNode(id: string): void {
     const node = cy.getElementById(id);
     if (!node.length) return;
     cy.animate({ center: { eles: node }, zoom: cy.zoom() }, { duration: 250 });
-    openPanel(node.data('nodeData') as GraphNode);
+    openPanel(node.data('nodeData') as GraphNode, editMode);
 }
 
-function openPanel(node: GraphNode): void {
+function openPanel(node: GraphNode, edit = false): void {
     currentPanelNode = node;
+    editMode = edit;
+    btnEdit.textContent = editMode ? '● Done' : '✎ Edit';
+    btnEdit.classList.toggle('active', editMode);
     const { id, status, specs, specItems, specFile, lldFile, sampled, audited, next, drift } = node;
 
     panelTitle.textContent = id;
 
     const color = colorForStatus(status);
-    let html = `<span class="badge" style="background:${color}">${esc(status)}</span>`;
+    let html = editMode
+        ? `<select class="edit-select" id="edit-status" data-seg-id="${esc(id)}">
+            ${['UNMAPPED','MAPPED','AUDITED','OK','MERGED'].map(s =>
+              `<option value="${s}"${s === status ? ' selected' : ''}>${s}</option>`
+            ).join('')}
+           </select>`
+        : `<span class="badge" style="background:${color}">${esc(status)}</span>`;
 
     // ── Hierarchy chips (parent / children) ─────────────────────────────────
     if (node.parent) {
@@ -418,12 +458,30 @@ function openPanel(node: GraphNode): void {
                 for (const item of specItems!) {
                     const cls = item.marker === 'done' ? 'si-done' : item.marker === 'open' ? 'si-open' : 'si-def';
                     const sym = item.marker === 'done' ? '✓' : item.marker === 'open' ? '○' : '⊘';
+                    const statusVal = item.marker === 'done' ? 'implemented' : item.marker === 'open' ? 'open' : 'deferred';
                     const idBtn = item.id && item.line !== undefined && node.specFile
                         ? `<button class="si-id" data-path="${esc(node.specFile)}" data-line="${item.line}">${esc(item.id)}</button>`
                         : '';
-                    html += `<div class="si"><span class="si-m ${cls}">${sym}</span>${idBtn}<span class="si-t">${esc(trunc(item.text, 100))}</span></div>`;
+                    const marker = editMode && item.id && item.line !== undefined && node.specFile
+                        ? `<button class="si-toggle" data-id="${esc(item.id)}" data-file="${esc(node.specFile)}" data-line="${item.line}" data-status="${statusVal}" title="Cycle status"><span class="si-m ${cls}">${sym}</span></button>`
+                        : `<span class="si-m ${cls}">${sym}</span>`;
+                    html += `<div class="si">${marker}${idBtn}<span class="si-t">${esc(trunc(item.text, 100))}</span></div>`;
                 }
                 html += `</div>`;
+            }
+            // Add-spec form (edit mode only)
+            if (editMode) {
+                html += `<button class="add-spec-btn" id="btn-add-spec">+ Add spec</button>
+                  <div class="add-spec-form" id="add-spec-form">
+                    <div class="add-spec-row">
+                      <input class="edit-input" id="new-spec-id" placeholder="${esc(id.toUpperCase())}-001" style="flex:0 0 110px">
+                      <input class="edit-input" id="new-spec-text" placeholder="spec text…">
+                    </div>
+                    <div class="add-spec-row">
+                      <button class="btn-save" id="btn-submit-spec" style="margin-top:0">Add</button>
+                      <span class="add-spec-err" id="spec-id-err"></span>
+                    </div>
+                  </div>`;
             }
             html += `</div>`;
         }
@@ -445,8 +503,16 @@ function openPanel(node: GraphNode): void {
     html += `</div>`;
 
     // ── Next / Drift ──────────────────────────────────────────────────────────
-    if (next)  html += `<div class="sec"><div class="sec-title">Next</div><div class="prose">${esc(next)}</div></div>`;
-    if (drift) html += `<div class="sec"><div class="sec-title">Drift</div><div class="prose">${esc(drift)}</div></div>`;
+    if (editMode) {
+        html += `<div class="sec"><div class="sec-title">Next</div>
+          <textarea class="edit-textarea" id="edit-next" data-seg-id="${esc(id)}">${esc(next ?? '')}</textarea></div>
+          <div class="sec"><div class="sec-title">Drift</div>
+          <textarea class="edit-textarea" id="edit-drift" data-seg-id="${esc(id)}">${esc(drift ?? '')}</textarea></div>
+          <div class="sec"><button class="btn-save" id="btn-save-meta">Save</button></div>`;
+    } else {
+        if (next)  html += `<div class="sec"><div class="sec-title">Next</div><div class="prose">${esc(next)}</div></div>`;
+        if (drift) html += `<div class="sec"><div class="sec-title">Drift</div><div class="prose">${esc(drift)}</div></div>`;
+    }
 
     panelBody.innerHTML = html;
     sidePanel.classList.add('open');
@@ -484,11 +550,89 @@ panelBody.addEventListener('click', (e) => {
         const open = list.style.display === 'none';
         list.style.display = open ? 'block' : 'none';
         toggle.textContent = `${open ? '▴' : '▾'} ${toggle.dataset['count'] ?? ''} items`;
+        return;
+    }
+
+    // Edit-mode: spec status cycle
+    const siToggle = t.closest<HTMLButtonElement>('.si-toggle');
+    if (siToggle && editMode) {
+        const cur = siToggle.dataset['status'] as 'open' | 'implemented' | 'deferred';
+        const next: 'open' | 'implemented' | 'deferred' =
+            cur === 'open' ? 'implemented' : cur === 'implemented' ? 'deferred' : 'open';
+        vscode.postMessage({
+            type: 'updateSpecStatus',
+            specFile: siToggle.dataset['file']!,
+            specId: siToggle.dataset['id']!,
+            line: parseInt(siToggle.dataset['line'] ?? '0', 10),
+            newStatus: next,
+        });
+        // Optimistic UI update
+        const newCls = next === 'implemented' ? 'si-done' : next === 'open' ? 'si-open' : 'si-def';
+        const newSym = next === 'implemented' ? '✓' : next === 'open' ? '○' : '⊘';
+        const span = siToggle.querySelector<HTMLSpanElement>('.si-m');
+        if (span) { span.className = `si-m ${newCls}`; span.textContent = newSym; }
+        siToggle.dataset['status'] = next;
+        return;
+    }
+
+    // Edit-mode: toggle add-spec form
+    if ((t as HTMLElement).id === 'btn-add-spec') {
+        panelBody.querySelector<HTMLElement>('#add-spec-form')?.classList.toggle('open');
+        return;
+    }
+
+    // Edit-mode: submit new spec
+    if ((t as HTMLElement).id === 'btn-submit-spec' && editMode && currentPanelNode) {
+        const specIdInput = panelBody.querySelector<HTMLInputElement>('#new-spec-id');
+        const specTextInput = panelBody.querySelector<HTMLInputElement>('#new-spec-text');
+        const errSpan = panelBody.querySelector<HTMLElement>('#spec-id-err');
+        const specId = specIdInput?.value.trim() ?? '';
+        const text = specTextInput?.value.trim() ?? '';
+        const prefix = currentPanelNode.id.toUpperCase();
+        const valid = /^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$/.test(specId)
+            && specId.startsWith(prefix + '-')
+            && /\d/.test(specId);
+        if (!valid) { if (errSpan) errSpan.textContent = `Must start with ${prefix}- and include a digit`; return; }
+        if (!text)  { if (errSpan) errSpan.textContent = 'Text is required'; return; }
+        if (errSpan) errSpan.textContent = '';
+        vscode.postMessage({ type: 'addSpec', specFile: currentPanelNode.specFile, segmentId: currentPanelNode.id, specId, text });
+        if (specIdInput) specIdInput.value = '';
+        if (specTextInput) specTextInput.value = '';
+        panelBody.querySelector<HTMLElement>('#add-spec-form')?.classList.remove('open');
+        return;
+    }
+
+    // Edit-mode: save next/drift
+    if ((t as HTMLElement).id === 'btn-save-meta' && editMode && currentPanelNode) {
+        const nextTA  = panelBody.querySelector<HTMLTextAreaElement>('#edit-next');
+        const driftTA = panelBody.querySelector<HTMLTextAreaElement>('#edit-drift');
+        vscode.postMessage({
+            type: 'updateSegmentMeta',
+            segmentId: currentPanelNode.id,
+            next:  nextTA?.value  ?? '',
+            drift: driftTA?.value ?? '',
+        });
+        return;
+    }
+});
+
+// Edit-mode: status dropdown change
+panelBody.addEventListener('change', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.id === 'edit-status' && editMode && currentPanelNode) {
+        vscode.postMessage({
+            type: 'updateSegmentStatus',
+            segmentId: currentPanelNode.id,
+            newStatus: (t as HTMLSelectElement).value,
+        });
     }
 });
 
 function closePanel(): void {
     currentPanelNode = null;
+    editMode = false;
+    btnEdit.textContent = '✎ Edit';
+    btnEdit.classList.remove('active');
     clearFocus();
     sidePanel.classList.remove('open');
     cy?.resize();
@@ -605,15 +749,23 @@ function wireInteractions(): void {
     });
     cy.on('mouseout', 'node', hideTooltip);
 
-    // Dual tap + click for macOS trackpad inside WebView; debounced to avoid double-fire.
-    let lastOpenTs = 0;
+    // Tap+click: debounce co-fire; detect double-click to open in edit mode.
+    let lastTapTs = 0;
+    let tapTimer: ReturnType<typeof setTimeout> | null = null;
     const openSidebar = (evt: cytoscape.EventObject) => {
         const now = Date.now();
-        if (now - lastOpenTs < 100) return;
-        lastOpenTs = now;
-        hideCtxMenu();
-        hideTooltip();
-        openPanel(evt.target.data('nodeData') as GraphNode);
+        if (now - lastTapTs < 100) return; // absorb simultaneous tap+click
+        lastTapTs = now;
+        hideCtxMenu(); hideTooltip();
+        const node = evt.target.data('nodeData') as GraphNode;
+        if (tapTimer !== null) {
+            // Second tap within 280 ms → double-click → edit mode
+            clearTimeout(tapTimer);
+            tapTimer = null;
+            openPanel(node, true);
+        } else {
+            tapTimer = setTimeout(() => { tapTimer = null; openPanel(node); }, 280);
+        }
     };
     cy.on('tap',   'node', openSidebar);
     cy.on('click', 'node', openSidebar);
@@ -625,13 +777,50 @@ function wireInteractions(): void {
     });
 }
 
+// ── Add-segment overlay ───────────────────────────────────────────────────────
+
+const addSegOverlay = document.getElementById('add-seg-overlay')!;
+
+document.getElementById('btn-add-seg')!.addEventListener('click', () => {
+    (document.getElementById('seg-id-input') as HTMLInputElement).value = '';
+    (document.getElementById('seg-detail-input') as HTMLInputElement).value = '';
+    (document.getElementById('seg-add-err') as HTMLElement).textContent = '';
+    addSegOverlay.classList.add('open');
+});
+
+document.getElementById('btn-seg-cancel')!.addEventListener('click', () => {
+    addSegOverlay.classList.remove('open');
+});
+
+document.getElementById('btn-seg-submit')!.addEventListener('click', () => {
+    const segId   = (document.getElementById('seg-id-input')    as HTMLInputElement).value.trim();
+    const status  = (document.getElementById('seg-status-select') as HTMLSelectElement).value;
+    const detail  = (document.getElementById('seg-detail-input') as HTMLInputElement).value.trim();
+    const errEl   = document.getElementById('seg-add-err')!;
+    if (!segId || !/^[a-z][a-z0-9-]*$/.test(segId)) {
+        errEl.textContent = 'ID: lowercase letters, digits, hyphens only'; return;
+    }
+    if (!detail) { errEl.textContent = 'Detail path is required'; return; }
+    errEl.textContent = '';
+    addSegOverlay.classList.remove('open');
+    vscode.postMessage({ type: 'addSegment', segmentId: segId, status, detail });
+});
+
+addSegOverlay.addEventListener('click', (e) => {
+    if (e.target === addSegOverlay) addSegOverlay.classList.remove('open');
+});
+
 // ── Message bridge ────────────────────────────────────────────────────────────
 
 window.addEventListener(
     'message',
-    (event: MessageEvent<{ type: string; payload: GraphPayload }>) => {
+    (event: MessageEvent<{ type: string; payload: GraphPayload; message?: string }>) => {
         if (event.data.type === 'graph') {
             render(event.data.payload);
+        } else if (event.data.type === 'mutationOk') {
+            showMutBanner(true, event.data.message ?? 'Done');
+        } else if (event.data.type === 'mutationError') {
+            showMutBanner(false, event.data.message ?? 'Error');
         }
     },
 );

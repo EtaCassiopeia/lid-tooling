@@ -83,7 +83,12 @@ interface GraphPayload {
 
 type WebviewMessage =
     | { type: 'open'; segmentId: string }
-    | { type: 'openFile'; path: string; line?: number };
+    | { type: 'openFile'; path: string; line?: number }
+    | { type: 'updateSpecStatus'; specFile: string; specId: string; line: number; newStatus: 'open' | 'implemented' | 'deferred' }
+    | { type: 'addSpec'; specFile: string | undefined; segmentId: string; specId: string; text: string }
+    | { type: 'updateSegmentStatus'; segmentId: string; newStatus: string }
+    | { type: 'updateSegmentMeta'; segmentId: string; next: string; drift: string }
+    | { type: 'addSegment'; segmentId: string; status: string; detail: string };
 
 // ── NavigatorPanel ────────────────────────────────────────────────────────────
 
@@ -141,12 +146,14 @@ export class NavigatorPanel {
             (msg: WebviewMessage) => {
                 if (msg.type === 'openFile') {
                     this._openDocAtPath(msg.path, msg.line);
-                } else {
+                } else if (msg.type === 'open') {
                     const entry = this._indexEntry(msg.segmentId);
                     const detailFile = entry?.detail ?? `${msg.segmentId}.md`;
                     this._openDocAtPath(
                         path.join(this._workspaceRoot, 'docs', 'arrows', detailFile),
                     );
+                } else {
+                    void this._handleMutation(msg);
                 }
             },
             null,
@@ -188,6 +195,102 @@ export class NavigatorPanel {
                     `LID Navigator: could not open ${docPath} — ${String(err)}`,
                 );
             });
+    }
+
+    private async _handleMutation(msg: WebviewMessage): Promise<void> {
+        try {
+            if (msg.type === 'updateSpecStatus') {
+                await this._applySpecStatus(msg.specFile, msg.specId, msg.line, msg.newStatus);
+                this._postMutationResult(true, `Spec ${msg.specId} marked as ${msg.newStatus}`);
+            } else if (msg.type === 'addSpec') {
+                const specFile = msg.specFile ?? path.join(
+                    this._workspaceRoot, 'docs', 'intent', msg.segmentId, `${msg.segmentId}-specs.md`,
+                );
+                await this._appendSpec(specFile, msg.segmentId, msg.specId, msg.text);
+                this._postMutationResult(true, `Spec ${msg.specId} added`);
+            } else if (msg.type === 'updateSegmentStatus') {
+                await this._updateIndexEntry(msg.segmentId, { status: msg.newStatus });
+                this._postMutationResult(true, `Segment ${msg.segmentId} → ${msg.newStatus}`);
+            } else if (msg.type === 'updateSegmentMeta') {
+                await this._updateIndexEntry(msg.segmentId, {
+                    next:  msg.next  || undefined,
+                    drift: msg.drift || undefined,
+                });
+                this._postMutationResult(true, `Segment ${msg.segmentId} metadata saved`);
+            } else if (msg.type === 'addSegment') {
+                await this._updateIndexEntry(msg.segmentId, { status: msg.status, detail: msg.detail }, true);
+                this._postMutationResult(true, `Segment ${msg.segmentId} added`);
+            }
+        } catch (err: unknown) {
+            this._postMutationResult(false, String(err));
+        }
+    }
+
+    private _postMutationResult(ok: boolean, message: string): void {
+        void this._panel.webview.postMessage({ type: ok ? 'mutationOk' : 'mutationError', message });
+    }
+
+    private async _applySpecStatus(
+        specFile: string,
+        specId: string,
+        line: number,
+        newStatus: 'open' | 'implemented' | 'deferred',
+    ): Promise<void> {
+        const uri = vscode.Uri.file(specFile);
+        const doc = await vscode.workspace.openTextDocument(uri);
+        const lineIdx = line - 1;
+        const lineText = doc.lineAt(lineIdx).text;
+        const newMarker = newStatus === 'implemented' ? 'x' : newStatus === 'deferred' ? 'D' : ' ';
+        const newText = lineText.replace(/^(\s*-\s+\[)[xX D](\].*)$/, `$1${newMarker}$2`);
+        if (newText === lineText) {
+            throw new Error(`No spec marker found for ${specId} on line ${line}`);
+        }
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(uri, doc.lineAt(lineIdx).range, newText);
+        await vscode.workspace.applyEdit(edit);
+    }
+
+    private async _appendSpec(specFile: string, segmentId: string, specId: string, text: string): Promise<void> {
+        const uri = vscode.Uri.file(specFile);
+        const newLine = `- [ ] **${specId}**: ${text}\n`;
+
+        let exists = true;
+        try { await vscode.workspace.fs.stat(uri); }
+        catch { exists = false; }
+
+        if (exists) {
+            const doc = await vscode.workspace.openTextDocument(uri);
+            const end = doc.lineAt(doc.lineCount - 1).rangeIncludingLineBreak.end;
+            const suffix = doc.getText().endsWith('\n') ? '' : '\n';
+            const edit = new vscode.WorkspaceEdit();
+            edit.insert(uri, end, suffix + newLine);
+            await vscode.workspace.applyEdit(edit);
+        } else {
+            await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(specFile)));
+            await vscode.workspace.fs.writeFile(uri, Buffer.from(`# ${segmentId} specs\n\n${newLine}`));
+        }
+    }
+
+    private async _updateIndexEntry(
+        segmentId: string,
+        changes: Partial<ArrowEntry>,
+        create = false,
+    ): Promise<void> {
+        const indexPath = path.join(this._workspaceRoot, 'docs', 'arrows', 'index.yaml');
+        const index = this._loadIndex();
+        if (!index.arrows) { index.arrows = {}; }
+        if (!create && !index.arrows[segmentId]) {
+            throw new Error(`Segment '${segmentId}' not found in index.yaml`);
+        }
+        const merged = { ...(index.arrows[segmentId] ?? {}), ...changes };
+        for (const key of Object.keys(merged)) {
+            if ((merged as Record<string, unknown>)[key] === undefined) {
+                delete (merged as Record<string, unknown>)[key];
+            }
+        }
+        index.arrows[segmentId] = merged;
+        const yamlStr = yaml.dump(index, { lineWidth: -1 });
+        await vscode.workspace.fs.writeFile(vscode.Uri.file(indexPath), Buffer.from(yamlStr));
     }
 
     private _loadIndex(): ArrowIndex {
@@ -509,18 +612,85 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
     .si-open { color: #f59e0b; }
     .si-def  { color: #6b7280; }
     .si-t { opacity: 0.85; word-break: break-word; line-height: 1.5; }
-    /* ── Focus button ── */
-    .btn-focus {
+    /* ── Focus + Edit buttons ── */
+    .btn-focus, #btn-edit {
       background: none;
       border: 1px solid var(--vscode-editorGroup-border, #444);
       color: var(--vscode-descriptionForeground, #9d9d9d);
       border-radius: 3px; padding: 1px 7px; font-size: 10px; cursor: pointer; flex-shrink: 0;
     }
-    .btn-focus:hover:not(.active) { color: var(--vscode-foreground, #d4d4d4); border-color: var(--vscode-focusBorder, #007fd4); }
-    .btn-focus.active {
+    .btn-focus:hover:not(.active), #btn-edit:hover:not(.active) { color: var(--vscode-foreground, #d4d4d4); border-color: var(--vscode-focusBorder, #007fd4); }
+    .btn-focus.active, #btn-edit.active {
       background: var(--vscode-button-background, #0e639c);
       color: var(--vscode-button-foreground, #fff); border-color: transparent;
     }
+    /* ── Mutation feedback banner ── */
+    #mut-banner {
+      display: none; padding: 4px 10px; font-size: 11px; flex-shrink: 0;
+      border-bottom: 1px solid var(--vscode-editorGroup-border, #3c3c3c);
+    }
+    #mut-banner.ok  { background: rgba(34,197,94,.15); color: #4ade80; }
+    #mut-banner.err { background: rgba(239,68,68,.15);  color: #f87171; }
+    /* ── Edit-mode form elements ── */
+    .edit-select, .edit-textarea, .edit-input {
+      width: 100%;
+      background: var(--vscode-input-background, #3c3c3c);
+      color: var(--vscode-input-foreground, #cccccc);
+      border: 1px solid var(--vscode-input-border, #555);
+      border-radius: 2px; padding: 3px 6px; font-size: 11px; outline: none;
+      font-family: var(--vscode-font-family, system-ui, sans-serif);
+      box-sizing: border-box;
+    }
+    .edit-textarea { resize: vertical; min-height: 60px; }
+    .btn-save {
+      margin-top: 5px; padding: 4px 12px;
+      background: var(--vscode-button-background, #0e639c);
+      color: var(--vscode-button-foreground, #fff);
+      border: none; border-radius: 2px; cursor: pointer; font-size: 11px;
+    }
+    .btn-save:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
+    /* spec status toggle button in edit mode */
+    .si-toggle {
+      background: none; border: none; cursor: pointer; padding: 0;
+      display: flex; align-items: center; flex-shrink: 0; line-height: 1;
+    }
+    .si-toggle:hover { opacity: 0.7; }
+    /* add-spec inline form */
+    .add-spec-btn {
+      display: block; width: 100%; margin-top: 6px;
+      background: none; border: 1px dashed var(--vscode-editorGroup-border, #555);
+      color: var(--vscode-descriptionForeground, #9d9d9d);
+      border-radius: 3px; padding: 2px 8px; font-size: 10px; cursor: pointer; text-align: left;
+    }
+    .add-spec-btn:hover { border-color: var(--vscode-focusBorder, #007fd4); color: var(--vscode-foreground, #d4d4d4); }
+    .add-spec-form { margin-top: 6px; display: none; }
+    .add-spec-form.open { display: block; }
+    .add-spec-row { display: flex; gap: 4px; margin-top: 4px; }
+    .add-spec-row .edit-input { flex: 1; }
+    .add-spec-err { font-size: 10px; color: #f87171; margin-top: 3px; min-height: 14px; }
+    /* ── Add-segment overlay ── */
+    #add-seg-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.55); z-index: 2000;
+      align-items: flex-start; justify-content: center; padding-top: 60px;
+    }
+    #add-seg-overlay.open { display: flex; }
+    #add-seg-box {
+      background: var(--vscode-editorWidget-background, #252526);
+      border: 1px solid var(--vscode-editorWidget-border, #454545);
+      border-radius: 6px; padding: 16px; width: 320px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.6);
+    }
+    #add-seg-box h3 { font-size: 13px; margin-bottom: 12px; }
+    .seg-field { margin-bottom: 8px; }
+    .seg-field label { display: block; font-size: 10px; opacity: 0.6; margin-bottom: 2px; }
+    .seg-field-row { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+    .btn-cancel {
+      background: transparent; border: 1px solid var(--vscode-editorGroup-border, #555);
+      color: var(--vscode-foreground, #d4d4d4); border-radius: 2px; padding: 4px 12px;
+      cursor: pointer; font-size: 11px;
+    }
+    #seg-add-err { font-size: 10px; color: #f87171; margin-top: 6px; min-height: 14px; }
     /* ── Tooltip ── */
     #tooltip {
       position: fixed; pointer-events: none;
@@ -570,6 +740,7 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
 <body>
   <div id="toolbar">
     <button id="btn-fit">Fit</button>
+    <button id="btn-add-seg">+ Segment</button>
     <div class="tb-sep"></div>
     <label>Status
       <select id="filter-status">
@@ -597,9 +768,11 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
     <div id="panel">
       <div class="ph">
         <span class="ph-title" id="panel-title">—</span>
+        <button id="btn-edit">✎ Edit</button>
         <button class="btn-focus" id="btn-focus">Focus</button>
         <span class="ph-close" id="panel-close">✕</span>
       </div>
+      <div id="mut-banner"></div>
       <div class="pb" id="panel-body"></div>
     </div>
   </div>
@@ -629,6 +802,36 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
   </div>
 
   <div id="empty">No segments found in docs/arrows/index.yaml</div>
+
+  <div id="add-seg-overlay">
+    <div id="add-seg-box">
+      <h3>Add Segment</h3>
+      <div class="seg-field">
+        <label>Segment ID</label>
+        <input class="edit-input" id="seg-id-input" placeholder="billing">
+      </div>
+      <div class="seg-field">
+        <label>Status</label>
+        <select class="edit-select" id="seg-status-select">
+          <option value="UNMAPPED">UNMAPPED</option>
+          <option value="MAPPED">MAPPED</option>
+          <option value="AUDITED">AUDITED</option>
+          <option value="OK">OK</option>
+          <option value="MERGED">MERGED</option>
+        </select>
+      </div>
+      <div class="seg-field">
+        <label>Detail path (relative to docs/arrows/)</label>
+        <input class="edit-input" id="seg-detail-input" placeholder="billing/core.md">
+      </div>
+      <div id="seg-add-err"></div>
+      <div class="seg-field-row">
+        <button class="btn-cancel" id="btn-seg-cancel">Cancel</button>
+        <button class="btn-save" id="btn-seg-submit">Add</button>
+      </div>
+    </div>
+  </div>
+
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
