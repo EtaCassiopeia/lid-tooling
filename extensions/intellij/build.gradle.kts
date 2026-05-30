@@ -38,3 +38,15 @@ intellijPlatform {
 kotlin {
     jvmToolchain(21)
 }
+
+// Bundle the lid-lsp binary (populated by CI) into the plugin zip
+// so end-users need no separate install.  The server/ dir is .gitignored
+// locally; the release pipeline copies the platform binary before buildPlugin.
+tasks.prepareSandbox {
+    val serverDir = layout.projectDirectory.dir("server")
+    if (serverDir.asFile.exists()) {
+        from(serverDir) {
+            into("${intellijPlatform.projectName.get()}/server")
+        }
+    }
+}
