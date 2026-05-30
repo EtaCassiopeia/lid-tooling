@@ -361,7 +361,12 @@ mod tests {
                 intent: vec![PathBuf::from("docs/intent/auth/parked-design.md")],
             },
         };
-        let repo = make_repo(&["parked-design.md"], &[], ArrowReferences::default(), unmapped);
+        let repo = make_repo(
+            &["parked-design.md"],
+            &[],
+            ArrowReferences::default(),
+            unmapped,
+        );
         let findings = OrphanCheck.run(&repo);
         assert!(findings.is_empty(), "got {findings:?}");
     }
