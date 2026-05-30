@@ -126,6 +126,12 @@
 
     <colorSettingsPage implementation="dev.lid.intellij.highlight.LidColorSettingsPage"/>
 
+    <!-- ── Intent Navigator tool window ─────────────────────────────────── -->
+    <toolWindow id="LID Navigator"
+                anchor="right"
+                factoryClass="dev.lid.intellij.navigator.LidNavigatorToolWindowFactory"
+                canCloseContents="false"/>
+
   </extensions>
 
   <!-- ── Commands ────────────────────────────────────────────────────── -->

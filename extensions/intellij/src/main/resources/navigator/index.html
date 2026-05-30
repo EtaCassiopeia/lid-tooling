@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LID Intent Navigator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1e2030; color: #c8c9d3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 12px; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  #toolbar {
+    display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+    background: #171923; border-bottom: 1px solid #2d3250; flex-shrink: 0; flex-wrap: wrap;
+  }
+  #toolbar select, #toolbar input {
+    background: #252a3d; color: #c8c9d3; border: 1px solid #3d4663;
+    border-radius: 4px; padding: 3px 6px; font-size: 11px; outline: none;
+  }
+  #toolbar select:focus, #toolbar input:focus { border-color: #6366f1; }
+  #toolbar button {
+    background: #252a3d; color: #c8c9d3; border: 1px solid #3d4663;
+    border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;
+  }
+  #toolbar button:hover { background: #2d3250; }
+  #toolbar button.primary { background: #6366f1; border-color: #6366f1; color: #fff; }
+  #toolbar button.primary:hover { background: #4f52d3; }
+
+  #main { display: flex; flex: 1; overflow: hidden; position: relative; }
+  #cy { flex: 1; }
+
+  #empty {
+    display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    color: #6b7280; font-size: 13px; text-align: center; pointer-events: none;
+  }
+
+  #tooltip {
+    display: none; position: fixed; background: #252a3d; border: 1px solid #3d4663;
+    border-radius: 6px; padding: 8px 10px; font-size: 11px; max-width: 280px;
+    pointer-events: none; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .tt-title { font-weight: 600; margin-bottom: 4px; }
+  .tt-row { color: #a0a3b5; margin-top: 2px; }
+  .tt-sep { border: none; border-top: 1px solid #3d4663; margin: 6px 0; }
+
+  /* ── Side panel ──────────────────────────────────────────── */
+  #panel {
+    width: 0; overflow: hidden; transition: width 0.2s ease;
+    background: #1a1d2e; border-left: 1px solid #2d3250; display: flex; flex-direction: column;
+  }
+  #panel.open { width: 300px; }
+  #panel-header {
+    display: flex; align-items: center; padding: 8px 10px; gap: 6px;
+    border-bottom: 1px solid #2d3250; flex-shrink: 0;
+  }
+  #panel-title { flex: 1; font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #panel-header button {
+    background: none; border: 1px solid #3d4663; color: #c8c9d3;
+    border-radius: 4px; padding: 2px 7px; font-size: 11px; cursor: pointer;
+  }
+  #panel-header button:hover { background: #252a3d; }
+  #panel-header button.active { background: #6366f1; border-color: #6366f1; color: #fff; }
+  #panel-body { overflow-y: auto; padding: 10px; flex: 1; }
+
+  .sec { margin-bottom: 12px; }
+  .sec-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: #6b7280; margin-bottom: 4px; }
+  .sec-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+  .badge-UNMAPPED { background:#6b7280; color:#fff; }
+  .badge-MAPPED   { background:#6366f1; color:#fff; }
+  .badge-AUDITED  { background:#f59e0b; color:#000; }
+  .badge-OK       { background:#81b29a; color:#000; }
+  .badge-MERGED   { background:#14b8a6; color:#000; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    background: #252a3d; border: 1px solid #3d4663; border-radius: 4px;
+    padding: 2px 7px; font-size: 11px; cursor: pointer; color: #c8c9d3;
+  }
+  .chip:hover { background: #2d3250; }
+  .chip-rm { display: flex; align-items: center; gap: 4px; background: #252a3d; border: 1px solid #3d4663; border-radius: 4px; padding: 2px 4px 2px 7px; font-size: 11px; }
+  .chip-x { background: none; border: none; color: #6b7280; cursor: pointer; font-size: 13px; padding: 0 2px; line-height: 1; }
+  .chip-x:hover { color: #e07a5f; }
+
+  .prog-wrap { height: 4px; background: #2d3250; border-radius: 2px; margin-bottom: 4px; overflow: hidden; }
+  .prog-fill { height: 100%; border-radius: 2px; }
+  .spec-row { display: flex; gap: 10px; color: #a0a3b5; font-size: 11px; }
+  .spec-toggle { background: none; border: none; color: #6366f1; font-size: 11px; cursor: pointer; }
+  .spec-list { margin-top: 6px; border-top: 1px solid #2d3250; padding-top: 6px; }
+  .si { display: flex; align-items: flex-start; gap: 5px; margin-bottom: 4px; font-size: 11px; }
+  .si-m { display: inline-block; width: 14px; text-align: center; flex-shrink: 0; }
+  .si-done { color: #81b29a; }
+  .si-open { color: #f59e0b; }
+  .si-def  { color: #6b7280; }
+  .si-t { color: #a0a3b5; }
+  .si-id { background: none; border: none; color: #6366f1; cursor: pointer; font-size: 11px; padding: 0; white-space: nowrap; }
+  .si-id:hover { text-decoration: underline; }
+  .si-toggle { background: none; border: none; cursor: pointer; padding: 0; flex-shrink: 0; }
+  .add-spec-btn { background: none; border: none; color: #6366f1; font-size: 11px; cursor: pointer; margin-top: 4px; padding: 0; }
+  .add-spec-form { display: none; margin-top: 6px; }
+  .add-spec-form.open { display: block; }
+  .add-spec-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .add-spec-err { color: #e07a5f; font-size: 10px; }
+
+  .edit-select, .edit-input, .edit-textarea {
+    background: #252a3d; color: #c8c9d3; border: 1px solid #3d4663;
+    border-radius: 4px; padding: 4px 6px; font-size: 11px; outline: none; width: 100%;
+  }
+  .edit-select:focus, .edit-input:focus, .edit-textarea:focus { border-color: #6366f1; }
+  .edit-textarea { resize: vertical; min-height: 52px; }
+  .btn-save {
+    background: #6366f1; color: #fff; border: none; border-radius: 4px;
+    padding: 4px 12px; font-size: 11px; cursor: pointer; margin-top: 4px;
+  }
+  .btn-save:hover { background: #4f52d3; }
+  .btn-open {
+    display: block; width: 100%; background: #252a3d; color: #c8c9d3; border: 1px solid #3d4663;
+    border-radius: 4px; padding: 5px 8px; font-size: 11px; cursor: pointer; text-align: left; margin-bottom: 4px;
+  }
+  .btn-open:hover { background: #2d3250; }
+
+  .meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 11px; }
+  .meta-k { color: #6b7280; }
+  .prose { font-size: 11px; color: #a0a3b5; line-height: 1.5; white-space: pre-wrap; }
+
+  /* ── Context menu ──────────────────────────────────────────── */
+  #ctxmenu {
+    display: none; position: fixed; background: #252a3d; border: 1px solid #3d4663;
+    border-radius: 6px; z-index: 200; min-width: 160px; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    overflow: hidden;
+  }
+  #ctxmenu div {
+    padding: 7px 14px; cursor: pointer; font-size: 12px;
+  }
+  #ctxmenu div:hover { background: #2d3250; }
+  .hidden { display: none !important; }
+
+  /* ── Add-segment overlay ────────────────────────────────────── */
+  #add-seg-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 300; align-items: center; justify-content: center;
+  }
+  #add-seg-overlay.open { display: flex; }
+  #add-seg-box {
+    background: #1a1d2e; border: 1px solid #3d4663; border-radius: 8px;
+    padding: 18px; width: 380px; max-width: 90vw; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  #add-seg-box h3 { font-size: 13px; margin-bottom: 14px; }
+  .seg-field { margin-bottom: 10px; }
+  .seg-label { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 3px; }
+  #seg-add-err { color: #e07a5f; font-size: 10px; margin-top: 4px; }
+  .seg-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+  .btn-cancel {
+    background: #252a3d; color: #c8c9d3; border: 1px solid #3d4663;
+    border-radius: 4px; padding: 5px 14px; font-size: 12px; cursor: pointer;
+  }
+  .btn-cancel:hover { background: #2d3250; }
+  .btn-submit {
+    background: #6366f1; color: #fff; border: none;
+    border-radius: 4px; padding: 5px 14px; font-size: 12px; cursor: pointer;
+  }
+  .btn-submit:hover { background: #4f52d3; }
+
+  /* ── Mutation banner ────────────────────────────────────────── */
+  #mut-banner {
+    display: none; position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+    padding: 6px 16px; border-radius: 6px; font-size: 12px; z-index: 400;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  #mut-banner.ok  { background: #1e3a2f; border: 1px solid #81b29a; color: #81b29a; }
+  #mut-banner.err { background: #3a1e1e; border: 1px solid #e07a5f; color: #e07a5f; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <select id="filter-status" title="Filter by status">
+    <option value="">All statuses</option>
+    <option value="UNMAPPED">UNMAPPED</option>
+    <option value="MAPPED">MAPPED</option>
+    <option value="AUDITED">AUDITED</option>
+    <option value="OK">OK</option>
+    <option value="MERGED">MERGED</option>
+  </select>
+  <select id="filter-cluster" title="Filter by cluster">
+    <option value="">All clusters</option>
+  </select>
+  <input id="search" type="text" placeholder="Search…" style="width:130px">
+  <button id="btn-clear" title="Clear search">✕</button>
+  <button id="btn-fit" title="Fit graph">⊡ Fit</button>
+  <button id="btn-add-seg" class="primary" title="Add segment">+ Segment</button>
+</div>
+
+<div id="main">
+  <div id="cy"></div>
+  <div id="empty">No segments found in index.yaml</div>
+
+  <div id="panel">
+    <div id="panel-header">
+      <span id="panel-title"></span>
+      <button id="btn-focus">Focus</button>
+      <button id="btn-edit">✎ Edit</button>
+      <button id="panel-close" title="Close">✕</button>
+    </div>
+    <div id="panel-body"></div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<div id="ctxmenu">
+  <div id="ctx-arrow">Open Arrow Doc</div>
+  <div id="ctx-spec" class="hidden">Open Spec File</div>
+  <div id="ctx-lld"  class="hidden">Open LLD</div>
+  <div id="ctx-copy">Copy ID</div>
+</div>
+
+<div id="add-seg-overlay">
+  <div id="add-seg-box">
+    <h3>Add Segment</h3>
+    <div class="seg-field">
+      <div class="seg-label">Segment ID</div>
+      <input class="edit-input" id="seg-id-input" placeholder="my-segment">
+    </div>
+    <div class="seg-field">
+      <div class="seg-label">Status</div>
+      <select class="edit-select" id="seg-status-select">
+        <option value="UNMAPPED">UNMAPPED</option>
+        <option value="MAPPED">MAPPED</option>
+        <option value="AUDITED">AUDITED</option>
+        <option value="OK">OK</option>
+        <option value="MERGED">MERGED</option>
+      </select>
+    </div>
+    <div class="seg-field">
+      <div class="seg-label">Detail file</div>
+      <input class="edit-input" id="seg-detail-input" placeholder="my-segment.md">
+    </div>
+    <div class="seg-field">
+      <div class="seg-label">Blocks</div>
+      <select class="edit-select" id="seg-blocks-select"><option value="">— pick segment —</option></select>
+      <div class="chips" id="seg-blocks-chips" style="margin-top:4px"></div>
+    </div>
+    <div class="seg-field">
+      <div class="seg-label">Children</div>
+      <select class="edit-select" id="seg-children-select"><option value="">— pick segment —</option></select>
+      <div class="chips" id="seg-children-chips" style="margin-top:4px"></div>
+    </div>
+    <div id="seg-add-err"></div>
+    <div class="seg-row">
+      <button class="btn-cancel" id="btn-seg-cancel">Cancel</button>
+      <button class="btn-submit" id="btn-seg-submit">Add</button>
+    </div>
+  </div>
+</div>
+
+<div id="mut-banner"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+<script>
+'use strict';
+
+// ── Bridge: injected by Kotlin replacing __QUERY_INJECT__ ───────────────────
+window.__lidPostMessage = function(msg) {
+  var msgJson = JSON.stringify(msg);
+  __QUERY_INJECT__
+};
+
+// ── Status colours ──────────────────────────────────────────────────────────
+var STATUS_COLOR = {
+  UNMAPPED: '#6B7280', MAPPED: '#6366F1', AUDITED: '#F59E0B', OK: '#81B29A', MERGED: '#14B8A6'
+};
+function colorForStatus(s) { return STATUS_COLOR[s] || STATUS_COLOR.UNMAPPED; }
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function trunc(s, n) { return s && s.length > n ? s.slice(0, n) + '…' : (s || ''); }
+function fmtDate(s) { return s ? String(s).replace(/T.*$/, '') : '—'; }
+
+// ── State ────────────────────────────────────────────────────────────────────
+var cy, _clusters = {}, _allIds = [], _addBlocks = [], _addChildren = [];
+var currentNode = null, editMode = false, focusedId = null;
+
+var LAYOUT = { name:'dagre', rankDir:'TB', ranker:'network-simplex', nodeSep:40, rankSep:60, animate:false };
+
+function buildLabel(n) {
+  var s = n.specs;
+  if (!s) return n.id;
+  var total = s.implemented + s.open + s.deferred;
+  return total > 0 ? n.id + '\n' + s.implemented + '/' + total : n.id;
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function render(payload) {
+  _clusters = payload.clusters || {};
+  _allIds = (payload.nodes || []).map(function(n){ return n.id; }).sort();
+
+  var clusterSel = document.getElementById('filter-cluster');
+  var prev = clusterSel.value;
+  while (clusterSel.options.length > 1) clusterSel.remove(1);
+  Object.keys(_clusters).sort().forEach(function(name) {
+    var opt = document.createElement('option');
+    opt.value = opt.textContent = name;
+    clusterSel.appendChild(opt);
+  });
+  if (_clusters[prev]) clusterSel.value = prev;
+
+  var elements = (payload.nodes || []).map(function(n) {
+    return { data: { id: n.id, label: buildLabel(n), status: n.status, hasDrift: n.drift ? 1 : 0, hasNext: n.next ? 1 : 0, nodeData: n } };
+  }).concat((payload.edges || []).map(function(e, i) {
+    return { data: { id: 'e'+i, source: e.source, target: e.target, kind: e.kind || 'blocks' } };
+  }));
+
+  document.getElementById('empty').style.display = (payload.nodes || []).length === 0 ? 'block' : 'none';
+
+  if (cy) {
+    cy.elements().remove();
+    if (elements.length > 0) { cy.add(elements); cy.layout(LAYOUT).run(); cy.fit(); }
+    if (currentNode && document.getElementById('panel').classList.contains('open')) {
+      var updated = (payload.nodes || []).find(function(n){ return n.id === currentNode.id; });
+      if (updated) openPanel(updated, editMode);
+    }
+    return;
+  }
+
+  cy = cytoscape({
+    container: document.getElementById('cy'),
+    elements: elements,
+    style: [
+      { selector: 'node', style: {
+          label: 'data(label)', 'background-color': function(ele){ return colorForStatus(ele.data('status')); },
+          color: '#fff', 'font-size': '10px', 'text-valign': 'center', 'text-halign': 'center',
+          'text-wrap': 'wrap', 'text-max-width': '115px', width: 135, height: 54,
+          shape: 'round-rectangle', 'border-width': 0,
+          'font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+      }},
+      { selector: 'node[?hasNext]',    style: { 'border-width': 3, 'border-color': '#E07A5F' } },
+      { selector: 'node[?hasDrift]',   style: { 'border-width': 3, 'border-color': '#F59E0B' } },
+      { selector: 'node:selected',     style: { 'border-width': 4, 'border-color': '#E07A5F' } },
+      { selector: 'node:active',       style: { 'overlay-opacity': 0.08 } },
+      { selector: 'node.dimmed',       style: { opacity: 0.15 } },
+      { selector: 'node.highlighted',  style: { 'border-width': 2, 'border-color': '#E07A5F' } },
+      { selector: 'edge', style: {
+          width: 1.5, 'line-color': '#3D4663', 'target-arrow-color': '#3D4663',
+          'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'arrow-scale': 0.8
+      }},
+      { selector: 'edge[kind = "child"]', style: {
+          width: 1, 'line-color': '#252A40', 'line-style': 'dashed',
+          'target-arrow-shape': 'none', 'curve-style': 'bezier'
+      }},
+      { selector: 'edge.dimmed',    style: { opacity: 0.08 } },
+      { selector: 'edge:selected',  style: { 'line-color': '#E07A5F', 'target-arrow-color': '#E07A5F' } },
+    ],
+    layout: LAYOUT, minZoom: 0.2, maxZoom: 3
+  });
+  wireInteractions();
+}
+
+// ── Tooltip ───────────────────────────────────────────────────────────────────
+var tooltip = document.getElementById('tooltip');
+function showTooltip(x, y, node) {
+  var html = '<div class="tt-title">' + esc(node.id) + ' <span style="opacity:.6">[' + esc(node.status) + ']</span></div>';
+  if (node.specs) {
+    var s = node.specs, total = s.implemented + s.open + s.deferred;
+    if (total > 0) html += '<div class="tt-row">Specs: <strong>' + s.implemented + '</strong>✓ ' + s.open + '○ ' + s.deferred + '⊘</div>';
+  }
+  if (node.sampled || node.audited) {
+    html += '<div class="tt-row">Sampled: ' + fmtDate(node.sampled) + '  Audited: ' + fmtDate(node.audited) + '</div>';
+  }
+  if (node.next || node.drift) {
+    html += '<hr class="tt-sep">';
+    if (node.next)  html += '<div class="tt-row"><span style="opacity:.55">Next: </span>' + esc(trunc(node.next, 120)) + '</div>';
+    if (node.drift) html += '<div class="tt-row"><span style="opacity:.55">Drift: </span>' + esc(trunc(node.drift, 120)) + '</div>';
+  }
+  tooltip.innerHTML = html;
+  tooltip.style.display = 'block';
+  posTooltip(x, y);
+}
+function posTooltip(x, y) {
+  var vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+  tooltip.style.left = Math.min(x + 14, vw - tooltip.offsetWidth - 8) + 'px';
+  tooltip.style.top  = Math.min(y + 14, vh - tooltip.offsetHeight - 8) + 'px';
+}
+function hideTooltip() { tooltip.style.display = 'none'; }
+
+// ── Focus neighbourhood ────────────────────────────────────────────────────
+var btnFocus = document.getElementById('btn-focus');
+function applyFocus(id) {
+  if (!cy) return;
+  focusedId = id;
+  var node = cy.getElementById(id);
+  var focusSet = node.predecessors('node').union(node.successors('node')).union(node);
+  var focusEdges = focusSet.edgesWith(focusSet);
+  cy.batch(function() {
+    cy.elements().addClass('dimmed');
+    focusSet.union(focusEdges).removeClass('dimmed');
+  });
+  btnFocus.classList.add('active');
+  btnFocus.textContent = 'Unfocus';
+}
+function clearFocus() {
+  if (!focusedId) return;
+  focusedId = null;
+  cy && cy.elements().removeClass('dimmed');
+  applyFilter();
+  btnFocus.classList.remove('active');
+  btnFocus.textContent = 'Focus';
+}
+btnFocus.addEventListener('click', function() {
+  focusedId ? clearFocus() : currentNode && applyFocus(currentNode.id);
+});
+
+// ── Sidebar panel ──────────────────────────────────────────────────────────
+var sidePanel  = document.getElementById('panel');
+var panelTitle = document.getElementById('panel-title');
+var panelBody  = document.getElementById('panel-body');
+
+document.getElementById('panel-close').addEventListener('click', closePanel);
+
+var btnEdit = document.getElementById('btn-edit');
+btnEdit.addEventListener('click', function() {
+  if (!currentNode) return;
+  editMode = !editMode;
+  btnEdit.textContent = editMode ? '● Done' : '✎ Edit';
+  btnEdit.classList.toggle('active', editMode);
+  openPanel(currentNode, editMode);
+});
+
+function navigateToNode(id) {
+  if (!cy) return;
+  var node = cy.getElementById(id);
+  if (!node.length) return;
+  cy.animate({ center: { eles: node }, zoom: cy.zoom() }, { duration: 250 });
+  openPanel(node.data('nodeData'), editMode);
+}
+
+function openPanel(node, edit) {
+  currentNode = node;
+  editMode = !!edit;
+  btnEdit.textContent = editMode ? '● Done' : '✎ Edit';
+  btnEdit.classList.toggle('active', editMode);
+  panelTitle.textContent = node.id;
+
+  var id = node.id, status = node.status;
+  var html = editMode
+    ? '<select class="edit-select" id="edit-status">' +
+        ['UNMAPPED','MAPPED','AUDITED','OK','MERGED'].map(function(s) {
+          return '<option value="' + s + '"' + (s === status ? ' selected' : '') + '>' + s + '</option>';
+        }).join('') + '</select>'
+    : '<span class="badge badge-' + esc(status) + '">' + esc(status) + '</span>';
+
+  // Hierarchy
+  if (node.parent) {
+    html += '<div class="sec"><div class="sec-title">Parent</div><div class="chips">';
+    html += editMode
+      ? '<div class="chip chip-rm" data-nav="' + esc(node.parent) + '">' + esc(node.parent) +
+        '<button class="chip-x" data-rm-kind="parent" data-rm-seg="' + esc(id) + '" data-rm-target="' + esc(node.parent) + '">×</button></div>'
+      : '<button class="chip" data-nav="' + esc(node.parent) + '">' + esc(node.parent) + '</button>';
+    html += '</div></div>';
+  }
+  if (node.children && node.children.length > 0) {
+    html += '<div class="sec"><div class="sec-title">Children</div><div class="chips">';
+    node.children.forEach(function(c) {
+      html += editMode
+        ? '<div class="chip chip-rm" data-nav="' + esc(c) + '">' + esc(c) +
+          '<button class="chip-x" data-rm-kind="children" data-rm-seg="' + esc(id) + '" data-rm-target="' + esc(c) + '">×</button></div>'
+        : '<button class="chip" data-nav="' + esc(c) + '">' + esc(c) + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Dependency edges
+  var preds = cy && cy.getElementById(id).incomers('edge').filter(function(e){ return e.data('kind') === 'blocks'; }).sources();
+  var succs = cy && cy.getElementById(id).outgoers('edge').filter(function(e){ return e.data('kind') === 'blocks'; }).targets();
+  if ((preds && preds.length > 0) || (succs && succs.length > 0)) {
+    html += '<div class="sec">';
+    if (preds && preds.length > 0) {
+      html += '<div class="sec-title">Blocked by</div><div class="chips">';
+      preds.forEach(function(n) {
+        html += editMode
+          ? '<div class="chip chip-rm" data-nav="' + esc(n.id()) + '">' + esc(n.id()) +
+            '<button class="chip-x" data-rm-kind="blockedBy" data-rm-seg="' + esc(id) + '" data-rm-target="' + esc(n.id()) + '">×</button></div>'
+          : '<button class="chip" data-nav="' + esc(n.id()) + '">' + esc(n.id()) + '</button>';
+      });
+      html += '</div>';
+    }
+    if (succs && succs.length > 0) {
+      html += '<div class="sec-title" style="margin-top:8px">Blocks</div><div class="chips">';
+      succs.forEach(function(n) {
+        html += editMode
+          ? '<div class="chip chip-rm" data-nav="' + esc(n.id()) + '">' + esc(n.id()) +
+            '<button class="chip-x" data-rm-kind="blocks" data-rm-seg="' + esc(id) + '" data-rm-target="' + esc(n.id()) + '">×</button></div>'
+          : '<button class="chip" data-nav="' + esc(n.id()) + '">' + esc(n.id()) + '</button>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  // Specs
+  if (node.specs) {
+    var s = node.specs, total = s.implemented + s.open + s.deferred;
+    if (total > 0) {
+      var pct = Math.round(s.implemented / total * 100);
+      var barColor = s.open > 0 ? '#F59E0B' : '#81B29A';
+      var hasItems = node.specItems && node.specItems.length > 0;
+      html += '<div class="sec"><div class="sec-title-row"><span class="sec-title">Specs</span>' +
+        (hasItems ? '<button class="spec-toggle" data-count="' + node.specItems.length + '">▾ ' + node.specItems.length + ' items</button>' : '') +
+        '</div><div class="prog-wrap"><div class="prog-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>' +
+        '<div class="spec-row"><span>✓ ' + s.implemented + '</span><span>○ ' + s.open + '</span><span>⊘ ' + s.deferred + '</span>' +
+        '<span style="margin-left:auto">' + s.implemented + '/' + total + '</span></div>';
+      if (hasItems) {
+        html += '<div class="spec-list" style="display:none">';
+        node.specItems.forEach(function(item) {
+          var cls = item.marker === 'done' ? 'si-done' : item.marker === 'open' ? 'si-open' : 'si-def';
+          var sym = item.marker === 'done' ? '✓' : item.marker === 'open' ? '○' : '⊘';
+          var statusVal = item.marker === 'done' ? 'implemented' : item.marker === 'open' ? 'open' : 'deferred';
+          var idBtn = item.id && item.line && node.specFile
+            ? '<button class="si-id" data-path="' + esc(node.specFile) + '" data-line="' + item.line + '">' + esc(item.id) + '</button>'
+            : '';
+          var marker = editMode && item.id && item.line && node.specFile
+            ? '<button class="si-toggle" data-id="' + esc(item.id) + '" data-file="' + esc(node.specFile) +
+              '" data-line="' + item.line + '" data-status="' + statusVal + '"><span class="si-m ' + cls + '">' + sym + '</span></button>'
+            : '<span class="si-m ' + cls + '">' + sym + '</span>';
+          html += '<div class="si">' + marker + idBtn + '<span class="si-t">' + esc(trunc(item.text, 100)) + '</span></div>';
+        });
+        html += '</div>';
+      }
+      if (editMode) {
+        html += '<button class="add-spec-btn" id="btn-add-spec">+ Add spec</button>' +
+          '<div class="add-spec-form" id="add-spec-form"><div class="add-spec-row">' +
+          '<input class="edit-input" id="new-spec-id" placeholder="' + esc(id.toUpperCase()) + '-001" style="flex:0 0 110px">' +
+          '<input class="edit-input" id="new-spec-text" placeholder="spec text…"></div>' +
+          '<div class="add-spec-row"><button class="btn-save" id="btn-submit-spec">Add</button>' +
+          '<span class="add-spec-err" id="spec-id-err"></span></div></div>';
+      }
+      html += '</div>';
+    }
+  }
+
+  // Metadata
+  if (node.sampled || node.audited) {
+    html += '<div class="sec"><div class="meta"><span class="meta-k">Sampled</span><span>' + fmtDate(node.sampled) + '</span>' +
+      '<span class="meta-k">Audited</span><span>' + fmtDate(node.audited) + '</span></div></div>';
+  }
+
+  // Action buttons
+  html += '<div class="sec"><button class="btn-open" data-action="open-arrow">Open Arrow Doc</button>';
+  if (node.specFile) html += '<button class="btn-open" data-action="open-spec">Open Spec File</button>';
+  if (node.lldFile)  html += '<button class="btn-open" data-action="open-lld">Open LLD</button>';
+  html += '</div>';
+
+  // Next / Drift
+  if (editMode) {
+    html += '<div class="sec"><div class="sec-title">Next</div>' +
+      '<textarea class="edit-textarea" id="edit-next">' + esc(node.next || '') + '</textarea></div>' +
+      '<div class="sec"><div class="sec-title">Drift</div>' +
+      '<textarea class="edit-textarea" id="edit-drift">' + esc(node.drift || '') + '</textarea></div>' +
+      '<div class="sec"><button class="btn-save" id="btn-save-meta">Save</button></div>';
+  } else {
+    if (node.next)  html += '<div class="sec"><div class="sec-title">Next</div><div class="prose">' + esc(node.next) + '</div></div>';
+    if (node.drift) html += '<div class="sec"><div class="sec-title">Drift</div><div class="prose">' + esc(node.drift) + '</div></div>';
+  }
+
+  panelBody.innerHTML = html;
+  sidePanel.classList.add('open');
+  cy && cy.resize();
+}
+
+panelBody.addEventListener('click', function(e) {
+  var t = e.target;
+
+  var chipX = t.closest && t.closest('.chip-x');
+  if (chipX && editMode) {
+    window.__lidPostMessage({ type: 'removeConnection', kind: chipX.dataset.rmKind, segmentId: chipX.dataset.rmSeg, target: chipX.dataset.rmTarget });
+    return;
+  }
+
+  var chip = t.closest && t.closest('.chip[data-nav]');
+  if (chip && chip.dataset.nav) { navigateToNode(chip.dataset.nav); return; }
+
+  var specIdBtn = t.closest && t.closest('.si-id');
+  if (specIdBtn && specIdBtn.dataset.path) {
+    window.__lidPostMessage({ type: 'openFile', path: specIdBtn.dataset.path, line: parseInt(specIdBtn.dataset.line || '0', 10) });
+    return;
+  }
+
+  var openBtn = t.closest && t.closest('.btn-open[data-action]');
+  if (openBtn && currentNode) {
+    var action = openBtn.dataset.action;
+    if (action === 'open-arrow') window.__lidPostMessage({ type: 'open', segmentId: currentNode.id });
+    else if (action === 'open-spec' && currentNode.specFile) window.__lidPostMessage({ type: 'openFile', path: currentNode.specFile });
+    else if (action === 'open-lld' && currentNode.lldFile)   window.__lidPostMessage({ type: 'openFile', path: currentNode.lldFile });
+    return;
+  }
+
+  var toggle = t.closest && t.closest('.spec-toggle');
+  if (toggle) {
+    var list = panelBody.querySelector('.spec-list');
+    if (!list) return;
+    var open = list.style.display === 'none';
+    list.style.display = open ? 'block' : 'none';
+    toggle.textContent = (open ? '▴' : '▾') + ' ' + (toggle.dataset.count || '') + ' items';
+    return;
+  }
+
+  var siToggle = t.closest && t.closest('.si-toggle');
+  if (siToggle && editMode) {
+    var cur = siToggle.dataset.status;
+    var next = cur === 'open' ? 'implemented' : cur === 'implemented' ? 'deferred' : 'open';
+    window.__lidPostMessage({ type: 'updateSpecStatus', specFile: siToggle.dataset.file, specId: siToggle.dataset.id, line: parseInt(siToggle.dataset.line || '0', 10), newStatus: next });
+    var newCls = next === 'implemented' ? 'si-done' : next === 'open' ? 'si-open' : 'si-def';
+    var newSym = next === 'implemented' ? '✓' : next === 'open' ? '○' : '⊘';
+    var span = siToggle.querySelector('.si-m');
+    if (span) { span.className = 'si-m ' + newCls; span.textContent = newSym; }
+    siToggle.dataset.status = next;
+    return;
+  }
+
+  if (t.id === 'btn-add-spec') {
+    panelBody.querySelector('#add-spec-form') && panelBody.querySelector('#add-spec-form').classList.toggle('open');
+    return;
+  }
+
+  if (t.id === 'btn-submit-spec' && editMode && currentNode) {
+    var specIdInput = panelBody.querySelector('#new-spec-id');
+    var specTextInput = panelBody.querySelector('#new-spec-text');
+    var errSpan = panelBody.querySelector('#spec-id-err');
+    var specId = specIdInput ? specIdInput.value.trim() : '';
+    var text = specTextInput ? specTextInput.value.trim() : '';
+    var prefix = currentNode.id.toUpperCase();
+    var valid = /^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$/.test(specId) && specId.startsWith(prefix + '-') && /\d/.test(specId);
+    if (!valid) { if (errSpan) errSpan.textContent = 'Must start with ' + prefix + '- and include a digit'; return; }
+    if (!text)  { if (errSpan) errSpan.textContent = 'Text is required'; return; }
+    if (errSpan) errSpan.textContent = '';
+    window.__lidPostMessage({ type: 'addSpec', specFile: currentNode.specFile || null, segmentId: currentNode.id, specId: specId, text: text });
+    if (specIdInput) specIdInput.value = '';
+    if (specTextInput) specTextInput.value = '';
+    panelBody.querySelector('#add-spec-form') && panelBody.querySelector('#add-spec-form').classList.remove('open');
+    return;
+  }
+
+  if (t.id === 'btn-save-meta' && editMode && currentNode) {
+    var nextTA  = panelBody.querySelector('#edit-next');
+    var driftTA = panelBody.querySelector('#edit-drift');
+    window.__lidPostMessage({ type: 'updateSegmentMeta', segmentId: currentNode.id, next: nextTA ? nextTA.value : '', drift: driftTA ? driftTA.value : '' });
+    return;
+  }
+});
+
+panelBody.addEventListener('change', function(e) {
+  if (e.target.id === 'edit-status' && editMode && currentNode) {
+    window.__lidPostMessage({ type: 'updateSegmentStatus', segmentId: currentNode.id, newStatus: e.target.value });
+  }
+});
+
+function closePanel() {
+  currentNode = null; editMode = false;
+  btnEdit.textContent = '✎ Edit'; btnEdit.classList.remove('active');
+  clearFocus();
+  sidePanel.classList.remove('open');
+  cy && cy.resize();
+}
+
+// ── Context menu ──────────────────────────────────────────────────────────────
+var ctxMenu = document.getElementById('ctxmenu');
+var ctxNode = null;
+function showCtxMenu(x, y, node) {
+  ctxNode = node;
+  document.getElementById('ctx-spec').classList.toggle('hidden', !node.specFile);
+  document.getElementById('ctx-lld').classList.toggle('hidden', !node.lldFile);
+  ctxMenu.style.display = 'block';
+  var vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+  ctxMenu.style.left = Math.min(x, vw - ctxMenu.offsetWidth - 4) + 'px';
+  ctxMenu.style.top  = Math.min(y, vh - ctxMenu.offsetHeight - 4) + 'px';
+}
+function hideCtxMenu() { ctxMenu.style.display = 'none'; ctxNode = null; }
+
+document.getElementById('ctx-arrow').addEventListener('click', function() {
+  if (ctxNode) window.__lidPostMessage({ type: 'open', segmentId: ctxNode.id }); hideCtxMenu();
+});
+document.getElementById('ctx-spec').addEventListener('click', function() {
+  if (ctxNode && ctxNode.specFile) window.__lidPostMessage({ type: 'openFile', path: ctxNode.specFile }); hideCtxMenu();
+});
+document.getElementById('ctx-lld').addEventListener('click', function() {
+  if (ctxNode && ctxNode.lldFile) window.__lidPostMessage({ type: 'openFile', path: ctxNode.lldFile }); hideCtxMenu();
+});
+document.getElementById('ctx-copy').addEventListener('click', function() {
+  if (ctxNode) navigator.clipboard && navigator.clipboard.writeText(ctxNode.id); hideCtxMenu();
+});
+document.addEventListener('click', hideCtxMenu);
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { hideCtxMenu(); closePanel(); } });
+
+// ── Toolbar: filter + search ─────────────────────────────────────────────────
+var filterStatus  = document.getElementById('filter-status');
+var filterCluster = document.getElementById('filter-cluster');
+var searchInput   = document.getElementById('search');
+
+function applyFilter() {
+  if (!cy) return;
+  var status = filterStatus.value, cluster = filterCluster.value, q = searchInput.value.trim().toLowerCase();
+  var clusterIds = cluster ? new Set(_clusters[cluster] || []) : null;
+  cy.batch(function() {
+    cy.nodes().forEach(function(n) {
+      var ns = n.data('status') || '', id = n.id();
+      var statusOk = !status || ns === status;
+      var clusterOk = !cluster || clusterIds.has(id);
+      var searchOk = !q || id.toLowerCase().includes(q);
+      n.removeClass('dimmed highlighted');
+      if (!statusOk || !clusterOk || (q && !searchOk)) n.addClass('dimmed');
+      else if (q && searchOk) n.addClass('highlighted');
+    });
+    cy.edges().forEach(function(e) {
+      e.toggleClass('dimmed', e.source().hasClass('dimmed') || e.target().hasClass('dimmed'));
+    });
+  });
+}
+
+filterStatus.addEventListener('change', applyFilter);
+filterCluster.addEventListener('change', applyFilter);
+searchInput.addEventListener('input', applyFilter);
+document.getElementById('btn-clear').addEventListener('click', function() { searchInput.value = ''; applyFilter(); });
+document.getElementById('btn-fit').addEventListener('click', function() { cy && cy.fit(); });
+
+// ── Cytoscape events ──────────────────────────────────────────────────────────
+function wireInteractions() {
+  if (!cy) return;
+  cy.on('mouseover', 'node', function(evt) {
+    var me = evt.originalEvent;
+    showTooltip(me.clientX, me.clientY, evt.target.data('nodeData'));
+  });
+  cy.on('mousemove', 'node', function(evt) {
+    posTooltip(evt.originalEvent.clientX, evt.originalEvent.clientY);
+  });
+  cy.on('mouseout', 'node', hideTooltip);
+
+  var lastOpen = 0;
+  function openSidebar(evt) {
+    var now = Date.now();
+    if (now - lastOpen < 100) return;
+    lastOpen = now;
+    hideCtxMenu(); hideTooltip();
+    openPanel(evt.target.data('nodeData'));
+  }
+  cy.on('tap',   'node', openSidebar);
+  cy.on('click', 'node', openSidebar);
+  cy.on('dbltap', 'node', function(evt) { hideCtxMenu(); hideTooltip(); openPanel(evt.target.data('nodeData'), true); });
+  cy.on('cxttap', 'node', function(evt) {
+    var me = evt.originalEvent;
+    hideTooltip();
+    showCtxMenu(me.clientX, me.clientY, evt.target.data('nodeData'));
+  });
+}
+
+// ── Mutation banner ───────────────────────────────────────────────────────────
+var mutBanner = document.getElementById('mut-banner');
+var mutTimer;
+function showBanner(ok, message) {
+  clearTimeout(mutTimer);
+  mutBanner.textContent = message;
+  mutBanner.className = ok ? 'ok' : 'err';
+  mutBanner.style.display = 'block';
+  mutTimer = setTimeout(function() { mutBanner.style.display = 'none'; }, 3000);
+}
+
+// ── Add-segment overlay ────────────────────────────────────────────────────
+var addSegOverlay = document.getElementById('add-seg-overlay');
+function refreshOverlayChips() {
+  var blocksChips   = document.getElementById('seg-blocks-chips');
+  var childrenChips = document.getElementById('seg-children-chips');
+  blocksChips.innerHTML = _addBlocks.map(function(id) {
+    return '<div class="chip chip-rm">' + esc(id) + '<button class="chip-x overlay-chip-x" data-from="blocks" data-id="' + esc(id) + '">×</button></div>';
+  }).join('');
+  childrenChips.innerHTML = _addChildren.map(function(id) {
+    return '<div class="chip chip-rm">' + esc(id) + '<button class="chip-x overlay-chip-x" data-from="children" data-id="' + esc(id) + '">×</button></div>';
+  }).join('');
+  var blocksSelect   = document.getElementById('seg-blocks-select');
+  var childrenSelect = document.getElementById('seg-children-select');
+  if (!blocksSelect || !childrenSelect) return;
+  Array.from(blocksSelect.options).forEach(function(o) { if (o.value) o.hidden = _addBlocks.includes(o.value) || _addChildren.includes(o.value); });
+  Array.from(childrenSelect.options).forEach(function(o) { if (o.value) o.hidden = _addChildren.includes(o.value) || _addBlocks.includes(o.value); });
+}
+function populateOverlaySelects() {
+  ['seg-blocks-select','seg-children-select'].forEach(function(selId) {
+    var sel = document.getElementById(selId);
+    while (sel.options.length > 1) sel.remove(1);
+    _allIds.forEach(function(id) {
+      var opt = document.createElement('option');
+      opt.value = opt.textContent = id;
+      sel.appendChild(opt);
+    });
+    sel.value = '';
+  });
+}
+
+document.getElementById('btn-add-seg').addEventListener('click', function() {
+  document.getElementById('seg-id-input').value = '';
+  document.getElementById('seg-detail-input').value = '';
+  document.getElementById('seg-add-err').textContent = '';
+  _addBlocks = []; _addChildren = [];
+  populateOverlaySelects();
+  refreshOverlayChips();
+  addSegOverlay.classList.add('open');
+});
+
+document.getElementById('seg-blocks-select').addEventListener('change', function(e) {
+  var id = e.target.value;
+  if (id && !_addBlocks.includes(id)) { _addBlocks.push(id); refreshOverlayChips(); }
+  e.target.value = '';
+});
+document.getElementById('seg-children-select').addEventListener('change', function(e) {
+  var id = e.target.value;
+  if (id && !_addChildren.includes(id)) { _addChildren.push(id); refreshOverlayChips(); }
+  e.target.value = '';
+});
+
+document.getElementById('add-seg-box').addEventListener('click', function(e) {
+  var btn = e.target.closest && e.target.closest('.overlay-chip-x');
+  if (!btn) return;
+  var from = btn.dataset.from, id = btn.dataset.id;
+  if (from === 'blocks')   _addBlocks   = _addBlocks.filter(function(x){ return x !== id; });
+  if (from === 'children') _addChildren = _addChildren.filter(function(x){ return x !== id; });
+  refreshOverlayChips();
+});
+
+document.getElementById('btn-seg-cancel').addEventListener('click', function() { addSegOverlay.classList.remove('open'); });
+addSegOverlay.addEventListener('click', function(e) { if (e.target === addSegOverlay) addSegOverlay.classList.remove('open'); });
+
+document.getElementById('btn-seg-submit').addEventListener('click', function() {
+  var segId  = document.getElementById('seg-id-input').value.trim();
+  var status = document.getElementById('seg-status-select').value;
+  var detail = document.getElementById('seg-detail-input').value.trim();
+  var errEl  = document.getElementById('seg-add-err');
+  if (!segId || !/^[a-z][a-z0-9-]*$/.test(segId)) { errEl.textContent = 'ID: lowercase letters, digits, hyphens only'; return; }
+  if (!detail) { errEl.textContent = 'Detail path is required'; return; }
+  errEl.textContent = '';
+  addSegOverlay.classList.remove('open');
+  window.__lidPostMessage({ type: 'addSegment', segmentId: segId, status: status, detail: detail, blocks: _addBlocks.slice(), children: _addChildren.slice() });
+});
+
+// ── Message bridge ─────────────────────────────────────────────────────────
+window.addEventListener('message', function(event) {
+  var data = event.data;
+  if (!data) return;
+  if (data.type === 'graph') {
+    render(data.payload);
+  } else if (data.type === 'mutationOk') {
+    showBanner(true, data.message || 'Done');
+  } else if (data.type === 'mutationError') {
+    showBanner(false, data.message || 'Error');
+  }
+});
+</script>
+</body>
+</html>
