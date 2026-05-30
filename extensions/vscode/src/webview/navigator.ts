@@ -88,6 +88,9 @@ function fmtDate(s: string | undefined): string {
 let cy: cytoscape.Core | undefined;
 
 let _clusters: Record<string, string[]> = {};
+let _allSegmentIds: string[] = [];
+let _addSegBlocks: string[] = [];
+let _addSegChildren: string[] = [];
 
 const LAYOUT_OPTIONS = {
     name: 'dagre',
@@ -107,6 +110,7 @@ function buildLabel(n: GraphNode): string {
 
 function render(payload: GraphPayload): void {
     _clusters = payload.clusters ?? {};
+    _allSegmentIds = payload.nodes.map(n => n.id).sort();
     const clusterSel = document.getElementById('filter-cluster') as HTMLSelectElement;
     if (clusterSel) {
         const prev = clusterSel.value;
@@ -392,13 +396,21 @@ function openPanel(node: GraphNode, edit = false): void {
     // ── Hierarchy chips (parent / children) ─────────────────────────────────
     if (node.parent) {
         html += `<div class="sec"><div class="sec-title">Parent</div><div class="chips">`;
-        html += `<button class="chip" data-nav="${esc(node.parent)}">${esc(node.parent)}</button>`;
+        if (editMode) {
+            html += `<div class="chip chip-rm" data-nav="${esc(node.parent)}">${esc(node.parent)}<button class="chip-x" data-rm-kind="parent" data-rm-seg="${esc(id)}" data-rm-target="${esc(node.parent)}">×</button></div>`;
+        } else {
+            html += `<button class="chip" data-nav="${esc(node.parent)}">${esc(node.parent)}</button>`;
+        }
         html += `</div></div>`;
     }
     if (node.children && node.children.length > 0) {
         html += `<div class="sec"><div class="sec-title">Children</div><div class="chips">`;
         for (const c of node.children) {
-            html += `<button class="chip" data-nav="${esc(c)}">${esc(c)}</button>`;
+            if (editMode) {
+                html += `<div class="chip chip-rm" data-nav="${esc(c)}">${esc(c)}<button class="chip-x" data-rm-kind="children" data-rm-seg="${esc(id)}" data-rm-target="${esc(c)}">×</button></div>`;
+            } else {
+                html += `<button class="chip" data-nav="${esc(c)}">${esc(c)}</button>`;
+            }
         }
         html += `</div></div>`;
     }
@@ -416,14 +428,22 @@ function openPanel(node: GraphNode, edit = false): void {
         if ((predecessors?.length ?? 0) > 0) {
             html += `<div class="sec-title">Blocked by</div><div class="chips">`;
             predecessors!.forEach((n) => {
-                html += `<button class="chip" data-nav="${esc(n.id())}">${esc(n.id())}</button>`;
+                if (editMode) {
+                    html += `<div class="chip chip-rm" data-nav="${esc(n.id())}">${esc(n.id())}<button class="chip-x" data-rm-kind="blockedBy" data-rm-seg="${esc(id)}" data-rm-target="${esc(n.id())}">×</button></div>`;
+                } else {
+                    html += `<button class="chip" data-nav="${esc(n.id())}">${esc(n.id())}</button>`;
+                }
             });
             html += `</div>`;
         }
         if ((successors?.length ?? 0) > 0) {
             html += `<div class="sec-title"${predecessors?.length ? ' style="margin-top:8px"' : ''}>Blocks</div><div class="chips">`;
             successors!.forEach((n) => {
-                html += `<button class="chip" data-nav="${esc(n.id())}">${esc(n.id())}</button>`;
+                if (editMode) {
+                    html += `<div class="chip chip-rm" data-nav="${esc(n.id())}">${esc(n.id())}<button class="chip-x" data-rm-kind="blocks" data-rm-seg="${esc(id)}" data-rm-target="${esc(n.id())}">×</button></div>`;
+                } else {
+                    html += `<button class="chip" data-nav="${esc(n.id())}">${esc(n.id())}</button>`;
+                }
             });
             html += `</div>`;
         }
@@ -521,6 +541,18 @@ function openPanel(node: GraphNode, edit = false): void {
 // Single delegated click handler for the whole panel body.
 panelBody.addEventListener('click', (e) => {
     const t = e.target as HTMLElement;
+
+    // Edit-mode: remove connection chip
+    const chipX = t.closest<HTMLButtonElement>('.chip-x');
+    if (chipX && editMode) {
+        vscode.postMessage({
+            type: 'removeConnection',
+            kind: chipX.dataset['rmKind'] as 'blocks' | 'blockedBy' | 'children' | 'parent',
+            segmentId: chipX.dataset['rmSeg']!,
+            target: chipX.dataset['rmTarget']!,
+        });
+        return;
+    }
 
     const chip = t.closest<HTMLButtonElement>('.chip[data-nav]');
     if (chip?.dataset['nav']) { navigateToNode(chip.dataset['nav']); return; }
@@ -777,11 +809,90 @@ function wireInteractions(): void {
 
 const addSegOverlay = document.getElementById('add-seg-overlay')!;
 
+function refreshOverlayChips(): void {
+    const blocksChips   = document.getElementById('seg-blocks-chips')!;
+    const childrenChips = document.getElementById('seg-children-chips')!;
+
+    blocksChips.innerHTML = _addSegBlocks.map(id =>
+        `<div class="chip chip-rm">${esc(id)}<button class="chip-x overlay-chip-x" data-rm-from="blocks" data-rm-id="${esc(id)}">×</button></div>`
+    ).join('');
+    childrenChips.innerHTML = _addSegChildren.map(id =>
+        `<div class="chip chip-rm">${esc(id)}<button class="chip-x overlay-chip-x" data-rm-from="children" data-rm-id="${esc(id)}">×</button></div>`
+    ).join('');
+
+    // Remove already-selected IDs from each select's options
+    const blocksSelect   = document.getElementById('seg-blocks-select')   as HTMLSelectElement;
+    const childrenSelect = document.getElementById('seg-children-select') as HTMLSelectElement;
+    if (!blocksSelect || !childrenSelect) return;
+
+    for (const opt of Array.from(blocksSelect.options)) {
+        if (!opt.value) continue;
+        opt.hidden = _addSegBlocks.includes(opt.value) || _addSegChildren.includes(opt.value);
+    }
+    for (const opt of Array.from(childrenSelect.options)) {
+        if (!opt.value) continue;
+        opt.hidden = _addSegChildren.includes(opt.value) || _addSegBlocks.includes(opt.value);
+    }
+}
+
+function populateOverlaySelects(): void {
+    const blocksSelect   = document.getElementById('seg-blocks-select')   as HTMLSelectElement;
+    const childrenSelect = document.getElementById('seg-children-select') as HTMLSelectElement;
+    if (!blocksSelect || !childrenSelect) return;
+
+    for (const sel of [blocksSelect, childrenSelect]) {
+        while (sel.options.length > 1) sel.remove(1);
+        for (const id of _allSegmentIds) {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = id;
+            sel.appendChild(opt);
+        }
+        sel.value = '';
+    }
+}
+
 document.getElementById('btn-add-seg')!.addEventListener('click', () => {
     (document.getElementById('seg-id-input') as HTMLInputElement).value = '';
     (document.getElementById('seg-detail-input') as HTMLInputElement).value = '';
     (document.getElementById('seg-add-err') as HTMLElement).textContent = '';
+    _addSegBlocks   = [];
+    _addSegChildren = [];
+    populateOverlaySelects();
+    refreshOverlayChips();
     addSegOverlay.classList.add('open');
+});
+
+document.getElementById('seg-blocks-select')!.addEventListener('change', (e) => {
+    const sel = e.target as HTMLSelectElement;
+    const id = sel.value;
+    if (id && !_addSegBlocks.includes(id)) {
+        _addSegBlocks.push(id);
+        refreshOverlayChips();
+    }
+    sel.value = '';
+});
+
+document.getElementById('seg-children-select')!.addEventListener('change', (e) => {
+    const sel = e.target as HTMLSelectElement;
+    const id = sel.value;
+    if (id && !_addSegChildren.includes(id)) {
+        _addSegChildren.push(id);
+        refreshOverlayChips();
+    }
+    sel.value = '';
+});
+
+// Delegated removal of chips inside the overlay
+document.getElementById('add-seg-box')!.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.overlay-chip-x');
+    if (!btn) return;
+    const from = btn.dataset['rmFrom'];
+    const id   = btn.dataset['rmId'];
+    if (!id) return;
+    if (from === 'blocks')   _addSegBlocks   = _addSegBlocks.filter(x => x !== id);
+    if (from === 'children') _addSegChildren = _addSegChildren.filter(x => x !== id);
+    refreshOverlayChips();
 });
 
 document.getElementById('btn-seg-cancel')!.addEventListener('click', () => {
@@ -799,7 +910,14 @@ document.getElementById('btn-seg-submit')!.addEventListener('click', () => {
     if (!detail) { errEl.textContent = 'Detail path is required'; return; }
     errEl.textContent = '';
     addSegOverlay.classList.remove('open');
-    vscode.postMessage({ type: 'addSegment', segmentId: segId, status, detail });
+    vscode.postMessage({
+        type: 'addSegment',
+        segmentId: segId,
+        status,
+        detail,
+        blocks:   [..._addSegBlocks],
+        children: [..._addSegChildren],
+    });
 });
 
 addSegOverlay.addEventListener('click', (e) => {
