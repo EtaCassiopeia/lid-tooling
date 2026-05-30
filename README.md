@@ -29,7 +29,7 @@ LID answers one recurring problem: *you know what the code does, but you've lost
 Search **LID** in the Extensions panel, or run:
 
 ```
-ext install lid-tools.lid
+ext install lid-tools.tooling
 ```
 
 `lid-lsp` is bundled — nothing else to install.
@@ -38,7 +38,7 @@ ext install lid-tools.lid
 
 ```sh
 brew tap EtaCassiopeia/lid
-brew install lid
+brew install lid-tooling
 ```
 
 Installs `lidc`, `lid-mcp`, and `lid-lsp` on your `$PATH`.

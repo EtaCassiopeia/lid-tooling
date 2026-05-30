@@ -245,7 +245,7 @@ jobs:
           BASE="https://github.com/EtaCassiopeia/lid-tooling/releases/download/${VERSION}"
 
           cat > formula.rb <<RUBY
-          class Lid < Formula
+          class LidTooling < Formula
             desc "CLI and MCP server for Linked-Intent Development"
             homepage "https://github.com/EtaCassiopeia/lid-tooling"
             version "${VERSION#v}"
@@ -291,9 +291,9 @@ jobs:
           git config --global user.name  "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           gh repo clone EtaCassiopeia/homebrew-lid tap
-          cp formula.rb tap/Formula/lid.rb
+          cp formula.rb tap/Formula/lid-tooling.rb
           cd tap
-          git add Formula/lid.rb
+          git add Formula/lid-tooling.rb
           git diff --cached --quiet && echo "No changes" && exit 0
-          git commit -m "Update lid to ${GITHUB_REF_NAME}"
+          git commit -m "Update lid-tooling to ${GITHUB_REF_NAME}"
           git push

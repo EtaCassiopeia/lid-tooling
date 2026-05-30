@@ -9,7 +9,7 @@ LID ([Linked-Intent Development](https://github.com/jszmajda/lid)) is a lightwei
 Search **LID** in the VS Code Extensions panel, or:
 
 ```
-ext install lid-tools.lid
+ext install lid-tools.tooling
 ```
 
 The language server (`lid-lsp`) is bundled inside the extension — nothing else to install.
@@ -60,8 +60,8 @@ Open the visual segment graph with **LID: Show Intent Navigator** (`Cmd+Shift+P`
 
 | Tool | Install | Purpose |
 |---|---|---|
-| `lidc` CLI | `brew install EtaCassiopeia/lid/lid` | CI hook, `lidc check`, `lidc init` |
-| `lid-mcp` server | `brew install EtaCassiopeia/lid/lid` | MCP server for AI agents (Claude, Cursor) |
+| `lidc` CLI | `brew install EtaCassiopeia/lid/lid-tooling` | CI hook, `lidc check`, `lidc init` |
+| `lid-mcp` server | `brew install EtaCassiopeia/lid/lid-tooling` | MCP server for AI agents (Claude, Cursor) |
 
 See the [repository README](https://github.com/EtaCassiopeia/lid-tooling#readme) for full documentation.
 
