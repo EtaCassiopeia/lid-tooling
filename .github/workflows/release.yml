@@ -133,6 +133,30 @@ jobs:
           cp "extensions/vscode/lid-vscode-${{ matrix.vsce_target }}.vsix" \
              "dist/lid-vscode-${{ matrix.vsce_target }}.vsix"
 
+      # ── IntelliJ plugin ──────────────────────────────────────────────────
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Bundle lid-lsp into IntelliJ plugin
+        shell: bash
+        run: |
+          mkdir -p extensions/intellij/server
+          cp "target/${{ matrix.target }}/release/lid-lsp${{ matrix.ext }}" \
+             "extensions/intellij/server/lid-lsp${{ matrix.ext }}"
+
+      - name: Build IntelliJ plugin
+        working-directory: extensions/intellij
+        run: ./gradlew buildPlugin --no-daemon
+
+      - name: Move IntelliJ plugin zip to dist
+        shell: bash
+        run: |
+          find extensions/intellij/build/distributions -name '*.zip' \
+            -exec cp {} "dist/lid-intellij-${{ matrix.vsce_target }}.zip" \;
+
       - uses: actions/upload-artifact@v5
         with:
           name: release-${{ matrix.target }}
@@ -213,6 +237,37 @@ jobs:
           for vsix in vsix/*.vsix; do
             ovsx publish "$vsix" --pat "${{ secrets.OVSX_PAT }}"
           done
+
+  # ── Publish IntelliJ plugin to JetBrains Marketplace ────────────────────────
+
+  publish-intellij:
+    name: Publish IntelliJ plugin
+    if: github.ref_type == 'tag' && secrets.JETBRAINS_MARKETPLACE_TOKEN != ''
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/download-artifact@v5
+        with:
+          path: artifacts
+
+      - name: Collect IntelliJ plugin zips
+        run: |
+          mkdir -p intellij-zips
+          find artifacts -name 'lid-intellij-*.zip' -exec cp {} intellij-zips/ \;
+          ls intellij-zips/
+
+      - name: Publish to JetBrains Marketplace
+        working-directory: extensions/intellij
+        run: ./gradlew publishPlugin --no-daemon
+        env:
+          JETBRAINS_MARKETPLACE_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
 
   # ── Update Homebrew tap ───────────────────────────────────────────────────────
 

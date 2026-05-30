@@ -1,0 +1,28 @@
+<idea-plugin>
+  <id>dev.lid.intellij</id>
+  <name>LID — Linked-Intent Development</name>
+  <vendor url="https://github.com/EtaCassiopeia/lid-tooling">lid-tools</vendor>
+  <description><![CDATA[
+    Editor support for the <a href="https://github.com/jszmajda/lid">LID (Linked-Intent Development)</a>
+    methodology: hover, go-to-definition, find references, rename, completion, and real-time diagnostics
+    for <code>@spec</code> citations — powered by the bundled <code>lid-lsp</code> language server.
+  ]]></description>
+
+  <depends>com.intellij.modules.platform</depends>
+  <depends>com.redhat.devtools.lsp4ij</depends>
+
+  <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+    <server id="dev.lid.lsp"
+            name="LID Language Server"
+            factoryClass="dev.lid.intellij.LidServerSupportProvider"/>
+  </extensions>
+
+  <actions>
+    <action id="lid.initProject"
+            class="dev.lid.intellij.actions.InitProjectAction"
+            text="Initialize LID Project"
+            description="Scaffold docs/arrows/index.yaml and the first segment stub">
+      <add-to-group group-id="ToolsMenu" anchor="last"/>
+    </action>
+  </actions>
+</idea-plugin>

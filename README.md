@@ -17,6 +17,7 @@ LID answers one recurring problem: *you know what the code does, but you've lost
 | Tool | What it does |
 |------|-------------|
 | **VS Code extension** | LSP diagnostics, hover, go-to-definition, rename, completion, visual Intent Navigator |
+| **IntelliJ IDEA plugin** | LSP diagnostics, hover, go-to-definition, find references, rename, completion for all JetBrains IDEs |
 | **`lidc` CLI** | `lidc check` for CI, `lidc init` to scaffold new projects, `lidc status` for a quick summary |
 | **`lid-mcp` MCP server** | 13 tools so AI agents can read and write LID projects with full integrity guarantees |
 
@@ -31,6 +32,12 @@ Search **LID** in the Extensions panel, or run:
 ```
 ext install lid-tools.vscode
 ```
+
+`lid-lsp` is bundled — nothing else to install.
+
+### IntelliJ IDEA / JetBrains IDEs
+
+Search **LID** in *Settings → Plugins → Marketplace*, or install from the [JetBrains Marketplace](https://plugins.jetbrains.com).
 
 `lid-lsp` is bundled — nothing else to install.
 
