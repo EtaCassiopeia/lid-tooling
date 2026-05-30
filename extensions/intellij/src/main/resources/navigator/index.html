@@ -731,7 +731,6 @@ document.getElementById('btn-fit').addEventListener('click', function() { cy && 
 function wireInteractions() {
   if (!cy) return;
 
-  // Hover tooltip: mouseover/mousemove work reliably in JCEF
   cy.on('mouseover', 'node', function(evt) {
     var me = evt.originalEvent;
     showTooltip(me.clientX, me.clientY, evt.target.data('nodeData'));
@@ -741,11 +740,33 @@ function wireInteractions() {
   });
   cy.on('mouseout', 'node', hideTooltip);
 
-  // Click/dblclick/contextmenu: use raw DOM events on the cy container.
-  // Cytoscape's tap/cxttap rely on Hammer.js touch simulation which can
-  // silently fail in JBCefBrowser (embedded Chromium). Raw DOM events are
-  // always reliable; we map back to the node via renderedBoundingBox().
+  // cy.on('mousedown'/'mouseup') are direct DOM event mappings in Cytoscape —
+  // no Hammer.js, same reliability as mouseover/mouseout. We track mousedown
+  // to skip drag-to-pan gestures (moved > 5px).
   var lastOpen = 0;
+  var mdNode = null, mdX = 0, mdY = 0;
+
+  cy.on('mousedown', 'node', function(evt) {
+    if (evt.originalEvent.button !== 0) return;
+    mdNode = evt.target;
+    mdX = evt.originalEvent.clientX;
+    mdY = evt.originalEvent.clientY;
+  });
+  cy.on('mouseup', 'node', function(evt) {
+    if (evt.originalEvent.button !== 0) return;
+    var hit = evt.target;
+    if (hit !== mdNode) { mdNode = null; return; }
+    var dx = Math.abs(evt.originalEvent.clientX - mdX);
+    var dy = Math.abs(evt.originalEvent.clientY - mdY);
+    mdNode = null;
+    if (dx > 5 || dy > 5) return;
+    var now = Date.now();
+    if (now - lastOpen < 150) return;
+    lastOpen = now;
+    hideCtxMenu(); hideTooltip();
+    openPanel(hit.data('nodeData'));
+  });
+
   var cyEl = document.getElementById('cy');
 
   function nodeAt(clientX, clientY) {
@@ -759,37 +780,18 @@ function wireInteractions() {
     return hit;
   }
 
-  cyEl.addEventListener('click', function(e) {
-    if (!cy || e.button !== 0) return;
-    var hit = nodeAt(e.clientX, e.clientY);
-    if (!hit) return;
-    var now = Date.now();
-    if (now - lastOpen < 150) return;
-    lastOpen = now;
-    hideCtxMenu(); hideTooltip();
-    openPanel(hit.data('nodeData'));
-  });
-
+  // dblclick: capture phase so it fires before Cytoscape's canvas handlers
   cyEl.addEventListener('dblclick', function(e) {
     if (!cy) return;
     var hit = nodeAt(e.clientX, e.clientY);
     if (hit) { hideCtxMenu(); hideTooltip(); openPanel(hit.data('nodeData'), true); }
-  });
+  }, true);
 
   cyEl.addEventListener('contextmenu', function(e) {
     e.preventDefault();
     if (!cy) return;
     var hit = nodeAt(e.clientX, e.clientY);
     if (hit) { hideTooltip(); showCtxMenu(e.clientX, e.clientY, hit.data('nodeData')); }
-  });
-
-  // Cytoscape tap as secondary fallback (works in VS Code webview, may work here too)
-  cy.on('tap', 'node', function(evt) {
-    var now = Date.now();
-    if (now - lastOpen < 150) return;
-    lastOpen = now;
-    hideCtxMenu(); hideTooltip();
-    openPanel(evt.target.data('nodeData'));
   });
 }
 
