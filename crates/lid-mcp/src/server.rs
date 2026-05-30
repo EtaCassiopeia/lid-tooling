@@ -13,6 +13,7 @@ use crate::tools::{
     discover::DiscoverInput,
     find_refs::FindRefsInput,
     get_segment::GetSegmentInput,
+    init::InitInput,
     list_segments::ListSegmentsInput,
     list_specs::ListSpecsInput,
     search::SearchInput,
@@ -46,6 +47,15 @@ impl LidMcpServer {
 
 #[tool_router]
 impl LidMcpServer {
+    #[tool(
+        description = "Scaffold a new LID project at `path`. Creates docs/arrows/index.yaml (schema v2), a stub arrow document, and docs/intent/. Accepts an optional `segment` name (default: \"core\"). Fails if a project already exists there. Returns the canonical root and list of created files."
+    )]
+    async fn lid_init(&self, Parameters(input): Parameters<InitInput>) -> String {
+        crate::tools::init::lid_init(input)
+            .await
+            .unwrap_or_else(|e| format!("error: {}", e.message))
+    }
+
     #[tool(
         description = "Discover a LID project at or above `path`. Registers it in the server and returns the canonical root, schema version, and segment count. Call this first before using any other tool."
     )]
