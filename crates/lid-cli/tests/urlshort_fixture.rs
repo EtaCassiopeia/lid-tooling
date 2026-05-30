@@ -1,7 +1,7 @@
 //! End-to-end tests against the vendored `urlshort` example project fixture.
 //!
 //! The `urlshort` fixture is a minimal URL shortener project migrated to the
-//! schema_version: 2 / `docs/intent/` node-as-folder layout. It exercises the
+//! `schema_version: 2` / `docs/intent/` node-as-folder layout. It exercises the
 //! flat (non-hierarchical) segment structure — no `children`/`parent` fields —
 //! which is the baseline layout for new LID projects.
 
