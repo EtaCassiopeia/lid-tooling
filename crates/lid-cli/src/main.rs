@@ -1,7 +1,8 @@
 //! `lidc` — coherence checker for the LID methodology.
 //!
 //! Subcommands:
-//! * `lidc check` — discover a LID repo, run the registered checks, report
+//! * `lidc init`   — scaffold a new LID project (index.yaml + stub arrow doc).
+//! * `lidc check`  — discover a LID repo, run the registered checks, report
 //!   findings, exit 1 when severity crosses `--fail-on` threshold.
 //! * `lidc status` — print a quick health dashboard (segment counts, spec
 //!   coverage, drift/next counts); always exits 0.
@@ -10,6 +11,7 @@ mod report;
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -40,10 +42,22 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
+    /// Scaffold a new LID project at the current (or --root) directory.
+    ///
+    /// Creates docs/arrows/index.yaml, a stub arrow document, and the
+    /// docs/intent/ directory. Fails if a LID project already exists there.
+    Init(InitArgs),
     /// Run the coherence checks against a LID repository.
     Check(CheckArgs),
     /// Print a health dashboard: segment counts, spec coverage, drift/next.
     Status,
+}
+
+#[derive(Args)]
+struct InitArgs {
+    /// Name of the first segment to create (default: "core").
+    #[arg(long, default_value = "core")]
+    segment: String,
 }
 
 #[derive(Args)]
@@ -76,9 +90,63 @@ fn main() -> ExitCode {
 fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
     match &cli.cmd {
+        Cmd::Init(args) => cmd_init(cli.root.as_deref(), args),
         Cmd::Check(args) => cmd_check(cli.root.as_deref(), cli.json, args),
         Cmd::Status => cmd_status(cli.root.as_deref(), cli.json),
     }
+}
+
+fn cmd_init(root: Option<&Path>, args: &InitArgs) -> Result<ExitCode> {
+    let dir = match root {
+        Some(p) => p.to_path_buf(),
+        None => std::env::current_dir().context("reading the current directory")?,
+    };
+
+    let index_path = dir.join("docs").join("arrows").join("index.yaml");
+    if index_path.exists() {
+        anyhow::bail!(
+            "docs/arrows/index.yaml already exists; {} looks like an existing LID project",
+            dir.display()
+        );
+    }
+
+    let seg = &args.segment;
+    let arrows_seg_dir = dir.join("docs").join("arrows").join(seg);
+    let intent_dir = dir.join("docs").join("intent");
+
+    fs::create_dir_all(&arrows_seg_dir).with_context(|| format!("creating docs/arrows/{seg}/"))?;
+    fs::create_dir_all(&intent_dir).context("creating docs/intent/")?;
+
+    fs::write(
+        &index_path,
+        format!("schema_version: 2\narrows:\n  {seg}:\n    status: UNMAPPED\n    detail: {seg}/overview.md\n"),
+    )
+    .context("writing docs/arrows/index.yaml")?;
+
+    fs::write(
+        arrows_seg_dir.join("overview.md"),
+        format!(
+            "# {seg}\n\n\
+             ## Overview\n\n\
+             <!-- Describe the {seg} segment here. -->\n\n\
+             ## References\n\n\
+             <!-- List related documents and spec files here. -->\n"
+        ),
+    )
+    .with_context(|| format!("writing docs/arrows/{seg}/overview.md"))?;
+
+    println!("Initialized LID project at {}", dir.display());
+    println!();
+    println!("Created:");
+    println!("  docs/arrows/index.yaml            schema v2, segment '{seg}'");
+    println!("  docs/arrows/{seg}/overview.md     stub arrow document");
+    println!("  docs/intent/                      home for spec files (e.g. {seg}-specs.md)");
+    println!();
+    println!("Next:");
+    println!("  lidc check                        verify coherence");
+    println!("  lidc status                       segment and spec summary");
+
+    Ok(ExitCode::SUCCESS)
 }
 
 fn cmd_check(root: Option<&Path>, as_json: bool, args: &CheckArgs) -> Result<ExitCode> {
