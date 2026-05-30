@@ -2,7 +2,7 @@
   "name": "lid",
   "displayName": "LID — Linked-Intent Development",
   "description": "Editor support for the LID methodology: hover, go-to-definition, find references, rename, completion, and real-time diagnostics for @spec citations.",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "publisher": "lid-tools",
   "license": "MIT OR Apache-2.0",
   "repository": {
@@ -27,6 +27,7 @@
   ],
   "activationEvents": [
     "workspaceContains:docs/arrows/index.yaml",
+    "onCommand:lid.initProject",
     "onCommand:lid.showIntentNavigator",
     "onCommand:lid.restartServer",
     "onCommand:lid.showOutputChannel"
@@ -54,6 +55,11 @@
       }
     },
     "commands": [
+      {
+        "command": "lid.initProject",
+        "title": "Initialize Project",
+        "category": "LID"
+      },
       {
         "command": "lid.restartServer",
         "title": "Restart LID Server",

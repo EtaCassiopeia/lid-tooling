@@ -20,6 +20,7 @@ import {
 
 import { NavigatorPanel, NavigatorPanelSerializer } from './navigator';
 
+const COMMAND_INIT_PROJECT = 'lid.initProject';
 const COMMAND_RESTART_SERVER = 'lid.restartServer';
 const COMMAND_SHOW_OUTPUT = 'lid.showOutputChannel';
 const COMMAND_SHOW_NAVIGATOR = 'lid.showIntentNavigator';
@@ -39,6 +40,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(statusBarItem);
 
     context.subscriptions.push(
+        vscode.commands.registerCommand(COMMAND_INIT_PROJECT, () => {
+            void cmdInitProject(context);
+        }),
         vscode.commands.registerCommand(COMMAND_SHOW_OUTPUT, () => {
             client?.outputChannel.show(true);
         }),
@@ -90,6 +94,86 @@ export function deactivate(): Thenable<void> | undefined {
     statusBarItem?.dispose();
     statusBarItem = undefined;
     return client?.stop();
+}
+
+async function cmdInitProject(context: vscode.ExtensionContext): Promise<void> {
+    // Resolve target workspace folder.
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
+        void vscode.window.showWarningMessage('LID: open a folder first to initialize a project.');
+        return;
+    }
+    let wsRoot: string;
+    if (folders.length === 1) {
+        wsRoot = folders[0].uri.fsPath;
+    } else {
+        const picked = await vscode.window.showQuickPick(
+            folders.map((f) => ({ label: f.name, description: f.uri.fsPath, fsPath: f.uri.fsPath })),
+            { placeHolder: 'Select workspace folder to initialize' },
+        );
+        if (!picked) { return; }
+        wsRoot = picked.fsPath;
+    }
+
+    // Guard: already a LID project?
+    const indexUri = vscode.Uri.joinPath(vscode.Uri.file(wsRoot), 'docs', 'arrows', 'index.yaml');
+    try {
+        await vscode.workspace.fs.stat(indexUri);
+        void vscode.window.showWarningMessage(
+            'LID: docs/arrows/index.yaml already exists — this looks like an existing LID project.',
+        );
+        return;
+    } catch {
+        // expected: file does not exist yet
+    }
+
+    // Ask for the first segment name.
+    const segment = await vscode.window.showInputBox({
+        title: 'Initialize LID Project',
+        prompt: 'Name of the first segment',
+        value: 'core',
+        validateInput: (v) =>
+            /^[a-z][a-z0-9-]*$/.test(v.trim())
+                ? undefined
+                : 'Lowercase letters, digits, and hyphens only',
+    });
+    if (!segment) { return; }
+    const seg = segment.trim();
+
+    // Create directory structure and files.
+    const base = vscode.Uri.file(wsRoot);
+    const arrowsSegDir = vscode.Uri.joinPath(base, 'docs', 'arrows', seg);
+    const intentDir = vscode.Uri.joinPath(base, 'docs', 'intent');
+
+    try {
+        await vscode.workspace.fs.createDirectory(arrowsSegDir);
+        await vscode.workspace.fs.createDirectory(intentDir);
+
+        await vscode.workspace.fs.writeFile(
+            indexUri,
+            Buffer.from(
+                `schema_version: 2\narrows:\n  ${seg}:\n    status: UNMAPPED\n    detail: ${seg}/overview.md\n`,
+            ),
+        );
+        await vscode.workspace.fs.writeFile(
+            vscode.Uri.joinPath(arrowsSegDir, 'overview.md'),
+            Buffer.from(
+                `# ${seg}\n\n## Overview\n\n<!-- Describe the ${seg} segment here. -->\n\n` +
+                    `## References\n\n<!-- List related documents and spec files here. -->\n`,
+            ),
+        );
+    } catch (err) {
+        void vscode.window.showErrorMessage(`LID: failed to initialize project — ${formatError(err)}`);
+        return;
+    }
+
+    const action = await vscode.window.showInformationMessage(
+        `LID project initialized with segment '${seg}'.`,
+        'Open Intent Navigator',
+    );
+    if (action === 'Open Intent Navigator') {
+        NavigatorPanel.createOrShow(context.extensionUri, wsRoot);
+    }
 }
 
 async function startServer(context: vscode.ExtensionContext): Promise<void> {
