@@ -71,8 +71,12 @@ class LidNavigatorPanel(private val project: Project) : JPanel(BorderLayout()), 
             (path.contains("docs/intent") && path.endsWith(".md"))
 
     private fun loadHtml() {
-        val template = javaClass.getResource("/navigator/index.html")?.readText() ?: return
-        val html = template.replace("__QUERY_INJECT__", query!!.inject("msgJson"))
+        fun res(name: String) = javaClass.getResource("/navigator/$name")?.readText() ?: ""
+        val html = res("index.html")
+            .replace("__QUERY_INJECT__", query!!.inject("msgJson"))
+            .replace("__CYTOSCAPE_JS__", res("cytoscape.min.js"))
+            .replace("__DAGRE_JS__", res("dagre.min.js"))
+            .replace("__CYTOSCAPE_DAGRE_JS__", res("cytoscape-dagre.min.js"))
         browser!!.loadHTML(html)
     }
 
