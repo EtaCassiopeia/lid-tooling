@@ -30,16 +30,29 @@ impl Check for OrphanCheck {
         let referenced_specs = collect_referenced_paths(repo, |refs| &refs.ears);
         let unmapped_llds = unmapped_paths(repo, |u| &u.docs.llds);
         let unmapped_specs = unmapped_paths(repo, |u| &u.docs.specs);
+        // schema v2: unmapped.docs.intent lists intent-tree files not yet attached to a segment.
+        let unmapped_intent = unmapped_paths(repo, |u| &u.docs.intent);
+        // schema v2 sub-HLD pattern: a segment whose detail: points to ../intent/... has no
+        // arrow doc; the design doc is directly referenced via the detail field, so it must
+        // not be flagged as an orphan.
+        let detail_llds = collect_detail_llds(repo);
 
         let mut findings = Vec::new();
         for lld in &repo.llds {
-            if referenced_llds.contains(&lld.path) || unmapped_llds.contains(&lld.path) {
+            if referenced_llds.contains(&lld.path)
+                || unmapped_llds.contains(&lld.path)
+                || unmapped_intent.contains(&lld.path)
+                || detail_llds.contains(&lld.path)
+            {
                 continue;
             }
             findings.push(orphan_finding(repo, &lld.path, "LLD"));
         }
         for spec in &repo.specs {
-            if referenced_specs.contains(&spec.path) || unmapped_specs.contains(&spec.path) {
+            if referenced_specs.contains(&spec.path)
+                || unmapped_specs.contains(&spec.path)
+                || unmapped_intent.contains(&spec.path)
+            {
                 continue;
             }
             findings.push(orphan_finding(repo, &spec.path, "spec"));
@@ -73,6 +86,35 @@ where
             }
         })
         .collect()
+}
+
+/// Collect the absolute paths of design docs that are the `detail:` target of
+/// any arrow segment. Used to exempt sub-HLD design docs from the orphan check:
+/// in the schema v2 node-as-folder layout a sub-HLD has no arrow doc of its own
+/// — its `detail` field points directly to `../intent/…` — so the design doc
+/// will never appear in any `## References` section but is still reachable.
+fn collect_detail_llds(repo: &LidRepo) -> BTreeSet<PathBuf> {
+    let arrows_dir = repo.root.join("docs").join("arrows");
+    repo.index
+        .arrows
+        .values()
+        .map(|seg| normalize_path(&arrows_dir.join(&seg.detail)))
+        .collect()
+}
+
+/// Resolve `..` and `.` components in `p` without touching the filesystem.
+fn normalize_path(p: &Path) -> PathBuf {
+    let mut components: Vec<std::path::Component<'_>> = Vec::new();
+    for c in p.components() {
+        match c {
+            std::path::Component::ParentDir => {
+                components.pop();
+            }
+            std::path::Component::CurDir => {}
+            other => components.push(other),
+        }
+    }
+    components.iter().collect()
 }
 
 fn orphan_finding(repo: &LidRepo, path: &Path, kind: &str) -> Finding {
@@ -265,5 +307,62 @@ mod tests {
     #[test]
     fn check_id_is_orphan() {
         assert_eq!(OrphanCheck.id(), CheckId::Orphan);
+    }
+
+    /// Schema v2 sub-HLD pattern: a segment with `children` has no arrow doc;
+    /// its `detail` points to `../intent/…`. The design doc must not be flagged.
+    #[test]
+    fn sub_hld_design_doc_referenced_via_detail_is_not_orphaned() {
+        let root = PathBuf::from("/fake/root");
+        // The sub-HLD segment's detail traverses out of docs/arrows/ into docs/intent/.
+        let mut seg = minimal_segment("../intent/storage/storage-design.md");
+        seg.children = vec![seg_id("store-interface")];
+        let child = minimal_segment("storage/store-interface.md");
+
+        let mut arrows = BTreeMap::new();
+        arrows.insert(seg_id("storage"), seg);
+        arrows.insert(seg_id("store-interface"), child);
+
+        // The design doc is loaded as an LLD (matches *-design.md).
+        let design_doc_path = root.join("docs/intent/storage/storage-design.md");
+        let llds = vec![LldDoc {
+            path: design_doc_path,
+            decisions: vec![],
+        }];
+
+        let repo = LidRepo {
+            root,
+            index: ArrowIndex {
+                schema_version: 2,
+                last_updated: None,
+                taxonomy: BTreeMap::new(),
+                arrows,
+                unmapped: Unmapped::default(),
+            },
+            specs: vec![],
+            llds,
+            arrow_docs: vec![],
+            citations: vec![],
+        };
+
+        let findings = OrphanCheck.run(&repo);
+        assert!(
+            findings.is_empty(),
+            "sub-HLD design doc should not be orphaned, got {findings:?}"
+        );
+    }
+
+    #[test]
+    fn unmapped_intent_exempts_design_doc_from_orphan() {
+        let unmapped = Unmapped {
+            docs: UnmappedDocs {
+                llds: vec![],
+                specs: vec![],
+                intent: vec![PathBuf::from("docs/intent/auth/parked-design.md")],
+            },
+        };
+        let repo = make_repo(&["parked-design.md"], &[], ArrowReferences::default(), unmapped);
+        let findings = OrphanCheck.run(&repo);
+        assert!(findings.is_empty(), "got {findings:?}");
     }
 }
