@@ -13,6 +13,9 @@ import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.ui.jcef.JBCefBrowserBase
 import com.intellij.ui.jcef.JBCefJSQuery
+import org.cef.browser.CefBrowser
+import org.cef.browser.CefFrame
+import org.cef.handler.CefLoadHandlerAdapter
 import java.awt.BorderLayout
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
@@ -60,9 +63,14 @@ class LidNavigatorPanel(private val project: Project) : JPanel(BorderLayout()), 
                 },
             )
 
+            b.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
+                override fun onLoadEnd(cefBrowser: CefBrowser, frame: CefFrame, httpStatusCode: Int) {
+                    if (frame.isMain) postGraph()
+                }
+            }, b.cefBrowser)
+
             add(b.component, BorderLayout.CENTER)
             loadHtml()
-            scheduleRefresh(150)
         }
     }
 
