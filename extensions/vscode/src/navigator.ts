@@ -248,6 +248,7 @@ export class NavigatorPanel {
         const edit = new vscode.WorkspaceEdit();
         edit.replace(uri, doc.lineAt(lineIdx).range, newText);
         await vscode.workspace.applyEdit(edit);
+        await doc.save(); // flush to disk so the file watcher triggers a graph refresh
     }
 
     private async _appendSpec(specFile: string, segmentId: string, specId: string, text: string): Promise<void> {
@@ -265,6 +266,7 @@ export class NavigatorPanel {
             const edit = new vscode.WorkspaceEdit();
             edit.insert(uri, end, suffix + newLine);
             await vscode.workspace.applyEdit(edit);
+            await doc.save(); // flush to disk so the file watcher triggers a graph refresh
         } else {
             await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(specFile)));
             await vscode.workspace.fs.writeFile(uri, Buffer.from(`# ${segmentId} specs\n\n${newLine}`));
