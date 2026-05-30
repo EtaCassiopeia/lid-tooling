@@ -57,11 +57,11 @@ interface GraphPayload {
 // ── Status colours ───────────────────────────────────────────────────────────
 
 const STATUS_COLOR: Record<string, string> = {
-    UNMAPPED: '#6b7280',
-    MAPPED:   '#3b82f6',
-    AUDITED:  '#f59e0b',
-    OK:       '#22c55e',
-    MERGED:   '#9ca3af',
+    UNMAPPED: '#6B7280',
+    MAPPED:   '#6366F1',
+    AUDITED:  '#F59E0B',
+    OK:       '#81B29A',
+    MERGED:   '#4B5563',
 };
 
 function colorForStatus(status: string): string {
@@ -168,7 +168,7 @@ function render(payload: GraphPayload): void {
                         colorForStatus(ele.data('status') as string),
                     'color': '#ffffff',
                     'font-size': '10px',
-                    'font-family': 'var(--vscode-font-family, monospace)',
+                    'font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                     'text-valign': 'center',
                     'text-halign': 'center',
                     'text-wrap': 'wrap',
@@ -181,34 +181,34 @@ function render(payload: GraphPayload): void {
             },
             {
                 selector: 'node[?hasNext]',
-                style: { 'border-width': 3, 'border-color': '#60a5fa' },
+                style: { 'border-width': 3, 'border-color': '#6366F1' },
             },
             {
                 selector: 'node[?hasDrift]',
-                style: { 'border-width': 3, 'border-color': '#f59e0b' },
+                style: { 'border-width': 3, 'border-color': '#F59E0B' },
             },
             {
                 selector: 'node:selected',
-                style: { 'border-width': 4, 'border-color': '#ffffff' },
+                style: { 'border-width': 4, 'border-color': '#E07A5F' },
             },
             {
                 selector: 'node:active',
-                style: { 'overlay-opacity': 0.1 },
+                style: { 'overlay-opacity': 0.08 },
             },
             {
                 selector: 'node.dimmed',
-                style: { 'opacity': 0.2 },
+                style: { 'opacity': 0.15 },
             },
             {
                 selector: 'node.highlighted',
-                style: { 'border-width': 2, 'border-color': '#ffffff' },
+                style: { 'border-width': 2, 'border-color': '#E07A5F' },
             },
             {
                 selector: 'edge',
                 style: {
                     'width': 1.5,
-                    'line-color': '#6b7280',
-                    'target-arrow-color': '#6b7280',
+                    'line-color': '#3D4663',
+                    'target-arrow-color': '#3D4663',
                     'target-arrow-shape': 'triangle',
                     'curve-style': 'bezier',
                     'arrow-scale': 0.8,
@@ -218,7 +218,7 @@ function render(payload: GraphPayload): void {
                 selector: 'edge[kind = "child"]',
                 style: {
                     'width': 1,
-                    'line-color': '#374151',
+                    'line-color': '#252A40',
                     'line-style': 'dashed',
                     'target-arrow-shape': 'none',
                     'curve-style': 'bezier',
@@ -226,13 +226,13 @@ function render(payload: GraphPayload): void {
             },
             {
                 selector: 'edge.dimmed',
-                style: { 'opacity': 0.1 },
+                style: { 'opacity': 0.08 },
             },
             {
                 selector: 'edge:selected',
                 style: {
-                    'line-color': '#ffffff',
-                    'target-arrow-color': '#ffffff',
+                    'line-color': '#E07A5F',
+                    'target-arrow-color': '#E07A5F',
                 },
             },
         ] as cytoscape.StylesheetStyle[],
@@ -381,14 +381,13 @@ function openPanel(node: GraphNode, edit = false): void {
 
     panelTitle.textContent = id;
 
-    const color = colorForStatus(status);
     let html = editMode
         ? `<select class="edit-select" id="edit-status" data-seg-id="${esc(id)}">
             ${['UNMAPPED','MAPPED','AUDITED','OK','MERGED'].map(s =>
               `<option value="${s}"${s === status ? ' selected' : ''}>${s}</option>`
             ).join('')}
            </select>`
-        : `<span class="badge" style="background:${color}">${esc(status)}</span>`;
+        : `<span class="badge badge-${esc(status)}">${esc(status)}</span>`;
 
     // ── Hierarchy chips (parent / children) ─────────────────────────────────
     if (node.parent) {
@@ -437,7 +436,7 @@ function openPanel(node: GraphNode, edit = false): void {
         const total = implemented + open + deferred;
         if (total > 0) {
             const pct = Math.round((implemented / total) * 100);
-            const barColor = open > 0 ? '#f59e0b' : '#22c55e';
+            const barColor = open > 0 ? '#F59E0B' : '#81B29A';
             const hasItems = specItems && specItems.length > 0;
             html += `<div class="sec">
               <div class="sec-title-row">
