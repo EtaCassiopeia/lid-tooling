@@ -749,26 +749,23 @@ function wireInteractions(): void {
     });
     cy.on('mouseout', 'node', hideTooltip);
 
-    // Tap+click: debounce co-fire; detect double-click to open in edit mode.
-    let lastTapTs = 0;
-    let tapTimer: ReturnType<typeof setTimeout> | null = null;
+    // Tap+click: debounce co-fire from macOS trackpad.
+    let lastOpenTs = 0;
     const openSidebar = (evt: cytoscape.EventObject) => {
         const now = Date.now();
-        if (now - lastTapTs < 100) return; // absorb simultaneous tap+click
-        lastTapTs = now;
+        if (now - lastOpenTs < 100) return;
+        lastOpenTs = now;
         hideCtxMenu(); hideTooltip();
-        const node = evt.target.data('nodeData') as GraphNode;
-        if (tapTimer !== null) {
-            // Second tap within 280 ms → double-click → edit mode
-            clearTimeout(tapTimer);
-            tapTimer = null;
-            openPanel(node, true);
-        } else {
-            tapTimer = setTimeout(() => { tapTimer = null; openPanel(node); }, 280);
-        }
+        openPanel(evt.target.data('nodeData') as GraphNode);
     };
     cy.on('tap',   'node', openSidebar);
     cy.on('click', 'node', openSidebar);
+
+    // Double-click opens directly in edit mode (re-renders the already-open panel).
+    cy.on('dbltap', 'node', (evt) => {
+        hideCtxMenu(); hideTooltip();
+        openPanel(evt.target.data('nodeData') as GraphNode, true);
+    });
 
     cy.on('cxttap', 'node', (evt) => {
         const me = evt.originalEvent as MouseEvent;
