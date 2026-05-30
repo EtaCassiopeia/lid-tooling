@@ -499,243 +499,290 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline';">
   <style>
+    /* ── Rift Design Tokens ── */
+    :root {
+      --bg-primary:    #0f0f1a;
+      --bg-secondary:  #1a1b2e;
+      --bg-card:       #1e2235;
+      --bg-card-hover: #252a40;
+      --accent-coral:  #E07A5F;
+      --accent-green:  #81B29A;
+      --accent-blue:   #6366F1;
+      --accent-yellow: #F59E0B;
+      --accent-red:    #EF4444;
+      --accent-purple: #8B5CF6;
+      --text-primary:  #FFFFFF;
+      --text-secondary:#9CA3AF;
+      --text-muted:    #6B7280;
+      --border:        #2D3348;
+      --r-sm: 6px; --r-md: 12px; --r-full: 9999px;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono: 'SF Mono', 'Consolas', 'JetBrains Mono', monospace;
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100%; height: 100%; overflow: hidden;
-      background: var(--vscode-editor-background, #1e1e1e);
-      color: var(--vscode-editor-foreground, #d4d4d4);
-      font-family: var(--vscode-font-family, system-ui, sans-serif);
-      font-size: 12px;
+      background: var(--bg-primary);
+      color: var(--text-secondary);
+      font-family: var(--font); font-size: 12px;
       display: flex; flex-direction: column;
     }
     /* ── Toolbar ── */
     #toolbar {
-      height: 32px; flex-shrink: 0;
-      display: flex; align-items: center; gap: 8px; padding: 0 10px;
-      background: var(--vscode-editorGroupHeader-tabsBackground, #252526);
-      border-bottom: 1px solid var(--vscode-editorGroup-border, #3c3c3c);
+      height: 38px; flex-shrink: 0;
+      display: flex; align-items: center; gap: 8px; padding: 0 12px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
     }
     #toolbar button {
-      background: var(--vscode-button-background, #0e639c);
-      color: var(--vscode-button-foreground, #ffffff);
-      border: none; border-radius: 2px; padding: 2px 10px;
-      cursor: pointer; font-size: 11px;
+      background: rgba(224,122,95,.12);
+      color: var(--accent-coral);
+      border: 1px solid rgba(224,122,95,.3);
+      border-radius: var(--r-sm); padding: 3px 10px;
+      cursor: pointer; font-size: 11px; font-family: var(--font); font-weight: 500;
+      transition: background .15s;
     }
-    #toolbar button:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
+    #toolbar button:hover { background: rgba(224,122,95,.22); }
     #btn-clear {
-      background: transparent;
-      color: var(--vscode-descriptionForeground, #9d9d9d);
-      padding: 0 4px; font-size: 14px;
+      background: transparent; border: none !important;
+      color: var(--text-muted); padding: 0 4px; font-size: 14px;
     }
+    #btn-clear:hover { color: var(--text-primary); background: transparent !important; }
     #toolbar label {
       display: flex; align-items: center; gap: 4px; font-size: 11px;
-      color: var(--vscode-descriptionForeground, #9d9d9d);
+      color: var(--text-muted);
     }
     #toolbar select, #toolbar input[type=text] {
-      background: var(--vscode-input-background, #3c3c3c);
-      color: var(--vscode-input-foreground, #cccccc);
-      border: 1px solid var(--vscode-input-border, #555);
-      border-radius: 2px; padding: 1px 6px; font-size: 11px; outline: none;
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 2px 7px; font-size: 11px;
+      font-family: var(--font); outline: none;
+      transition: border-color .15s;
     }
+    #toolbar select:focus, #toolbar input[type=text]:focus { border-color: var(--accent-blue); }
     #search { width: 140px; }
-    .tb-sep { width: 1px; height: 16px; background: var(--vscode-editorGroup-border, #3c3c3c); }
-    /* ── Main area ── */
+    .tb-sep { width: 1px; height: 16px; background: var(--border); }
+    /* ── Main + graph canvas ── */
     #main { flex: 1; display: flex; overflow: hidden; min-height: 0; }
-    #cy { flex: 1; min-width: 0; }
+    #cy {
+      flex: 1; min-width: 0;
+      background:
+        linear-gradient(rgba(99,102,241,.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,102,241,.06) 1px, transparent 1px),
+        var(--bg-primary);
+      background-size: 40px 40px;
+    }
     /* ── Sidebar ── */
     #panel {
-      width: 260px; flex-shrink: 0;
+      width: 268px; flex-shrink: 0;
       display: none; flex-direction: column;
-      border-left: 1px solid var(--vscode-editorGroup-border, #3c3c3c);
-      background: var(--vscode-sideBar-background, #252526);
+      border-left: 1px solid var(--border);
+      background: var(--bg-secondary);
     }
     #panel.open { display: flex; }
     .ph {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 8px 10px; flex-shrink: 0;
-      border-bottom: 1px solid var(--vscode-editorGroup-border, #3c3c3c);
-      font-weight: 600; font-size: 12px;
+      display: flex; align-items: center; gap: 6px;
+      padding: 9px 12px; flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
     }
-    .ph-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .ph-close { cursor: pointer; opacity: 0.6; padding: 0 2px; font-size: 14px; }
-    .ph-close:hover { opacity: 1; }
+    .ph-title {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-weight: 600; font-size: 13px; color: var(--text-primary); flex: 1;
+    }
+    .ph-close { cursor: pointer; color: var(--text-muted); padding: 0 2px; font-size: 14px; flex-shrink: 0; }
+    .ph-close:hover { color: var(--text-primary); }
     .pb { overflow-y: auto; padding: 10px; flex: 1; }
+    /* ── Status badges ── */
     .badge {
-      display: inline-block; padding: 1px 8px; border-radius: 10px;
-      font-size: 10px; font-weight: 600; color: #fff; margin-bottom: 10px;
+      display: inline-flex; align-items: center;
+      padding: 3px 10px; border-radius: var(--r-full);
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .05em;
+      margin-bottom: 10px;
     }
-    .sec { margin-top: 12px; }
+    .badge-UNMAPPED { background: rgba(107,114,128,.15); border: 1px solid rgba(107,114,128,.3); color: #9CA3AF; }
+    .badge-MAPPED   { background: rgba(99,102,241,.15);  border: 1px solid rgba(99,102,241,.3);  color: #6366F1; }
+    .badge-AUDITED  { background: rgba(245,158,11,.15);  border: 1px solid rgba(245,158,11,.3);  color: #F59E0B; }
+    .badge-OK       { background: rgba(129,178,154,.15); border: 1px solid rgba(129,178,154,.3); color: #81B29A; }
+    .badge-MERGED   { background: rgba(75,85,99,.15);    border: 1px solid rgba(75,85,99,.3);    color: #6B7280; }
+    /* ── Panel sections (card-style) ── */
+    .sec {
+      margin-top: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 8px 10px;
+    }
     .sec-title {
-      font-size: 10px; text-transform: uppercase;
-      letter-spacing: 0.06em; opacity: 0.55; margin-bottom: 4px;
+      font-size: 9px; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--text-muted);
+      font-weight: 500; margin-bottom: 5px;
     }
-    .prog-wrap { height: 6px; border-radius: 3px; background: var(--vscode-input-background, #3c3c3c); overflow: hidden; margin: 4px 0; }
-    .prog-fill { height: 100%; border-radius: 3px; }
-    .spec-row { display: flex; gap: 8px; font-size: 10px; opacity: 0.75; margin-top: 2px; }
-    .meta { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; font-size: 10px; opacity: 0.75; }
-    .meta-k { opacity: 0.6; }
+    .prog-wrap { height: 4px; border-radius: 2px; background: rgba(255,255,255,.06); overflow: hidden; margin: 4px 0; }
+    .prog-fill { height: 100%; border-radius: 2px; }
+    .spec-row { display: flex; gap: 10px; font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+    .meta { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; font-size: 10px; }
+    .meta-k { color: var(--text-muted); }
+    /* Action buttons */
     .btn-open {
       display: block; width: 100%; margin-top: 5px;
-      padding: 5px 8px; text-align: left;
-      background: var(--vscode-button-secondaryBackground, #3a3d41);
-      color: var(--vscode-button-secondaryForeground, #cccccc);
-      border: none; border-radius: 3px; cursor: pointer; font-size: 11px;
+      padding: 5px 10px; text-align: left;
+      background: rgba(99,102,241,.1);
+      color: var(--accent-blue);
+      border: 1px solid rgba(99,102,241,.25);
+      border-radius: var(--r-sm); cursor: pointer; font-size: 11px;
+      font-family: var(--font); transition: background .15s;
     }
-    .btn-open:hover { background: var(--vscode-button-secondaryHoverBackground, #45494e); }
+    .btn-open:hover { background: rgba(99,102,241,.2); }
+    .btn-open:first-child { margin-top: 0; }
     .prose {
-      font-size: 11px; line-height: 1.55; opacity: 0.88;
+      font-size: 11px; line-height: 1.6; color: var(--text-secondary);
       white-space: pre-wrap; word-break: break-word;
     }
     /* ── Dependency chips ── */
-    .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
     .chip {
-      padding: 2px 9px; border-radius: 10px; font-size: 10px; cursor: pointer;
-      background: var(--vscode-badge-background, #4d4d4d);
-      color: var(--vscode-badge-foreground, #fff);
-      border: none; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      padding: 2px 9px; border-radius: var(--r-full); font-size: 10px; cursor: pointer;
+      background: rgba(99,102,241,.12);
+      color: var(--accent-blue);
+      border: 1px solid rgba(99,102,241,.25);
+      max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-weight: 500; font-family: var(--font); transition: background .15s;
     }
-    .chip:hover { background: var(--vscode-list-hoverBackground, #2a2d2e); outline: 1px solid var(--vscode-focusBorder, #007fd4); }
+    .chip:hover { background: rgba(99,102,241,.24); }
     /* ── Spec list ── */
     .sec-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-    .spec-toggle {
-      background: none; border: none; font-size: 10px; opacity: 0.55; cursor: pointer; padding: 0;
-      color: inherit;
+    .spec-toggle { background: none; border: none; font-size: 10px; color: var(--text-muted); cursor: pointer; padding: 0; }
+    .spec-toggle:hover { color: var(--text-primary); }
+    .spec-list { margin-top: 6px; max-height: 200px; overflow-y: auto; border-top: 1px solid var(--border); padding-top: 4px; }
+    .si { display: flex; gap: 6px; padding: 3px 0; font-size: 10px; align-items: flex-start; border-bottom: 1px solid rgba(45,51,72,.5); }
+    .si:last-child { border-bottom: none; }
+    .si-id {
+      font-size: 9px; font-family: var(--mono); color: var(--accent-blue);
+      background: none; border: none; padding: 0; cursor: pointer;
+      text-decoration: none; white-space: nowrap; flex-shrink: 0; font-weight: 500;
     }
-    .spec-toggle:hover { opacity: 0.9; }
-    .spec-list {
-      margin-top: 6px; max-height: 200px; overflow-y: auto;
-      border-top: 1px solid var(--vscode-editorGroup-border, #3c3c3c); padding-top: 4px;
-    }
-    .si { display: flex; gap: 6px; padding: 2px 0; font-size: 10px; align-items: flex-start; }
-    .si-id { font-size: 9px; font-family: var(--vscode-editor-font-family, monospace); color: var(--vscode-textLink-foreground); background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; white-space: nowrap; flex-shrink: 0; }
-    .si-id:hover { opacity: 0.75; }
-    .si-m { flex-shrink: 0; width: 14px; text-align: center; }
-    .si-done { color: #22c55e; }
-    .si-open { color: #f59e0b; }
-    .si-def  { color: #6b7280; }
-    .si-t { opacity: 0.85; word-break: break-word; line-height: 1.5; }
-    /* ── Focus + Edit buttons ── */
+    .si-id:hover { text-decoration: underline; }
+    .si-m { flex-shrink: 0; width: 14px; text-align: center; font-size: 11px; }
+    .si-done { color: var(--accent-green); }
+    .si-open { color: var(--accent-yellow); }
+    .si-def  { color: var(--text-muted); }
+    .si-t { color: var(--text-secondary); word-break: break-word; line-height: 1.5; }
+    /* ── Header buttons (Focus / Edit) ── */
     .btn-focus, #btn-edit {
-      background: none;
-      border: 1px solid var(--vscode-editorGroup-border, #444);
-      color: var(--vscode-descriptionForeground, #9d9d9d);
-      border-radius: 3px; padding: 1px 7px; font-size: 10px; cursor: pointer; flex-shrink: 0;
+      background: transparent;
+      border: 1px solid var(--border); color: var(--text-muted);
+      border-radius: var(--r-sm); padding: 2px 8px;
+      font-size: 10px; cursor: pointer; flex-shrink: 0;
+      font-family: var(--font); font-weight: 500; transition: all .15s;
     }
-    .btn-focus:hover:not(.active), #btn-edit:hover:not(.active) { color: var(--vscode-foreground, #d4d4d4); border-color: var(--vscode-focusBorder, #007fd4); }
-    .btn-focus.active, #btn-edit.active {
-      background: var(--vscode-button-background, #0e639c);
-      color: var(--vscode-button-foreground, #fff); border-color: transparent;
-    }
+    .btn-focus:hover:not(.active), #btn-edit:hover:not(.active) { color: var(--text-primary); border-color: var(--text-muted); }
+    .btn-focus.active, #btn-edit.active { background: var(--accent-coral); color: #fff; border-color: transparent; }
     /* ── Mutation feedback banner ── */
-    #mut-banner {
-      display: none; padding: 4px 10px; font-size: 11px; flex-shrink: 0;
-      border-bottom: 1px solid var(--vscode-editorGroup-border, #3c3c3c);
-    }
-    #mut-banner.ok  { background: rgba(34,197,94,.15); color: #4ade80; }
-    #mut-banner.err { background: rgba(239,68,68,.15);  color: #f87171; }
+    #mut-banner { display: none; padding: 6px 12px; font-size: 11px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
+    #mut-banner.ok  { background: rgba(129,178,154,.15); border-bottom-color: rgba(129,178,154,.3); color: var(--accent-green); }
+    #mut-banner.err { background: rgba(239,68,68,.15);   border-bottom-color: rgba(239,68,68,.3);   color: #F87171; }
     /* ── Edit-mode form elements ── */
     .edit-select, .edit-textarea, .edit-input {
       width: 100%;
-      background: var(--vscode-input-background, #3c3c3c);
-      color: var(--vscode-input-foreground, #cccccc);
-      border: 1px solid var(--vscode-input-border, #555);
-      border-radius: 2px; padding: 3px 6px; font-size: 11px; outline: none;
-      font-family: var(--vscode-font-family, system-ui, sans-serif);
-      box-sizing: border-box;
+      background: var(--bg-primary); color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 4px 8px; font-size: 11px; outline: none;
+      font-family: var(--font); box-sizing: border-box; transition: border-color .15s;
     }
+    .edit-select:focus, .edit-textarea:focus, .edit-input:focus { border-color: var(--accent-blue); }
     .edit-textarea { resize: vertical; min-height: 60px; }
     .btn-save {
-      margin-top: 5px; padding: 4px 12px;
-      background: var(--vscode-button-background, #0e639c);
-      color: var(--vscode-button-foreground, #fff);
-      border: none; border-radius: 2px; cursor: pointer; font-size: 11px;
+      margin-top: 5px; padding: 4px 14px;
+      background: var(--accent-coral); color: #fff;
+      border: none; border-radius: var(--r-sm);
+      cursor: pointer; font-size: 11px; font-family: var(--font); font-weight: 500;
+      transition: background .15s;
     }
-    .btn-save:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
-    /* spec status toggle button in edit mode */
-    .si-toggle {
-      background: none; border: none; cursor: pointer; padding: 0;
-      display: flex; align-items: center; flex-shrink: 0; line-height: 1;
-    }
+    .btn-save:hover { background: #c96a52; }
+    .si-toggle { background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; flex-shrink: 0; line-height: 1; transition: opacity .15s; }
     .si-toggle:hover { opacity: 0.7; }
-    /* add-spec inline form */
     .add-spec-btn {
       display: block; width: 100%; margin-top: 6px;
-      background: none; border: 1px dashed var(--vscode-editorGroup-border, #555);
-      color: var(--vscode-descriptionForeground, #9d9d9d);
-      border-radius: 3px; padding: 2px 8px; font-size: 10px; cursor: pointer; text-align: left;
+      background: transparent; border: 1px dashed rgba(45,51,72,.9);
+      color: var(--text-muted); border-radius: var(--r-sm);
+      padding: 4px 8px; font-size: 10px; cursor: pointer; text-align: left;
+      font-family: var(--font); transition: all .15s;
     }
-    .add-spec-btn:hover { border-color: var(--vscode-focusBorder, #007fd4); color: var(--vscode-foreground, #d4d4d4); }
+    .add-spec-btn:hover { border-color: var(--accent-coral); color: var(--accent-coral); }
     .add-spec-form { margin-top: 6px; display: none; }
     .add-spec-form.open { display: block; }
     .add-spec-row { display: flex; gap: 4px; margin-top: 4px; }
     .add-spec-row .edit-input { flex: 1; }
-    .add-spec-err { font-size: 10px; color: #f87171; margin-top: 3px; min-height: 14px; }
+    .add-spec-err { font-size: 10px; color: #F87171; margin-top: 3px; min-height: 14px; }
     /* ── Add-segment overlay ── */
     #add-seg-overlay {
       display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,.55); z-index: 2000;
+      background: rgba(0,0,0,.72); z-index: 2000;
       align-items: flex-start; justify-content: center; padding-top: 60px;
+      backdrop-filter: blur(4px);
     }
     #add-seg-overlay.open { display: flex; }
     #add-seg-box {
-      background: var(--vscode-editorWidget-background, #252526);
-      border: 1px solid var(--vscode-editorWidget-border, #454545);
-      border-radius: 6px; padding: 16px; width: 320px;
-      box-shadow: 0 8px 24px rgba(0,0,0,.6);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md); padding: 20px; width: 340px;
+      box-shadow: 0 20px 40px rgba(0,0,0,.6);
     }
-    #add-seg-box h3 { font-size: 13px; margin-bottom: 12px; }
-    .seg-field { margin-bottom: 8px; }
-    .seg-field label { display: block; font-size: 10px; opacity: 0.6; margin-bottom: 2px; }
-    .seg-field-row { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+    #add-seg-box h3 { font-size: 14px; margin-bottom: 16px; color: var(--text-primary); font-weight: 600; }
+    .seg-field { margin-bottom: 10px; }
+    .seg-field label {
+      display: block; font-size: 9px; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;
+    }
+    .seg-field-row { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
     .btn-cancel {
-      background: transparent; border: 1px solid var(--vscode-editorGroup-border, #555);
-      color: var(--vscode-foreground, #d4d4d4); border-radius: 2px; padding: 4px 12px;
-      cursor: pointer; font-size: 11px;
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text-secondary); border-radius: var(--r-sm);
+      padding: 5px 14px; cursor: pointer; font-size: 11px;
+      font-family: var(--font); font-weight: 500; transition: all .15s;
     }
-    #seg-add-err { font-size: 10px; color: #f87171; margin-top: 6px; min-height: 14px; }
+    .btn-cancel:hover { border-color: var(--text-muted); color: var(--text-primary); }
+    #seg-add-err { font-size: 10px; color: #F87171; margin-top: 6px; min-height: 14px; }
     /* ── Tooltip ── */
     #tooltip {
-      position: fixed; pointer-events: none;
-      max-width: 290px;
-      background: var(--vscode-editorHoverWidget-background, #252526);
-      border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
-      border-radius: 4px; padding: 8px 10px;
-      font-size: 11px; z-index: 999; display: none;
-      line-height: 1.5; box-shadow: 0 2px 8px rgba(0,0,0,.4);
+      position: fixed; pointer-events: none; max-width: 300px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 10px 12px;
+      font-size: 11px; z-index: 999; display: none; line-height: 1.5;
+      box-shadow: 0 8px 24px rgba(0,0,0,.5);
     }
-    .tt-title { font-weight: 600; margin-bottom: 3px; }
-    .tt-row { opacity: 0.8; margin-top: 1px; }
-    .tt-sep { border: none; border-top: 1px solid var(--vscode-editorHoverWidget-border, #454545); margin: 5px 0; }
+    .tt-title { font-weight: 600; margin-bottom: 4px; color: var(--text-primary); }
+    .tt-row { color: var(--text-muted); margin-top: 2px; }
+    .tt-sep { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
     /* ── Context menu ── */
     #ctxmenu {
       position: fixed;
-      background: var(--vscode-menu-background, #252526);
-      border: 1px solid var(--vscode-menu-border, #454545);
-      border-radius: 4px; padding: 4px 0;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 4px 0;
       font-size: 12px; z-index: 1000; display: none;
-      min-width: 170px; box-shadow: 0 4px 12px rgba(0,0,0,.5);
+      min-width: 175px; box-shadow: 0 8px 24px rgba(0,0,0,.6);
     }
-    .ctx-item { padding: 5px 14px; cursor: pointer; }
-    .ctx-item:hover {
-      background: var(--vscode-menu-selectionBackground, #094771);
-      color: var(--vscode-menu-selectionForeground, #fff);
-    }
+    .ctx-item { padding: 6px 14px; cursor: pointer; color: var(--text-secondary); }
+    .ctx-item:hover { background: rgba(99,102,241,.12); color: var(--text-primary); }
     .ctx-item.hidden { display: none; }
-    .ctx-sep { border-top: 1px solid var(--vscode-menu-border, #454545); margin: 3px 0; }
+    .ctx-sep { border-top: 1px solid var(--border); margin: 3px 0; }
     /* ── Legend ── */
     #legend {
-      position: fixed; bottom: 10px; left: 10px;
-      background: var(--vscode-editorWidget-background, #252526);
-      border: 1px solid var(--vscode-editorWidget-border, #454545);
-      border-radius: 4px; padding: 7px 10px;
-      font-size: 10px; opacity: 0.85; pointer-events: none; line-height: 1.8;
+      position: fixed; bottom: 12px; left: 12px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 8px 12px;
+      font-size: 10px; pointer-events: none; line-height: 1.9;
+      box-shadow: 0 4px 12px rgba(0,0,0,.4);
     }
-    .leg-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .leg-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; color: var(--text-muted); }
     .sw { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: middle; }
-    /* ── Empty ── */
+    /* ── Empty state ── */
     #empty {
       display: none; position: fixed; top: 50%; left: 50%;
-      transform: translate(-50%,-50%); opacity: 0.4; font-size: 13px;
+      transform: translate(-50%,-50%);
+      color: var(--text-muted); font-size: 13px;
     }
   </style>
 </head>
@@ -791,15 +838,15 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
 
   <div id="legend">
     <div class="leg-row">
-      <span class="sw" style="background:#6b7280"></span>UNMAPPED&nbsp;
-      <span class="sw" style="background:#3b82f6"></span>MAPPED&nbsp;
-      <span class="sw" style="background:#f59e0b"></span>AUDITED&nbsp;
-      <span class="sw" style="background:#22c55e"></span>OK&nbsp;
-      <span class="sw" style="background:#9ca3af"></span>MERGED
+      <span class="sw" style="background:#6B7280"></span>UNMAPPED&nbsp;
+      <span class="sw" style="background:#6366F1"></span>MAPPED&nbsp;
+      <span class="sw" style="background:#F59E0B"></span>AUDITED&nbsp;
+      <span class="sw" style="background:#81B29A"></span>OK&nbsp;
+      <span class="sw" style="background:#4B5563"></span>MERGED
     </div>
-    <div class="leg-row" style="margin-top:3px;opacity:0.8">
-      <span class="sw" style="background:transparent;border:2px solid #f59e0b;border-radius:3px"></span>has drift &nbsp;
-      <span class="sw" style="background:transparent;border:2px solid #60a5fa;border-radius:3px"></span>has next
+    <div class="leg-row" style="margin-top:3px">
+      <span class="sw" style="background:transparent;border:2px solid #F59E0B;border-radius:3px"></span>has drift &nbsp;
+      <span class="sw" style="background:transparent;border:2px solid #6366F1;border-radius:3px"></span>has next
     </div>
   </div>
 
