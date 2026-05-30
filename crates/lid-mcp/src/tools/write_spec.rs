@@ -57,7 +57,7 @@ pub async fn lid_update_spec_status(
     let rediscover_error = registry.rediscover(Path::new(&input.project_root)).await;
 
     let out = WriteResult {
-        action: format!("updated {} to {:?}", input.spec_id, new_status),
+        action: format!("updated {} to {}", input.spec_id, new_status),
         rediscover_error,
     };
     serde_json::to_string_pretty(&out).map_err(|e| ErrorData::internal_error(e.to_string(), None))
