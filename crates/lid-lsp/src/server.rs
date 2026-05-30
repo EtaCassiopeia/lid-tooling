@@ -214,47 +214,54 @@ impl LanguageServer for LidServer {
     }
 
     async fn initialized(&self, _: InitializedParams) {
-        self.client
-            .log_message(
-                MessageType::INFO,
-                format!("lid-lsp {} ready", env!("CARGO_PKG_VERSION")),
-            )
-            .await;
         tracing::info!("client connected, server is ready");
 
-        // Register file-system watchers so the server learns about
-        // changes made outside the editor (AI agents, git, scripts).
-        let watchers = [
-            "**/*.md",
-            "**/index.yaml",
-            "**/*.rs",
-            "**/*.ts",
-            "**/*.tsx",
-            "**/*.js",
-            "**/*.jsx",
-            "**/*.py",
-            "**/*.go",
-            "**/*.java",
-            "**/*.scala",
-        ]
-        .iter()
-        .map(|glob| FileSystemWatcher {
-            glob_pattern: GlobPattern::String((*glob).to_owned()),
-            kind: None, // defaults to Create | Change | Delete
-        })
-        .collect::<Vec<_>>();
+        // Spawn all client calls in a background task so the handler
+        // returns immediately. `register_capability` sends a server→client
+        // REQUEST and then awaits the response on stdin. Awaiting it inline
+        // in the tower-lsp dispatch loop deadlocks: the loop can't process
+        // the response because it's blocked waiting for the handler to return.
+        let client = self.client.clone();
+        tokio::spawn(async move {
+            client
+                .log_message(
+                    MessageType::INFO,
+                    format!("lid-lsp {} ready", env!("CARGO_PKG_VERSION")),
+                )
+                .await;
 
-        let opts = DidChangeWatchedFilesRegistrationOptions { watchers };
-        if let Ok(opts_value) = serde_json::to_value(opts) {
-            let reg = Registration {
-                id: "lid-file-watcher".to_owned(),
-                method: "workspace/didChangeWatchedFiles".to_owned(),
-                register_options: Some(opts_value),
-            };
-            if let Err(e) = self.client.register_capability(vec![reg]).await {
-                tracing::warn!(error = %e, "could not register file watchers");
+            let watchers = [
+                "**/*.md",
+                "**/index.yaml",
+                "**/*.rs",
+                "**/*.ts",
+                "**/*.tsx",
+                "**/*.js",
+                "**/*.jsx",
+                "**/*.py",
+                "**/*.go",
+                "**/*.java",
+                "**/*.scala",
+            ]
+            .iter()
+            .map(|glob| FileSystemWatcher {
+                glob_pattern: GlobPattern::String((*glob).to_owned()),
+                kind: None,
+            })
+            .collect::<Vec<_>>();
+
+            let opts = DidChangeWatchedFilesRegistrationOptions { watchers };
+            if let Ok(opts_value) = serde_json::to_value(opts) {
+                let reg = Registration {
+                    id: "lid-file-watcher".to_owned(),
+                    method: "workspace/didChangeWatchedFiles".to_owned(),
+                    register_options: Some(opts_value),
+                };
+                if let Err(e) = client.register_capability(vec![reg]).await {
+                    tracing::warn!(error = %e, "could not register file watchers");
+                }
             }
-        }
+        });
     }
 
     // ── Text document lifecycle ─────────────────────────────────────────────
