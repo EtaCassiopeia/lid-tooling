@@ -10,6 +10,7 @@
     "url": "https://github.com/EtaCassiopeia/lid-tooling.git",
     "directory": "extensions/vscode"
   },
+  "icon": "images/icon.png",
   "galleryBanner": {
     "color": "#0f0f1a",
     "theme": "dark"
