@@ -46,6 +46,10 @@ use tower_lsp::{Client, LanguageServer, jsonrpc::Result};
 
 use crate::handlers;
 
+fn is_spec_buffer(uri: &Url) -> bool {
+    uri.path().ends_with("-specs.md")
+}
+
 #[derive(Debug)]
 pub struct LidServer {
     client: Client,
@@ -154,7 +158,7 @@ impl LidServer {
         let Some(repo) = self.get_repo(&uri).await else {
             return;
         };
-        let diagnostics = if uri.path().ends_with("-specs.md") {
+        let diagnostics = if is_spec_buffer(&uri) {
             handlers::diagnostics::diagnostics_for_spec_buffer(&repo, text)
         } else {
             handlers::diagnostics::diagnostics_for_buffer(&repo, text)
@@ -172,7 +176,7 @@ impl LidServer {
             let Ok(uri) = Url::parse(&doc.uri) else {
                 continue;
             };
-            let diagnostics = if uri.path().ends_with("-specs.md") {
+            let diagnostics = if is_spec_buffer(&uri) {
                 handlers::diagnostics::diagnostics_for_spec_buffer(repo, &doc.text)
             } else {
                 handlers::diagnostics::diagnostics_for_buffer(repo, &doc.text)

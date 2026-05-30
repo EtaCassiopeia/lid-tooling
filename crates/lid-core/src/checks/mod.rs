@@ -194,6 +194,28 @@ pub enum Category {
     Orphans,
 }
 
+impl Category {
+    /// Return the canonical kebab-case string matching the serde representation.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Schema => "schema",
+            Self::References => "references",
+            Self::Coverage => "coverage",
+            Self::Staleness => "staleness",
+            Self::Dag => "dag",
+            Self::Lint => "lint",
+            Self::Orphans => "orphans",
+        }
+    }
+}
+
+impl std::fmt::Display for Category {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// A location in the repository — typically the file and 1-based line
 /// the finding refers to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -300,6 +322,28 @@ fn looks_like_path(s: &str) -> bool {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn category_as_str_matches_serde() {
+        for v in [
+            Category::Schema,
+            Category::References,
+            Category::Coverage,
+            Category::Staleness,
+            Category::Dag,
+            Category::Lint,
+            Category::Orphans,
+        ] {
+            let serde_form = serde_json::to_string(&v).unwrap();
+            let serde_str = serde_form.trim_matches('"');
+            assert_eq!(v.as_str(), serde_str, "as_str vs serde mismatch for {v:?}");
+            assert_eq!(
+                v.to_string(),
+                serde_str,
+                "Display vs serde mismatch for {v:?}"
+            );
+        }
+    }
 
     #[test]
     fn finding_serializes_with_omitted_optional_fields() {

@@ -33,6 +33,30 @@ pub enum Status {
     Merged,
 }
 
+impl Status {
+    /// Return the canonical `SCREAMING_SNAKE_CASE` string matching the serde representation.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Unmapped => "UNMAPPED",
+            Self::Mapped => "MAPPED",
+            Self::Audited => "AUDITED",
+            Self::Ok => "OK",
+            Self::Partial => "PARTIAL",
+            Self::Broken => "BROKEN",
+            Self::Stale => "STALE",
+            Self::Obsolete => "OBSOLETE",
+            Self::Merged => "MERGED",
+        }
+    }
+}
+
+impl std::fmt::Display for Status {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// One arrow segment — the value under `arrows.{segment-id}` in `index.yaml`.
 ///
 /// All optional fields default to `None` / empty so that minimal YAML
@@ -273,6 +297,30 @@ mod tests {
             let s = serde_json::to_string(&v).unwrap();
             let back: Status = serde_json::from_str(&s).unwrap();
             assert_eq!(v, back);
+        }
+    }
+
+    #[test]
+    fn status_as_str_matches_serde_representation() {
+        for v in [
+            Status::Unmapped,
+            Status::Mapped,
+            Status::Audited,
+            Status::Ok,
+            Status::Partial,
+            Status::Broken,
+            Status::Stale,
+            Status::Obsolete,
+            Status::Merged,
+        ] {
+            let serde_form = serde_json::to_string(&v).unwrap();
+            let serde_str = serde_form.trim_matches('"');
+            assert_eq!(v.as_str(), serde_str, "as_str vs serde mismatch for {v:?}");
+            assert_eq!(
+                v.to_string(),
+                serde_str,
+                "Display vs serde mismatch for {v:?}"
+            );
         }
     }
 

@@ -42,7 +42,7 @@ pub async fn lid_status(registry: &RepoRegistry, input: StatusInput) -> Result<S
         .iter()
         .map(|(id, seg)| SegmentSummary {
             id: id.to_string(),
-            status: format!("{:?}", seg.status),
+            status: seg.status.to_string(),
         })
         .collect();
 

@@ -84,7 +84,7 @@ impl Check for SchemaCheck {
                 (Some(target), other_status) => {
                     findings.push(warning_at(
                         format!(
-                            "segment `{seg_id}` declares `merged_into: {target}` but status is `{other_status:?}`, not MERGED"
+                            "segment `{seg_id}` declares `merged_into: {target}` but status is `{other_status}`, not MERGED"
                         ),
                         &index_yaml_path,
                         Some(

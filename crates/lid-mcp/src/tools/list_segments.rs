@@ -39,7 +39,7 @@ pub async fn lid_list_segments(
         .iter()
         .map(|(id, seg)| SegmentEntry {
             id: id.to_string(),
-            status: format!("{:?}", seg.status),
+            status: seg.status.to_string(),
             next: seg.next.clone(),
             drift: seg.drift.clone(),
             blocks: seg.blocks.iter().map(ToString::to_string).collect(),

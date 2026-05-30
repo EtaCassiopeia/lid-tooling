@@ -37,7 +37,7 @@ pub async fn lid_find_spec_references(
         .map(|c| CitationEntry {
             file: c.file.to_string_lossy().into_owned(),
             line: c.line,
-            kind: format!("{:?}", c.kind),
+            kind: c.kind.to_string(),
         })
         .collect();
 

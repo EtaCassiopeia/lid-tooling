@@ -74,8 +74,8 @@ pub async fn lid_check(registry: &RepoRegistry, input: CheckInput) -> Result<Str
         .into_iter()
         .map(|f| FindingSummary {
             check: f.check.to_string(),
-            severity: format!("{:?}", f.severity),
-            category: format!("{:?}", f.category),
+            severity: f.severity.to_string(),
+            category: f.category.to_string(),
             message: f.message,
             location: f.location.map(|l| l.path.to_string_lossy().into_owned()),
             spec: f.spec.map(|s| s.to_string()),
