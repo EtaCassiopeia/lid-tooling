@@ -2,11 +2,7 @@
 
 Developer tools for the [LID (Linked-Intent Development)](https://github.com/jszmajda/lid) methodology.
 
-A Rust core engine plus protocol adapters that bring LID into:
-
-- your editor (LSP + VS Code extension),
-- your CI (CLI for the `## LID Tooling` hook),
-- your AI workflow (MCP server, planned).
+A Rust core engine plus protocol adapters that bring LID into your editor, your CI pipeline, and your AI workflow.
 
 ## Demo
 
@@ -32,36 +28,88 @@ setup (CLI + LSP + VS Code extension) and
 [`tools/demo/README.md`](tools/demo/README.md) for how the demos
 are recorded.
 
-## Components
+## Installation
 
-| Crate / package | Purpose | Status |
-| --- | --- | --- |
-| `lid-core` | Parsing, model, and 9 deterministic coherence checks | ✅ shipping |
-| `lid-cli` | `lidc` binary — CI hook and the `## LID Tooling` slot | ✅ shipping |
-| `lid-lsp` | Language Server: hover, definition, references, rename, completion, diagnostics | ✅ shipping |
-| `vscode-lid` | VS Code extension bundling the language client | ✅ shipping |
+### VS Code extension (recommended — includes everything)
 
-## Quick start
+Search **LID** in the Extensions panel, or:
 
-```sh
-# 1. Build
-cargo build --release
-cargo install --path crates/lid-cli --force
-cargo install --path crates/lid-lsp --force
-
-# 2. Try the CLI against the bundled sample project
-cd examples/sample-project
-lidc check
-
-# 3. Build and install the VS Code extension
-cd ../../extensions/vscode
-npm ci && npm run compile
-npx vsce package --skip-license
-code --install-extension lid-0.1.0.vsix
+```
+ext install lid-tools.lid
 ```
 
-Full walkthrough with test scenarios (hover, rename, diagnostics,
-deliberate breakage): [`WALKTHROUGH.md`](WALKTHROUGH.md).
+`lid-lsp` is bundled inside the extension — nothing else to install.
+
+### CLI + MCP server — macOS / Linux
+
+```sh
+brew tap EtaCassiopeia/lid
+brew install lid
+```
+
+This puts `lidc`, `lid-mcp`, and `lid-lsp` on your `$PATH`.
+
+### CLI + MCP server — Windows
+
+```powershell
+irm https://raw.githubusercontent.com/EtaCassiopeia/lid-tooling/main/install.ps1 | iex
+```
+
+Add `--Mcp` to also install `lid-mcp`.
+
+### One-line install script (Linux / macOS without Homebrew)
+
+```sh
+# lidc only
+curl -fsSL https://raw.githubusercontent.com/EtaCassiopeia/lid-tooling/main/install.sh | bash
+
+# lidc + lid-mcp
+curl -fsSL https://raw.githubusercontent.com/EtaCassiopeia/lid-tooling/main/install.sh | bash -s -- --mcp
+```
+
+### From source
+
+```sh
+cargo install --git https://github.com/EtaCassiopeia/lid-tooling lidc lid-mcp
+```
+
+---
+
+## MCP server configuration
+
+After installing `lid-mcp`, add it to your MCP client:
+
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "lid": { "command": "lid-mcp" }
+  }
+}
+```
+
+**Cursor / VS Code** (`.mcp.json` at project root):
+```json
+{
+  "servers": {
+    "lid": { "type": "stdio", "command": "lid-mcp" }
+  }
+}
+```
+
+---
+
+## Components
+
+| Crate / package | Purpose |
+| --- | --- |
+| `lid-core` | Parsing, model, and coherence checks |
+| `lid-cli` | `lidc` binary — `lidc check`, `lidc init`, CI hook |
+| `lid-lsp` | Language server: hover, definition, references, rename, completion, diagnostics |
+| `lid-mcp` | MCP server: 13 tools for AI agents to read and write LID projects |
+| `extensions/vscode` | VS Code extension bundling `lid-lsp` |
+
+---
 
 ## Build & test
 

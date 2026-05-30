@@ -1,59 +1,70 @@
-# LID — Linked-Intent Development for VS Code
+# LID — Linked-Intent Development
 
-Editor support for the [LID methodology](https://github.com/jszmajda/lid):
-hover, go-to-definition, find references, rename, completion, and
-real-time diagnostics for `@spec` citations and spec definitions.
+> Keep design intent permanently linked to running code.
 
-## Status
+LID ([Linked-Intent Development](https://github.com/jszmajda/lid)) is a lightweight methodology that connects every requirement to the test that proves it is met. This extension brings full LID tooling into VS Code — no separate installs required.
 
-Early development. The extension auto-activates in any workspace
-containing `docs/arrows/index.yaml`.
+## Installation
 
-## Installing the language server
+Search **LID** in the VS Code Extensions panel, or:
 
-The extension shells out to a `lid-lsp` binary. For v0.1 the binary
-isn't bundled inside the `.vsix` — install it once via:
-
-```sh
-cargo install lid-lsp     # crates.io (once published)
-# or, from a clone:
-cargo install --path crates/lid-lsp
+```
+ext install lid-tools.lid
 ```
 
-Then either ensure `lid-lsp` is on your `$PATH`, or point the
-extension at the binary explicitly:
+The language server (`lid-lsp`) is bundled inside the extension — nothing else to install.
 
-```jsonc
-// .vscode/settings.json
-{
-  "lid.serverPath": "/absolute/path/to/lid-lsp"
-}
-```
+## Features
 
-A bundled-binary `.vsix` (one per platform, no separate install
-step) lands in v0.2 once `cargo-dist` produces the per-target
-artifacts.
+### Language Server (LSP)
 
-## Features (planned)
+| Feature | How to trigger |
+|---|---|
+| **Hover** | Point at any `@spec ID` — see the spec text and status |
+| **Go to Definition** | `F12` on a `@spec ID` — jump to the spec line |
+| **Find References** | `Shift+F12` on a spec definition — list every citation |
+| **Rename** | `F2` on a spec ID — atomically renames across the spec file and all `@spec` citations |
+| **Completion** | Type `@spec ` — autocomplete from all known spec IDs |
+| **Diagnostics** | Red squiggles on unknown or mismatched `@spec` references; coverage warnings on spec lines |
 
-- **Hover** — see a spec's text and status by pointing at any
-  `@spec ID` reference; see every citation by pointing at a spec
-  definition.
-- **Go to Definition** — jump from `@spec ID` to the spec line.
-- **Find References** — show every site that cites a spec.
-- **Rename** — atomically rename a spec ID across the spec file and
-  every `@spec` citation.
-- **Completion** — autocomplete spec IDs after `@spec ` or `, `.
-- **Diagnostics** — real-time error for `@spec` references that don't
-  match any defined spec.
+### Intent Navigator
+
+Open the visual segment graph with **LID: Show Intent Navigator** (`Cmd+Shift+P`).
+
+- **Single-click** a node → read-only detail panel (specs, next/drift, dependencies)
+- **Double-click** a node → edit mode: update status, cycle spec status, add specs, edit next/drift prose
+- **+ Segment** button → add a new segment via an overlay form
+- Live-reloads on any file change (manual edit, MCP agent write, or navigator edit)
+
+### CLI integration
+
+**LID: Initialize Project** scaffolds a new LID project (`docs/arrows/index.yaml`, first segment stub, `docs/intent/`) in the current workspace.
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `LID: Show Intent Navigator` | Open the visual segment graph |
+| `LID: Initialize Project` | Scaffold a new LID project in the workspace |
+| `LID: Restart LID Server` | Restart the language server |
+| `LID: Show Output Channel` | Open the LID output panel |
 
 ## Configuration
 
-| Setting | Description |
-| --- | --- |
-| `lid.serverPath` | Absolute path to the `lid-lsp` binary. Empty (default) uses the bundled binary. |
-| `lid.trace.server` | LSP trace level (`off` / `messages` / `verbose`). |
+| Setting | Default | Description |
+|---|---|---|
+| `lid.serverPath` | *(bundled)* | Absolute path to `lid-lsp`. Leave empty to use the bundled binary. |
+| `lid.trace.server` | `off` | LSP trace verbosity: `off` / `messages` / `verbose` |
+
+## Related tools
+
+| Tool | Install | Purpose |
+|---|---|---|
+| `lidc` CLI | `brew install EtaCassiopeia/lid/lid` | CI hook, `lidc check`, `lidc init` |
+| `lid-mcp` server | `brew install EtaCassiopeia/lid/lid` | MCP server for AI agents (Claude, Cursor) |
+
+See the [repository README](https://github.com/EtaCassiopeia/lid-tooling#readme) for full documentation.
 
 ## License
 
-Dual-licensed under MIT OR Apache-2.0.
+MIT OR Apache-2.0
