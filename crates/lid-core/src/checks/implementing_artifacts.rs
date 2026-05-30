@@ -75,7 +75,7 @@ mod tests {
 
     fn make_repo(root: PathBuf, spec_files: Vec<SpecFile>) -> LidRepo {
         LidRepo {
-            root: root.clone(),
+            root,
             index: ArrowIndex {
                 schema_version: 2,
                 last_updated: None,

@@ -309,6 +309,9 @@ mod tests {
 
     #[test]
     fn directory_reference_passes_when_directory_exists() {
+        use crate::model::{ArrowIndex, Segment, SegmentId, Status, Unmapped};
+        use std::collections::BTreeMap;
+        use std::path::PathBuf;
         // Bullets pointing at directories (workspace outputs, skill dirs, site
         // source trees) are valid as long as the directory exists.
         let refs = ArrowReferences {
@@ -319,10 +322,6 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = std::fs::canonicalize(dir.path()).unwrap();
         std::fs::create_dir_all(root.join("plugins/my-skill/workspace/iteration-1")).unwrap();
-
-        use crate::model::{ArrowIndex, Segment, SegmentId, Status, Unmapped};
-        use std::collections::BTreeMap;
-        use std::path::PathBuf;
         let mut arrows = BTreeMap::new();
         arrows.insert(
             SegmentId::parse("auth").unwrap(),
