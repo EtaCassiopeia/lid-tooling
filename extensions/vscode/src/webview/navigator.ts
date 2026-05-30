@@ -61,7 +61,7 @@ const STATUS_COLOR: Record<string, string> = {
     MAPPED:   '#6366F1',
     AUDITED:  '#F59E0B',
     OK:       '#81B29A',
-    MERGED:   '#4B5563',
+    MERGED:   '#14B8A6',
 };
 
 function colorForStatus(status: string): string {
@@ -181,7 +181,7 @@ function render(payload: GraphPayload): void {
             },
             {
                 selector: 'node[?hasNext]',
-                style: { 'border-width': 3, 'border-color': '#6366F1' },
+                style: { 'border-width': 3, 'border-color': '#E07A5F' },
             },
             {
                 selector: 'node[?hasDrift]',

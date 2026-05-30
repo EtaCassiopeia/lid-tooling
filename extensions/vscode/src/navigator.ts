@@ -508,9 +508,9 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
       --accent-coral:  #E07A5F;
       --accent-green:  #81B29A;
       --accent-blue:   #6366F1;
+      --accent-teal:   #14B8A6;
       --accent-yellow: #F59E0B;
       --accent-red:    #EF4444;
-      --accent-purple: #8B5CF6;
       --text-primary:  #FFFFFF;
       --text-secondary:#9CA3AF;
       --text-muted:    #6B7280;
@@ -560,7 +560,7 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
       font-family: var(--font); outline: none;
       transition: border-color .15s;
     }
-    #toolbar select:focus, #toolbar input[type=text]:focus { border-color: var(--accent-blue); }
+    #toolbar select:focus, #toolbar input[type=text]:focus { border-color: var(--accent-coral); }
     #search { width: 140px; }
     .tb-sep { width: 1px; height: 16px; background: var(--border); }
     /* ── Main + graph canvas ── */
@@ -568,8 +568,8 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
     #cy {
       flex: 1; min-width: 0;
       background:
-        linear-gradient(rgba(99,102,241,.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(99,102,241,.06) 1px, transparent 1px),
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px),
         var(--bg-primary);
       background-size: 40px 40px;
     }
@@ -605,7 +605,7 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
     .badge-MAPPED   { background: rgba(99,102,241,.15);  border: 1px solid rgba(99,102,241,.3);  color: #6366F1; }
     .badge-AUDITED  { background: rgba(245,158,11,.15);  border: 1px solid rgba(245,158,11,.3);  color: #F59E0B; }
     .badge-OK       { background: rgba(129,178,154,.15); border: 1px solid rgba(129,178,154,.3); color: #81B29A; }
-    .badge-MERGED   { background: rgba(75,85,99,.15);    border: 1px solid rgba(75,85,99,.3);    color: #6B7280; }
+    .badge-MERGED   { background: rgba(20,184,166,.15);  border: 1px solid rgba(20,184,166,.3);  color: #14B8A6; }
     /* ── Panel sections (card-style) ── */
     .sec {
       margin-top: 8px;
@@ -628,13 +628,13 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
     .btn-open {
       display: block; width: 100%; margin-top: 5px;
       padding: 5px 10px; text-align: left;
-      background: rgba(99,102,241,.1);
-      color: var(--accent-blue);
-      border: 1px solid rgba(99,102,241,.25);
+      background: rgba(224,122,95,.08);
+      color: var(--accent-coral);
+      border: 1px solid rgba(224,122,95,.3);
       border-radius: var(--r-sm); cursor: pointer; font-size: 11px;
       font-family: var(--font); transition: background .15s;
     }
-    .btn-open:hover { background: rgba(99,102,241,.2); }
+    .btn-open:hover { background: rgba(224,122,95,.18); }
     .btn-open:first-child { margin-top: 0; }
     .prose {
       font-size: 11px; line-height: 1.6; color: var(--text-secondary);
@@ -644,13 +644,13 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
     .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
     .chip {
       padding: 2px 9px; border-radius: var(--r-full); font-size: 10px; cursor: pointer;
-      background: rgba(99,102,241,.12);
-      color: var(--accent-blue);
-      border: 1px solid rgba(99,102,241,.25);
+      background: rgba(20,184,166,.1);
+      color: var(--accent-teal);
+      border: 1px solid rgba(20,184,166,.28);
       max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       font-weight: 500; font-family: var(--font); transition: background .15s;
     }
-    .chip:hover { background: rgba(99,102,241,.24); }
+    .chip:hover { background: rgba(20,184,166,.22); }
     /* ── Spec list ── */
     .sec-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
     .spec-toggle { background: none; border: none; font-size: 10px; color: var(--text-muted); cursor: pointer; padding: 0; }
@@ -659,7 +659,7 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
     .si { display: flex; gap: 6px; padding: 3px 0; font-size: 10px; align-items: flex-start; border-bottom: 1px solid rgba(45,51,72,.5); }
     .si:last-child { border-bottom: none; }
     .si-id {
-      font-size: 9px; font-family: var(--mono); color: var(--accent-blue);
+      font-size: 9px; font-family: var(--mono); color: var(--accent-teal);
       background: none; border: none; padding: 0; cursor: pointer;
       text-decoration: none; white-space: nowrap; flex-shrink: 0; font-weight: 500;
     }
@@ -691,7 +691,7 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
       border-radius: var(--r-sm); padding: 4px 8px; font-size: 11px; outline: none;
       font-family: var(--font); box-sizing: border-box; transition: border-color .15s;
     }
-    .edit-select:focus, .edit-textarea:focus, .edit-input:focus { border-color: var(--accent-blue); }
+    .edit-select:focus, .edit-textarea:focus, .edit-input:focus { border-color: var(--accent-coral); }
     .edit-textarea { resize: vertical; min-height: 60px; }
     .btn-save {
       margin-top: 5px; padding: 4px 14px;
@@ -842,11 +842,11 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
       <span class="sw" style="background:#6366F1"></span>MAPPED&nbsp;
       <span class="sw" style="background:#F59E0B"></span>AUDITED&nbsp;
       <span class="sw" style="background:#81B29A"></span>OK&nbsp;
-      <span class="sw" style="background:#4B5563"></span>MERGED
+      <span class="sw" style="background:#14B8A6"></span>MERGED
     </div>
     <div class="leg-row" style="margin-top:3px">
       <span class="sw" style="background:transparent;border:2px solid #F59E0B;border-radius:3px"></span>has drift &nbsp;
-      <span class="sw" style="background:transparent;border:2px solid #6366F1;border-radius:3px"></span>has next
+      <span class="sw" style="background:transparent;border:2px solid #E07A5F;border-radius:3px"></span>has next
     </div>
   </div>
 
