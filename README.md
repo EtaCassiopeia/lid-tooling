@@ -1,5 +1,9 @@
 # lid-tooling
 
+<p align="center">
+  <img src="extensions/vscode/images/lid_tooling_logo.svg" alt="lid-tools logo" width="680"/>
+</p>
+
 Developer tools for the [LID (Linked-Intent Development)](https://github.com/jszmajda/lid) methodology — keep design intent permanently linked to running code.
 
 LID answers one recurring problem: *you know what the code does, but you've lost track of why it exists and whether it still does what the design said it should.* This tooling enforces the link between requirements, design docs, and test citations — in your editor, your CI pipeline, and your AI workflow.
