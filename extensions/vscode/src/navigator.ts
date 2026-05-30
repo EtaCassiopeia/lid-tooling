@@ -88,7 +88,8 @@ type WebviewMessage =
     | { type: 'addSpec'; specFile: string | undefined; segmentId: string; specId: string; text: string }
     | { type: 'updateSegmentStatus'; segmentId: string; newStatus: string }
     | { type: 'updateSegmentMeta'; segmentId: string; next: string; drift: string }
-    | { type: 'addSegment'; segmentId: string; status: string; detail: string };
+    | { type: 'addSegment'; segmentId: string; status: string; detail: string; blocks: string[]; children: string[] }
+    | { type: 'removeConnection'; kind: 'blocks' | 'blockedBy' | 'children' | 'parent'; segmentId: string; target: string };
 
 // ── NavigatorPanel ────────────────────────────────────────────────────────────
 
@@ -218,8 +219,17 @@ export class NavigatorPanel {
                 });
                 this._postMutationResult(true, `Segment ${msg.segmentId} metadata saved`);
             } else if (msg.type === 'addSegment') {
-                await this._updateIndexEntry(msg.segmentId, { status: msg.status, detail: msg.detail }, true);
+                const entry: Partial<ArrowEntry> = { status: msg.status, detail: msg.detail };
+                if (msg.blocks.length)   { entry.blocks   = msg.blocks; }
+                if (msg.children.length) { entry.children = msg.children; }
+                await this._updateIndexEntry(msg.segmentId, entry, true);
+                for (const child of msg.children) {
+                    await this._updateIndexEntry(child, { parent: msg.segmentId });
+                }
                 this._postMutationResult(true, `Segment ${msg.segmentId} added`);
+            } else if (msg.type === 'removeConnection') {
+                await this._removeConnection(msg.kind, msg.segmentId, msg.target);
+                this._postMutationResult(true, 'Connection removed');
             }
         } catch (err: unknown) {
             this._postMutationResult(false, String(err));
@@ -306,6 +316,40 @@ export class NavigatorPanel {
 
     private _indexEntry(segmentId: string): ArrowEntry | undefined {
         return this._loadIndex().arrows?.[segmentId];
+    }
+
+    private async _removeConnection(
+        kind: 'blocks' | 'blockedBy' | 'children' | 'parent',
+        segmentId: string,
+        target: string,
+    ): Promise<void> {
+        if (kind === 'blocks') {
+            const entry = this._indexEntry(segmentId);
+            const next = (entry?.blocks ?? []).filter(b => b !== target);
+            await this._updateIndexEntry(segmentId, { blocks: next.length ? next : undefined });
+        } else if (kind === 'blockedBy') {
+            // segmentId is blocked by target → remove segmentId from target.blocks[]
+            const entry = this._indexEntry(target);
+            const next = (entry?.blocks ?? []).filter(b => b !== segmentId);
+            await this._updateIndexEntry(target, { blocks: next.length ? next : undefined });
+        } else if (kind === 'children') {
+            const entry = this._indexEntry(segmentId);
+            const next = (entry?.children ?? []).filter(c => c !== target);
+            await this._updateIndexEntry(segmentId, { children: next.length ? next : undefined });
+            const child = this._indexEntry(target);
+            if (child?.parent === segmentId) {
+                await this._updateIndexEntry(target, { parent: undefined });
+            }
+        } else if (kind === 'parent') {
+            // clear segmentId from target.children[]
+            const parentEntry = this._indexEntry(target);
+            const next = (parentEntry?.children ?? []).filter(c => c !== segmentId);
+            await this._updateIndexEntry(target, { children: next.length ? next : undefined });
+            const entry = this._indexEntry(segmentId);
+            if (entry?.parent === target) {
+                await this._updateIndexEntry(segmentId, { parent: undefined });
+            }
+        }
     }
 
     private _buildSpecInfo(): Map<string, SpecInfo> {
@@ -716,6 +760,15 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
     .add-spec-row { display: flex; gap: 4px; margin-top: 4px; }
     .add-spec-row .edit-input { flex: 1; }
     .add-spec-err { font-size: 10px; color: #F87171; margin-top: 3px; min-height: 14px; }
+    /* ── Removable chips ── */
+    .chip-rm { display: inline-flex; align-items: center; }
+    .chip-x {
+      display: none; background: none; border: none; padding: 0 0 0 4px;
+      color: #F87171; cursor: pointer; font-size: 13px; font-weight: 700;
+      line-height: 1; flex-shrink: 0;
+    }
+    .chip-rm:hover .chip-x { display: inline; }
+    .picker-chips { display: flex; flex-wrap: wrap; gap: 4px; min-height: 20px; margin-bottom: 4px; }
     /* ── Add-segment overlay ── */
     #add-seg-overlay {
       display: none; position: fixed; inset: 0;
@@ -727,7 +780,7 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
     #add-seg-box {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: var(--r-md); padding: 20px; width: 340px;
+      border-radius: var(--r-md); padding: 20px; width: 380px;
       box-shadow: 0 20px 40px rgba(0,0,0,.6);
     }
     #add-seg-box h3 { font-size: 14px; margin-bottom: 16px; color: var(--text-primary); font-weight: 600; }
@@ -872,6 +925,20 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
       <div class="seg-field">
         <label>Detail path (relative to docs/arrows/)</label>
         <input class="edit-input" id="seg-detail-input" placeholder="billing/core.md">
+      </div>
+      <div class="seg-field">
+        <label>Blocks (optional)</label>
+        <div class="picker-chips" id="seg-blocks-chips"></div>
+        <select class="edit-select" id="seg-blocks-select">
+          <option value="">— add segment —</option>
+        </select>
+      </div>
+      <div class="seg-field">
+        <label>Children (optional)</label>
+        <div class="picker-chips" id="seg-children-chips"></div>
+        <select class="edit-select" id="seg-children-select">
+          <option value="">— add segment —</option>
+        </select>
       </div>
       <div id="seg-add-err"></div>
       <div class="seg-field-row">
