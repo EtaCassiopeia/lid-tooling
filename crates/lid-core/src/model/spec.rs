@@ -33,6 +33,24 @@ pub enum SpecStatus {
     Deferred,
 }
 
+impl SpecStatus {
+    /// Return the canonical lowercase string matching the serde representation.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Implemented => "implemented",
+            Self::Open => "open",
+            Self::Deferred => "deferred",
+        }
+    }
+}
+
+impl std::fmt::Display for SpecStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// One requirement line inside a spec file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SpecLine {
@@ -65,6 +83,20 @@ pub struct SpecFile {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spec_status_as_str_matches_serde() {
+        for v in [
+            SpecStatus::Implemented,
+            SpecStatus::Open,
+            SpecStatus::Deferred,
+        ] {
+            let serde_form = serde_json::to_string(&v).unwrap();
+            let serde_str = serde_form.trim_matches('"');
+            assert_eq!(v.as_str(), serde_str);
+            assert_eq!(v.to_string(), serde_str);
+        }
+    }
 
     #[test]
     fn spec_status_serializes_lowercase() {

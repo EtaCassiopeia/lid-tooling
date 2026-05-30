@@ -149,6 +149,20 @@ fn cmd_init(root: Option<&Path>, args: &InitArgs) -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+fn discover_repo(root: Option<&Path>) -> Result<LidRepo> {
+    let start = match root {
+        Some(p) => p.to_path_buf(),
+        None => std::env::current_dir().context("reading the current directory")?,
+    };
+    LidRepo::discover(&start).map_err(|e| match e {
+        e @ LidError::UnsupportedSchemaVersion { .. } => anyhow::Error::from(e),
+        other => anyhow::Error::from(other).context(format!(
+            "discovering a LID repo at or above {}",
+            start.display()
+        )),
+    })
+}
+
 fn cmd_check(root: Option<&Path>, as_json: bool, args: &CheckArgs) -> Result<ExitCode> {
     let only = parse_only(&args.only)?;
     let fail_threshold: Severity = args
@@ -156,18 +170,7 @@ fn cmd_check(root: Option<&Path>, as_json: bool, args: &CheckArgs) -> Result<Exi
         .parse()
         .map_err(|e: String| anyhow!("invalid --fail-on value: {e}"))?;
 
-    let start = match root {
-        Some(p) => p.to_path_buf(),
-        None => std::env::current_dir().context("reading the current directory")?,
-    };
-
-    let repo = LidRepo::discover(&start).map_err(|e| match e {
-        e @ LidError::UnsupportedSchemaVersion { .. } => anyhow::Error::from(e),
-        other => anyhow::Error::from(other).context(format!(
-            "discovering a LID repo at or above {}",
-            start.display()
-        )),
-    })?;
+    let repo = discover_repo(root)?;
 
     let mut findings = Vec::new();
     for check in checks::default_checks() {
@@ -197,22 +200,11 @@ fn cmd_check(root: Option<&Path>, as_json: bool, args: &CheckArgs) -> Result<Exi
 }
 
 fn cmd_status(root: Option<&Path>, as_json: bool) -> Result<ExitCode> {
-    let start = match root {
-        Some(p) => p.to_path_buf(),
-        None => std::env::current_dir().context("reading the current directory")?,
-    };
-
-    let repo = LidRepo::discover(&start).map_err(|e| match e {
-        e @ LidError::UnsupportedSchemaVersion { .. } => anyhow::Error::from(e),
-        other => anyhow::Error::from(other).context(format!(
-            "discovering a LID repo at or above {}",
-            start.display()
-        )),
-    })?;
+    let repo = discover_repo(root)?;
 
     let mut by_status: BTreeMap<String, usize> = BTreeMap::new();
     for seg in repo.index.arrows.values() {
-        let key = format!("{:?}", seg.status).to_uppercase();
+        let key = seg.status.as_str().to_owned();
         *by_status.entry(key).or_default() += 1;
     }
     let total_segments = repo.index.arrows.len();

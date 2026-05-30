@@ -43,7 +43,7 @@ pub async fn lid_list_specs(
         })
         .map(|(path, sl)| SpecEntry {
             id: sl.id.to_string(),
-            status: format!("{:?}", sl.status),
+            status: sl.status.to_string(),
             text: sl.text.clone(),
             file: path.to_string_lossy().into_owned(),
         })

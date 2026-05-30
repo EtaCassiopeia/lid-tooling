@@ -30,6 +30,25 @@ pub enum CitationKind {
     Other,
 }
 
+impl CitationKind {
+    /// Return the canonical lowercase string matching the serde representation.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Code => "code",
+            Self::Test => "test",
+            Self::Spec => "spec",
+            Self::Other => "other",
+        }
+    }
+}
+
+impl std::fmt::Display for CitationKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// One occurrence of `@spec SPEC-ID` in some file.
 ///
 /// A single line in a source file may produce *multiple* citations when
@@ -60,6 +79,21 @@ mod tests {
         let json = serde_json::to_string(&cite).unwrap();
         let back: SpecCitation = serde_json::from_str(&json).unwrap();
         assert_eq!(back, cite);
+    }
+
+    #[test]
+    fn citation_kind_as_str_matches_serde() {
+        for (k, _) in [
+            (CitationKind::Code, "\"code\""),
+            (CitationKind::Test, "\"test\""),
+            (CitationKind::Spec, "\"spec\""),
+            (CitationKind::Other, "\"other\""),
+        ] {
+            let serde_form = serde_json::to_string(&k).unwrap();
+            let serde_str = serde_form.trim_matches('"');
+            assert_eq!(k.as_str(), serde_str);
+            assert_eq!(k.to_string(), serde_str);
+        }
     }
 
     #[test]

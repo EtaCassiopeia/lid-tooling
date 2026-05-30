@@ -14,6 +14,46 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::LidError;
 
+/// Generates the five boilerplate trait impls shared by every validated
+/// ID newtype: `as_str`, `Display`, `FromStr`, `AsRef<str>`, `Deserialize`.
+macro_rules! impl_id_boilerplate {
+    ($T:ident) => {
+        impl $T {
+            /// Borrow the underlying string slice.
+            #[must_use]
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+        }
+
+        impl fmt::Display for $T {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(&self.0)
+            }
+        }
+
+        impl FromStr for $T {
+            type Err = LidError;
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                Self::parse(s)
+            }
+        }
+
+        impl AsRef<str> for $T {
+            fn as_ref(&self) -> &str {
+                &self.0
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $T {
+            fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+                let s = String::deserialize(d)?;
+                Self::parse(&s).map_err(serde::de::Error::custom)
+            }
+        }
+    };
+}
+
 /// Anchored pattern for a syntactically valid spec ID.
 ///
 /// Shape: one uppercase letter, optionally followed by uppercase letters or
@@ -71,39 +111,9 @@ impl SpecId {
         }
         Ok(Self(value.to_owned()))
     }
-
-    /// Borrow the underlying string slice.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
 }
 
-impl fmt::Display for SpecId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl FromStr for SpecId {
-    type Err = LidError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::parse(s)
-    }
-}
-
-impl AsRef<str> for SpecId {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl<'de> Deserialize<'de> for SpecId {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(d)?;
-        Self::parse(&s).map_err(serde::de::Error::custom)
-    }
-}
+impl_id_boilerplate!(SpecId);
 
 /// A git SHA-1 hash in its short or full lowercase-hex form (7..=40 chars).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
@@ -125,39 +135,9 @@ impl GitSha {
         }
         Ok(Self(value.to_owned()))
     }
-
-    /// Borrow the underlying string slice.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
 }
 
-impl fmt::Display for GitSha {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl FromStr for GitSha {
-    type Err = LidError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::parse(s)
-    }
-}
-
-impl AsRef<str> for GitSha {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl<'de> Deserialize<'de> for GitSha {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(d)?;
-        Self::parse(&s).map_err(serde::de::Error::custom)
-    }
-}
+impl_id_boilerplate!(GitSha);
 
 /// A LID arrow-segment name such as `linked-intent-dev` or `arrow-maintenance`.
 ///
@@ -183,39 +163,9 @@ impl SegmentId {
         }
         Ok(Self(value.to_owned()))
     }
-
-    /// Borrow the underlying string slice.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
 }
 
-impl fmt::Display for SegmentId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl FromStr for SegmentId {
-    type Err = LidError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::parse(s)
-    }
-}
-
-impl AsRef<str> for SegmentId {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl<'de> Deserialize<'de> for SegmentId {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(d)?;
-        Self::parse(&s).map_err(serde::de::Error::custom)
-    }
-}
+impl_id_boilerplate!(SegmentId);
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]

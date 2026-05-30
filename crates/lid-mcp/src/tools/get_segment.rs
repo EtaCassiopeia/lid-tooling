@@ -63,14 +63,14 @@ pub async fn lid_get_segment(
         .filter(|sl| sl.id.as_ref().starts_with(&prefix))
         .map(|sl| SpecSummary {
             id: sl.id.to_string(),
-            status: format!("{:?}", sl.status),
+            status: sl.status.to_string(),
             text: sl.text.clone(),
         })
         .collect();
 
     let detail = SegmentDetail {
         id: seg_id.clone(),
-        status: format!("{:?}", seg.status),
+        status: seg.status.to_string(),
         next: seg.next.clone(),
         drift: seg.drift.clone(),
         blocks: seg.blocks.iter().map(ToString::to_string).collect(),

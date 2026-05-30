@@ -41,7 +41,7 @@ pub async fn lid_search(registry: &RepoRegistry, input: SearchInput) -> Result<S
         if id.as_ref().to_lowercase().contains(&q) {
             hits.push(SearchHit::Segment {
                 id: id.to_string(),
-                status: format!("{:?}", seg.status),
+                status: seg.status.to_string(),
             });
         }
     }
@@ -51,7 +51,7 @@ pub async fn lid_search(registry: &RepoRegistry, input: SearchInput) -> Result<S
             if sl.id.as_ref().to_lowercase().contains(&q) || sl.text.to_lowercase().contains(&q) {
                 hits.push(SearchHit::Spec {
                     id: sl.id.to_string(),
-                    status: format!("{:?}", sl.status),
+                    status: sl.status.to_string(),
                     text: sl.text.clone(),
                     file: sf.path.to_string_lossy().into_owned(),
                 });
