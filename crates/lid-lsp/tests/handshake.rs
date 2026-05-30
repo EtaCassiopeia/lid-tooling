@@ -68,10 +68,11 @@ where
         .spawn()
         .expect("spawn lid-lsp");
 
-    let mut stdin  = child.stdin.take().unwrap();
+    let mut stdin = child.stdin.take().unwrap();
     let mut stdout = child.stdout.take().unwrap();
 
-    let initialize  = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}"#;
+    let initialize =
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}"#;
     let initialized = r#"{"jsonrpc":"2.0","method":"initialized","params":{}}"#;
     stdin.write_all(&frame(initialize)).unwrap();
     let _ = read_response_for_id(&mut stdout, "\"id\":1");
@@ -80,7 +81,7 @@ where
     test_body(&mut stdin, &mut stdout);
 
     let shutdown = r#"{"jsonrpc":"2.0","id":99,"method":"shutdown"}"#;
-    let exit     = r#"{"jsonrpc":"2.0","method":"exit"}"#;
+    let exit = r#"{"jsonrpc":"2.0","method":"exit"}"#;
     stdin.write_all(&frame(shutdown)).unwrap();
     let shutdown_response = read_response_for_id(&mut stdout, "\"id\":99");
     assert!(
@@ -109,18 +110,19 @@ fn server_responds_to_initialize_and_shutdown() {
             .spawn()
             .expect("spawn lid-lsp");
 
-        let mut stdin  = child.stdin.take().unwrap();
+        let mut stdin = child.stdin.take().unwrap();
         let mut stdout = child.stdout.take().unwrap();
 
-        let initialize  = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}"#;
+        let initialize =
+            r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}"#;
         let initialized = r#"{"jsonrpc":"2.0","method":"initialized","params":{}}"#;
-        let shutdown    = r#"{"jsonrpc":"2.0","id":2,"method":"shutdown"}"#;
-        let exit        = r#"{"jsonrpc":"2.0","method":"exit"}"#;
+        let shutdown = r#"{"jsonrpc":"2.0","id":2,"method":"shutdown"}"#;
+        let exit = r#"{"jsonrpc":"2.0","method":"exit"}"#;
 
         stdin.write_all(&frame(initialize)).unwrap();
         stdin.write_all(&frame(initialized)).unwrap();
 
-        let init_response     = read_response_for_id(&mut stdout, "\"id\":1");
+        let init_response = read_response_for_id(&mut stdout, "\"id\":1");
         stdin.write_all(&frame(shutdown)).unwrap();
         let shutdown_response = read_response_for_id(&mut stdout, "\"id\":2");
 
@@ -136,9 +138,8 @@ fn server_responds_to_initialize_and_shutdown() {
         .recv_timeout(Duration::from_secs(30))
         .expect("timeout: server did not complete handshake within 30 s");
 
-    let (init_response, shutdown_response) = responses
-        .split_once('\n')
-        .expect("expected two responses");
+    let (init_response, shutdown_response) =
+        responses.split_once('\n').expect("expected two responses");
 
     assert!(
         init_response.contains("\"result\""),
