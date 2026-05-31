@@ -17,6 +17,7 @@ sealed class NavigatorMessage {
         val segmentId: String,
         val specId: String,
         val text: String,
+        val specPrefix: String? = null,
     ) : NavigatorMessage()
     data class UpdateSegmentStatus(val segmentId: String, val newStatus: String) : NavigatorMessage()
     data class UpdateSegmentMeta(val segmentId: String, val next: String, val drift: String) : NavigatorMessage()
@@ -53,6 +54,7 @@ fun parseMessage(json: String): NavigatorMessage {
             obj.get("segmentId").asString,
             obj.get("specId").asString,
             obj.get("text").asString,
+            obj.get("specPrefix")?.takeUnless { it.isJsonNull }?.asString,
         )
         "updateSegmentStatus" -> NavigatorMessage.UpdateSegmentStatus(
             obj.get("segmentId").asString,

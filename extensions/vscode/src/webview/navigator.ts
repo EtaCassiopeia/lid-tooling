@@ -627,7 +627,7 @@ panelBody.addEventListener('click', (e) => {
         if (!valid) { if (errSpan) errSpan.textContent = `Must start with ${prefix}- and include a digit`; return; }
         if (!text)  { if (errSpan) errSpan.textContent = 'Text is required'; return; }
         if (errSpan) errSpan.textContent = '';
-        vscode.postMessage({ type: 'addSpec', specFile: currentPanelNode.specFile, segmentId: currentPanelNode.id, specId, text });
+        vscode.postMessage({ type: 'addSpec', specFile: currentPanelNode.specFile, segmentId: currentPanelNode.id, specId, text, specPrefix: currentPanelNode.specPrefix });
         if (specIdInput) specIdInput.value = '';
         if (specTextInput) specTextInput.value = '';
         panelBody.querySelector<HTMLElement>('#add-spec-form')?.classList.remove('open');

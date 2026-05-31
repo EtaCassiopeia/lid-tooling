@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use lid_core::model::{SpecId, SpecStatus};
 use lid_core::parse::markdown;
@@ -111,9 +111,37 @@ pub async fn lid_add_spec(
         .join(&seg)
         .join(format!("{seg}-specs.md"));
 
-    append_spec_line(&specs_path, &input.spec_id, &input.text)
-        .await
-        .map_err(ErrorData::from)?;
+    // Validate prefix when the spec file already exists and declares one.
+    let declared_prefix = {
+        let repo = handle.read().await;
+        let specs_rel = PathBuf::from("docs")
+            .join("intent")
+            .join(&seg)
+            .join(format!("{seg}-specs.md"));
+        repo.specs
+            .iter()
+            .find(|sf| sf.path == specs_rel)
+            .and_then(|sf| sf.prefix.clone())
+    };
+    if let Some(ref prefix) = declared_prefix {
+        let expected = format!("{prefix}-");
+        if !input.spec_id.starts_with(&expected) {
+            return Err(ErrorData::from(McpToolError::InvalidSpecId(format!(
+                "spec ID {} does not start with declared prefix {}",
+                input.spec_id, prefix
+            ))));
+        }
+    }
+
+    let derived_prefix = declared_prefix.or_else(|| derive_prefix_from_id(&input.spec_id));
+    append_spec_line(
+        &specs_path,
+        &input.spec_id,
+        &input.text,
+        derived_prefix.as_deref(),
+    )
+    .await
+    .map_err(ErrorData::from)?;
 
     let rediscover_error = registry.rediscover(Path::new(&input.project_root)).await;
 
@@ -146,7 +174,12 @@ async fn rewrite_spec_status(
     atomic_write(path, &updated).await
 }
 
-async fn append_spec_line(path: &Path, spec_id: &str, text: &str) -> Result<(), McpToolError> {
+async fn append_spec_line(
+    path: &Path,
+    spec_id: &str,
+    text: &str,
+    prefix: Option<&str>,
+) -> Result<(), McpToolError> {
     let line = format!("- [ ] **{spec_id}**: {text}\n");
     if path.exists() {
         let mut existing = tokio::fs::read_to_string(path).await?;
@@ -164,8 +197,19 @@ async fn append_spec_line(path: &Path, spec_id: &str, text: &str) -> Result<(), 
             .and_then(|s| s.to_str())
             .unwrap_or("segment")
             .trim_end_matches("-specs");
-        let header = format!("# {seg} specs\n\n");
+        let frontmatter = prefix.map_or(String::new(), |p| format!("---\nprefix: {p}\n---\n\n"));
+        let header = format!("{frontmatter}# {seg} specs\n\n");
         atomic_write(path, &(header + &line)).await
+    }
+}
+
+fn derive_prefix_from_id(spec_id: &str) -> Option<String> {
+    let last = spec_id.rfind('-')?;
+    let last_seg = &spec_id[last + 1..];
+    if !last_seg.is_empty() && last_seg.chars().all(|c| c.is_ascii_digit()) {
+        Some(spec_id[..last].to_owned())
+    } else {
+        None
     }
 }
 

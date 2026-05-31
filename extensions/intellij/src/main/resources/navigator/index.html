@@ -638,7 +638,7 @@ panelBody.addEventListener('click', function(e) {
     if (!valid) { if (errSpan) errSpan.textContent = 'Must start with ' + prefix + '- and include a digit'; return; }
     if (!text)  { if (errSpan) errSpan.textContent = 'Text is required'; return; }
     if (errSpan) errSpan.textContent = '';
-    window.__lidPostMessage({ type: 'addSpec', specFile: currentNode.specFile || null, segmentId: currentNode.id, specId: specId, text: text });
+    window.__lidPostMessage({ type: 'addSpec', specFile: currentNode.specFile || null, segmentId: currentNode.id, specId: specId, text: text, specPrefix: currentNode.specPrefix || null });
     if (specIdInput) specIdInput.value = '';
     if (specTextInput) specTextInput.value = '';
     panelBody.querySelector('#add-spec-form') && panelBody.querySelector('#add-spec-form').classList.remove('open');
