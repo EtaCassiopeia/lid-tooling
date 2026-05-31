@@ -12,21 +12,17 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import * as yaml from 'js-yaml';
 
+import {
+    type ArrowEntry,
+    buildScaffoldContents,
+    buildSegmentBlock,
+    insertIntoArrows,
+    patchSegmentField,
+} from './lib/index-yaml';
+
 const VIEW_TYPE = 'lid.intentNavigator';
 
 // ── Shared types (must stay in sync with src/webview/navigator.ts) ───────────
-
-interface ArrowEntry {
-    status?: string;
-    detail?: string;
-    blocks?: string[];
-    children?: string[];
-    parent?: string;
-    next?: string;
-    drift?: string;
-    sampled?: string;
-    audited?: string;
-}
 
 interface ArrowIndex {
     arrows?: Record<string, ArrowEntry>;
@@ -302,49 +298,32 @@ export class NavigatorPanel {
     }
 
     private async _scaffoldSegment(segmentId: string, detail: string, specPrefix: string): Promise<void> {
-        const intentDir = vscode.Uri.file(path.join(this._workspaceRoot, 'docs', 'intent', segmentId));
+        const contents = buildScaffoldContents(segmentId, detail, specPrefix);
+        const root = this._workspaceRoot;
+
+        const intentDir = vscode.Uri.file(path.join(root, 'docs', 'intent', segmentId));
         await vscode.workspace.fs.createDirectory(intentDir);
 
-        const specsUri = vscode.Uri.file(path.join(intentDir.fsPath, `${segmentId}-specs.md`));
+        const specsUri = vscode.Uri.file(path.join(root, contents.specsPath));
         let specsExists = true;
         try { await vscode.workspace.fs.stat(specsUri); } catch { specsExists = false; }
         if (!specsExists) {
-            await vscode.workspace.fs.writeFile(
-                specsUri,
-                Buffer.from(`---\nprefix: ${specPrefix}\n---\n\n# ${segmentId} specs\n`),
-            );
+            await vscode.workspace.fs.writeFile(specsUri, Buffer.from(contents.specsContent));
         }
 
-        const designUri = vscode.Uri.file(path.join(intentDir.fsPath, `${segmentId}-design.md`));
+        const designUri = vscode.Uri.file(path.join(root, contents.designPath));
         let designExists = true;
         try { await vscode.workspace.fs.stat(designUri); } catch { designExists = false; }
         if (!designExists) {
-            await vscode.workspace.fs.writeFile(
-                designUri,
-                Buffer.from(
-                    `# ${segmentId} design\n\n` +
-                    `## Overview\n\n` +
-                    `<!-- Describe the design for ${segmentId} here. -->\n\n` +
-                    `## Decisions\n`,
-                ),
-            );
+            await vscode.workspace.fs.writeFile(designUri, Buffer.from(contents.designContent));
         }
 
-        // Create arrow doc stub only if the detail file doesn't already exist.
-        const arrowUri = vscode.Uri.file(path.join(this._workspaceRoot, 'docs', 'arrows', detail));
+        const arrowUri = vscode.Uri.file(path.join(root, contents.arrowPath));
         let arrowExists = true;
         try { await vscode.workspace.fs.stat(arrowUri); } catch { arrowExists = false; }
         if (!arrowExists) {
             await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(arrowUri.fsPath)));
-            const title = segmentId.replace(/-/g, ' ');
-            await vscode.workspace.fs.writeFile(
-                arrowUri,
-                Buffer.from(
-                    `# ${title}\n\n## Overview\n\n<!-- Describe the ${segmentId} segment here. -->\n\n` +
-                    `## References\n\n### LLD\n- \`docs/intent/${segmentId}/${segmentId}-design.md\`\n\n` +
-                    `### EARS\n- \`docs/intent/${segmentId}/${segmentId}-specs.md\`\n`,
-                ),
-            );
+            await vscode.workspace.fs.writeFile(arrowUri, Buffer.from(contents.arrowContent));
         }
     }
 
@@ -620,90 +599,6 @@ export class NavigatorPanelSerializer implements vscode.WebviewPanelSerializer {
     }
 }
 
-// ── YAML helpers ─────────────────────────────────────────────────────────────
-
-/**
- * Serialise a new segment entry as indented YAML lines (no trailing newline).
- * Keeps array values inline (`[a, b]`) to match the usual index.yaml style.
- */
-function buildSegmentBlock(segmentId: string, entry: Partial<ArrowEntry>): string {
-    const lines: string[] = [`  ${segmentId}:`];
-    const FIELD_ORDER: ReadonlyArray<keyof ArrowEntry> = [
-        'status', 'detail', 'parent', 'blocks', 'children',
-        'sampled', 'audited', 'next', 'drift',
-    ];
-    for (const k of FIELD_ORDER) {
-        const v = entry[k];
-        if (v === undefined || v === null) { continue; }
-        if (Array.isArray(v)) {
-            if (v.length === 0) { continue; }
-            lines.push(`    ${k}: [${v.join(', ')}]`);
-        } else if (typeof v === 'string') {
-            // Quote strings that contain YAML-special characters.
-            const needsQuote = /[:#[\]{}|>&*!,?@`]/.test(v) || v.trim() !== v;
-            lines.push(`    ${k}: ${needsQuote ? JSON.stringify(v) : v}`);
-        } else {
-            lines.push(`    ${k}: ${String(v)}`);
-        }
-    }
-    return lines.join('\n');
-}
-
-/**
- * Insert `block` (a multi-line segment entry, no trailing newline) into the
- * `arrows:` section of `content`, immediately before the first top-level key
- * that follows the section.  If the file ends with the arrows section, appends.
- */
-function insertIntoArrows(content: string, block: string): string {
-    const lines = content.split('\n');
-    let insertAt = lines.length;
-    let inArrows = false;
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]!;
-        if (/^arrows:/.test(line)) { inArrows = true; continue; }
-        // A non-empty line with no leading whitespace after arrows: is the next top-level key.
-        if (inArrows && line.length > 0 && !/^\s/.test(line)) {
-            insertAt = i;
-            break;
-        }
-    }
-    return [...lines.slice(0, insertAt), block, ...lines.slice(insertAt)].join('\n');
-}
-
-/**
- * Add or replace a scalar field on an existing segment entry without
- * touching any other part of the file.  If the field already exists on that
- * segment it is replaced; if it doesn't exist it is appended after the last
- * field of that segment.
- */
-function patchSegmentField(content: string, segmentId: string, field: string, value: string): string {
-    const lines = content.split('\n');
-    // Find the segment header line (e.g. "  auth:").
-    const headerRe = new RegExp(`^  ${segmentId}:\\s*$`);
-    let headerIdx = -1;
-    for (let i = 0; i < lines.length; i++) {
-        if (headerRe.test(lines[i]!)) { headerIdx = i; break; }
-    }
-    if (headerIdx === -1) { return content; }
-
-    // Find the extent of this segment's block (4-space-indented lines after header).
-    let end = headerIdx + 1;
-    while (end < lines.length) {
-        const l = lines[end]!;
-        if (l.length > 0 && !/^    /.test(l)) { break; }
-        end++;
-    }
-
-    const fieldRe = new RegExp(`^    ${field}:`);
-    const newLine = `    ${field}: ${value}`;
-    const existingIdx = lines.findIndex((l, i) => i > headerIdx && i < end && fieldRe.test(l));
-    if (existingIdx !== -1) {
-        lines[existingIdx] = newLine;
-    } else {
-        lines.splice(end, 0, newLine);
-    }
-    return lines.join('\n');
-}
 
 // ── HTML builder ──────────────────────────────────────────────────────────────
 

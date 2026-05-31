@@ -261,3 +261,172 @@ async fn add_segment_and_update_status() {
     assert!(content.contains("billing:"));
     assert!(content.contains("MAPPED"));
 }
+
+// Realistic index.yaml fixture: dates, comments, inline arrays, taxonomy.
+// Mirrors the structure of crates/lid-cli/tests/fixtures/urlshort/docs/arrows/index.yaml.
+const REALISTIC_INDEX: &str = "\
+schema_version: 2
+last_updated: 2026-05-29
+
+taxonomy:
+  infrastructure: [storage, auth]
+  domain: [shortener-core]
+
+arrows:
+  # ── Storage layer ────────────────────────────────────────────────────────────
+  storage:
+    status: MAPPED
+    sampled: 2026-04-10
+    audited: 2026-04-15
+    detail: storage.md
+    blocks: [shortener-core]
+    children: [in-memory-store]
+    next: \"provision Redis cluster; promote redis-store to MAPPED after infrastructure is ready\"
+
+  in-memory-store:
+    status: OK
+    parent: storage
+    audited: 2026-04-22
+    detail: storage/in-memory-store.md
+
+  # ── Domain layer ─────────────────────────────────────────────────────────────
+  shortener-core:
+    status: MAPPED
+    sampled: 2026-04-20
+    detail: shortener-core.md
+
+  auth:
+    status: UNMAPPED
+    detail: auth.md
+    blocks: [shortener-core]
+    next: \"implement HMAC-SHA256 API-key middleware\"
+
+unmapped:
+  docs:
+    intent: []
+";
+
+#[tokio::test]
+#[allow(clippy::too_many_lines)]
+async fn add_segment_does_not_reformat_realistic_yaml() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("docs/arrows")).unwrap();
+    fs::create_dir_all(dir.path().join("docs/intent/auth")).unwrap();
+    fs::write(dir.path().join("docs/arrows/index.yaml"), REALISTIC_INDEX).unwrap();
+    fs::write(
+        dir.path().join("docs/intent/auth/auth-specs.md"),
+        "---\nprefix: USH-AUTH\n---\n- [ ] **USH-AUTH-001**: the system shall authenticate users.\n",
+    )
+    .unwrap();
+
+    let root = dir.path().to_string_lossy().into_owned();
+    let registry = RepoRegistry::new();
+    tools::discover::lid_discover(
+        &registry,
+        tools::discover::DiscoverInput { path: root.clone() },
+    )
+    .await
+    .unwrap();
+
+    tools::write_segment::lid_add_segment(
+        &registry,
+        tools::write_segment::AddSegmentInput {
+            project_root: root.clone(),
+            segment_id: "billing".to_owned(),
+            status: "UNMAPPED".to_owned(),
+            detail: "billing/core.md".to_owned(),
+            blocks: vec![],
+            children: vec![],
+            spec_prefix: Some("USH-BILL".to_owned()),
+        },
+    )
+    .await
+    .unwrap();
+
+    let after = fs::read_to_string(dir.path().join("docs/arrows/index.yaml")).unwrap();
+
+    // New segment appears exactly once.
+    assert_eq!(
+        after.matches("billing:").count(),
+        1,
+        "segment header should appear once"
+    );
+
+    // No spurious fields injected by a full round-trip.
+    assert!(
+        !after.contains("blockedBy"),
+        "blockedBy should not appear after add"
+    );
+    assert!(
+        !after.contains("blocks: []"),
+        "empty blocks should not be serialised"
+    );
+    assert!(
+        !after.contains("children: []"),
+        "empty children should not be serialised"
+    );
+
+    // Dates must remain as bare strings, not ISO timestamps.
+    assert!(
+        after.contains("sampled: 2026-04-10"),
+        "sampled date must not be coerced"
+    );
+    assert!(
+        after.contains("audited: 2026-04-15"),
+        "audited date must not be coerced"
+    );
+    assert!(
+        !after.contains("T00:00:00"),
+        "dates must not become ISO timestamps"
+    );
+
+    // Comments must be preserved.
+    assert!(
+        after.contains("# ── Storage layer"),
+        "section comments must be preserved"
+    );
+    assert!(
+        after.contains("# ── Domain layer"),
+        "section comments must be preserved"
+    );
+
+    // Inline arrays must stay inline.
+    assert!(
+        after.contains("blocks: [shortener-core]"),
+        "inline arrays must stay inline after add"
+    );
+    assert!(
+        after.contains("children: [in-memory-store]"),
+        "inline arrays must stay inline after add"
+    );
+    assert!(
+        after.contains("infrastructure: [storage, auth]"),
+        "taxonomy inline arrays must stay inline"
+    );
+
+    // Every original line must still be present.
+    for line in REALISTIC_INDEX.lines() {
+        assert!(
+            after.contains(line),
+            "original line missing after add: {line:?}"
+        );
+    }
+
+    // Scaffold files must be created.
+    assert!(
+        dir.path()
+            .join("docs/intent/billing/billing-specs.md")
+            .exists(),
+        "specs.md must be created"
+    );
+    assert!(
+        dir.path()
+            .join("docs/intent/billing/billing-design.md")
+            .exists(),
+        "design.md must be created"
+    );
+    assert!(
+        dir.path().join("docs/arrows/billing/core.md").exists(),
+        "arrow doc must be created"
+    );
+}

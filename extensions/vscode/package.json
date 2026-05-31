@@ -118,6 +118,8 @@
     "compile": "tsc -p ./ --noEmit && npm run build:extension && npm run build:webview",
     "watch": "tsc -watch -p ./",
     "lint": "tsc -p ./ --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
     "vscode:prepublish": "npm run build:extension:prod && npm run build:webview:prod",
     "package": "vsce package"
   },
@@ -127,6 +129,7 @@
   },
   "devDependencies": {
     "@types/cytoscape": "^3.21.9",
+    "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
@@ -135,6 +138,8 @@
     "cytoscape-dagre": "^3.0.0",
     "dagre": "^0.8.5",
     "esbuild": "^0.28.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
     "typescript": "^5.4.0"
   }
 }
