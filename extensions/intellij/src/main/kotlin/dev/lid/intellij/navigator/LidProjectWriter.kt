@@ -2,8 +2,6 @@ package dev.lid.intellij.navigator
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
-import org.yaml.snakeyaml.DumperOptions
-import org.yaml.snakeyaml.Yaml
 import java.io.File
 
 class LidProjectWriter(private val project: Project) {
@@ -46,29 +44,29 @@ class LidProjectWriter(private val project: Project) {
         refreshVfs(resolved)
     }
 
-    @Suppress("UNCHECKED_CAST")
     fun updateIndexEntry(segmentId: String, changes: Map<String, Any?>, create: Boolean = false) {
         val indexFile = File(project.basePath ?: error("No project base"), "docs/arrows/index.yaml")
-        val yaml = buildYaml()
-        val raw: MutableMap<String, Any> = if (indexFile.exists()) {
-            yaml.load<Map<String, Any>>(indexFile.readText())?.toMutableMap() ?: mutableMapOf()
+        var content = if (indexFile.exists()) indexFile.readText() else "schema_version: 2\narrows:\n"
+
+        if (create) {
+            val block = IndexYamlWriter.buildSegmentBlock(segmentId, changes)
+            content = IndexYamlWriter.insertIntoArrows(content, block)
         } else {
-            mutableMapOf()
+            for ((k, v) in changes) {
+                content = when (v) {
+                    null -> IndexYamlWriter.patchSegmentField(content, segmentId, k, null)
+                    is List<*> -> {
+                        @Suppress("UNCHECKED_CAST")
+                        IndexYamlWriter.patchSegmentInlineArray(
+                            content, segmentId, k, (v as List<String?>).filterNotNull(),
+                        )
+                    }
+                    else -> IndexYamlWriter.patchSegmentField(content, segmentId, k, v.toString())
+                }
+            }
         }
 
-        val arrows = raw.getOrPut("arrows") { mutableMapOf<String, Any>() }
-            .let { it as? MutableMap<String, Any> ?: mutableMapOf<String, Any>().also { m -> raw["arrows"] = m } }
-
-        if (!create) check(arrows.containsKey(segmentId)) { "Segment '$segmentId' not found in index.yaml" }
-
-        val entry = (arrows[segmentId] as? MutableMap<String, Any>)
-            ?: mutableMapOf<String, Any>().also { arrows[segmentId] = it }
-
-        for ((k, v) in changes) {
-            if (v == null) entry.remove(k) else entry[k] = v
-        }
-
-        indexFile.writeText(yaml.dump(raw))
+        indexFile.writeText(content)
         refreshVfs(indexFile.absolutePath)
     }
 
@@ -149,14 +147,5 @@ class LidProjectWriter(private val project: Project) {
 
     private fun refreshVfs(path: String) {
         LocalFileSystem.getInstance().refreshAndFindFileByPath(path)?.refresh(false, false)
-    }
-
-    private fun buildYaml(): Yaml {
-        val opts = DumperOptions().apply {
-            defaultFlowStyle = DumperOptions.FlowStyle.BLOCK
-            indent = 2
-            isPrettyFlow = true
-        }
-        return Yaml(opts)
     }
 }
