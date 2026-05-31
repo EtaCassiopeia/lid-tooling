@@ -5,7 +5,8 @@
   <description><![CDATA[
     Editor support for the <a href="https://github.com/jszmajda/lid">LID (Linked-Intent Development)</a>
     methodology: hover, go-to-definition, find references, rename, completion, and real-time diagnostics
-    for <code>@spec</code> citations — powered by the bundled <code>lid-lsp</code> language server.
+    for <code>@spec</code> citations, plus a visual Intent Navigator — powered by the bundled
+    <code>lid-lsp</code> language server.
   ]]></description>
 
   <depends>com.intellij.modules.platform</depends>
