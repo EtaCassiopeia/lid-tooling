@@ -112,7 +112,7 @@ class LidNavigatorPanel(private val project: Project) : JPanel(BorderLayout()), 
                 postResult(true, "Spec ${msg.specId} marked as ${msg.newStatus}")
             }
             is NavigatorMessage.AddSpec -> {
-                LidProjectWriter(project).appendSpec(msg.specFile, msg.segmentId, msg.specId, msg.text)
+                LidProjectWriter(project).appendSpec(msg.specFile, msg.segmentId, msg.specId, msg.text, msg.specPrefix)
                 postResult(true, "Spec ${msg.specId} added")
             }
             is NavigatorMessage.UpdateSegmentStatus -> {

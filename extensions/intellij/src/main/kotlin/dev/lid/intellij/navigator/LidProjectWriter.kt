@@ -27,7 +27,7 @@ class LidProjectWriter(private val project: Project) {
         refreshVfs(specFile)
     }
 
-    fun appendSpec(specFile: String?, segmentId: String, specId: String, text: String) {
+    fun appendSpec(specFile: String?, segmentId: String, specId: String, text: String, specPrefix: String? = null) {
         val resolved = specFile ?: run {
             val base = project.basePath ?: error("No project base")
             "$base/docs/intent/$segmentId/$segmentId-specs.md"
@@ -40,7 +40,8 @@ class LidProjectWriter(private val project: Project) {
             file.writeText(existing + sep + newLine + "\n")
         } else {
             file.parentFile.mkdirs()
-            file.writeText("# $segmentId specs\n\n$newLine\n")
+            val frontmatter = if (specPrefix != null) "---\nprefix: $specPrefix\n---\n\n" else ""
+            file.writeText("${frontmatter}# $segmentId specs\n\n$newLine\n")
         }
         refreshVfs(resolved)
     }

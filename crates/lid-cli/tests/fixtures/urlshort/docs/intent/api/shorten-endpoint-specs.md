@@ -1,3 +1,7 @@
+---
+prefix: USH-POST
+---
+
 # EARS Specs: shorten-endpoint
 
 **Implementing artifacts**: `src/api.rs`, `tests/api_test.rs`

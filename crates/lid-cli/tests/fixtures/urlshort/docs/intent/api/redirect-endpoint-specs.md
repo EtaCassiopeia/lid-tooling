@@ -1,3 +1,7 @@
+---
+prefix: USH-GET
+---
+
 # EARS Specs: redirect-endpoint
 
 **Implementing artifacts**: `src/api.rs`, `tests/api_test.rs`

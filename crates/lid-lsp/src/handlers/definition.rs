@@ -95,6 +95,7 @@ mod tests {
                 }],
                 implementing_artifacts: vec![],
                 lld: None,
+                prefix: None,
             }],
             llds: vec![],
             arrow_docs: vec![],

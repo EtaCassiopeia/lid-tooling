@@ -1,3 +1,7 @@
+---
+prefix: USH-SITF
+---
+
 # EARS Specs: store-interface
 
 **Implementing artifacts**: `src/storage.rs`, `tests/storage_test.rs`

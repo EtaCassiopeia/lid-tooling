@@ -51,6 +51,7 @@ interface SpecInfo {
     items: SpecItem[];
     specFile?: string;
     lldFile?: string;
+    specPrefix?: string;
 }
 
 interface GraphNode {
@@ -65,6 +66,7 @@ interface GraphNode {
     specItems?: SpecItem[];
     specFile?: string;
     lldFile?: string;
+    specPrefix?: string;
     children?: string[];
     parent?: string;
 }
@@ -85,7 +87,7 @@ type WebviewMessage =
     | { type: 'open'; segmentId: string }
     | { type: 'openFile'; path: string; line?: number }
     | { type: 'updateSpecStatus'; specFile: string; specId: string; line: number; newStatus: 'open' | 'implemented' | 'deferred' }
-    | { type: 'addSpec'; specFile: string | undefined; segmentId: string; specId: string; text: string }
+    | { type: 'addSpec'; specFile: string | undefined; segmentId: string; specId: string; text: string; specPrefix?: string }
     | { type: 'updateSegmentStatus'; segmentId: string; newStatus: string }
     | { type: 'updateSegmentMeta'; segmentId: string; next: string; drift: string }
     | { type: 'addSegment'; segmentId: string; status: string; detail: string; blocks: string[]; children: string[] }
@@ -207,7 +209,7 @@ export class NavigatorPanel {
                 const specFile = msg.specFile ?? path.join(
                     this._workspaceRoot, 'docs', 'intent', msg.segmentId, `${msg.segmentId}-specs.md`,
                 );
-                await this._appendSpec(specFile, msg.segmentId, msg.specId, msg.text);
+                await this._appendSpec(specFile, msg.segmentId, msg.specId, msg.text, msg.specPrefix);
                 this._postMutationResult(true, `Spec ${msg.specId} added`);
             } else if (msg.type === 'updateSegmentStatus') {
                 await this._updateIndexEntry(msg.segmentId, { status: msg.newStatus });
@@ -261,7 +263,7 @@ export class NavigatorPanel {
         await doc.save(); // flush to disk so the file watcher triggers a graph refresh
     }
 
-    private async _appendSpec(specFile: string, segmentId: string, specId: string, text: string): Promise<void> {
+    private async _appendSpec(specFile: string, segmentId: string, specId: string, text: string, specPrefix?: string): Promise<void> {
         const uri = vscode.Uri.file(specFile);
         const newLine = `- [ ] **${specId}**: ${text}\n`;
 
@@ -279,7 +281,8 @@ export class NavigatorPanel {
             await doc.save(); // flush to disk so the file watcher triggers a graph refresh
         } else {
             await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(specFile)));
-            await vscode.workspace.fs.writeFile(uri, Buffer.from(`# ${segmentId} specs\n\n${newLine}`));
+            const frontmatter = specPrefix ? `---\nprefix: ${specPrefix}\n---\n\n` : '';
+            await vscode.workspace.fs.writeFile(uri, Buffer.from(`${frontmatter}# ${segmentId} specs\n\n${newLine}`));
         }
     }
 
@@ -378,7 +381,18 @@ export class NavigatorPanel {
                         const info = ensureEntry(segId);
                         if (!info.specFile) info.specFile = fullPath;
                         try {
-                            const lines = fs.readFileSync(fullPath, 'utf8').split('\n');
+                            const content = fs.readFileSync(fullPath, 'utf8');
+                            const lines = content.split('\n');
+                            // Parse YAML frontmatter for prefix:
+                            if (lines[0]?.trim() === '---') {
+                                const closeIdx = lines.findIndex((l, i) => i > 0 && l.trim() === '---');
+                                if (closeIdx > 0) {
+                                    for (let i = 1; i < closeIdx; i++) {
+                                        const match = /^prefix:\s*(.+)$/.exec(lines[i]!);
+                                        if (match) { info.specPrefix = match[1]!.trim(); break; }
+                                    }
+                                }
+                            }
                             lines.forEach((rawLine, idx) => {
                                 const m = SPEC_RE.exec(rawLine);
                                 if (!m) return;
@@ -436,6 +450,7 @@ export class NavigatorPanel {
                 specItems: info?.items,
                 specFile: info?.specFile,
                 lldFile: info?.lldFile,
+                specPrefix: info?.specPrefix,
                 children: entry.children,
                 parent: entry.parent,
             };

@@ -1,3 +1,7 @@
+---
+prefix: USH-AUTH
+---
+
 # EARS Specs: auth
 
 **Implementing artifacts**: `src/auth.rs`, `tests/auth_test.rs`

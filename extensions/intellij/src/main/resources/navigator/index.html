@@ -534,7 +534,7 @@ function openPanel(node, edit) {
       if (editMode) {
         html += '<button class="add-spec-btn" id="btn-add-spec">+ Add spec</button>' +
           '<div class="add-spec-form" id="add-spec-form"><div class="add-spec-row">' +
-          '<input class="edit-input" id="new-spec-id" placeholder="' + esc(id.toUpperCase()) + '-001" style="flex:0 0 110px">' +
+          '<input class="edit-input" id="new-spec-id" placeholder="' + esc(node.specPrefix || id.toUpperCase()) + '-001" style="flex:0 0 110px">' +
           '<input class="edit-input" id="new-spec-text" placeholder="spec text…"></div>' +
           '<div class="add-spec-row"><button class="btn-save" id="btn-submit-spec">Add</button>' +
           '<span class="add-spec-err" id="spec-id-err"></span></div></div>';
@@ -633,12 +633,12 @@ panelBody.addEventListener('click', function(e) {
     var errSpan = panelBody.querySelector('#spec-id-err');
     var specId = specIdInput ? specIdInput.value.trim() : '';
     var text = specTextInput ? specTextInput.value.trim() : '';
-    var prefix = currentNode.id.toUpperCase();
+    var prefix = currentNode.specPrefix || currentNode.id.toUpperCase();
     var valid = /^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$/.test(specId) && specId.startsWith(prefix + '-') && /\d/.test(specId);
     if (!valid) { if (errSpan) errSpan.textContent = 'Must start with ' + prefix + '- and include a digit'; return; }
     if (!text)  { if (errSpan) errSpan.textContent = 'Text is required'; return; }
     if (errSpan) errSpan.textContent = '';
-    window.__lidPostMessage({ type: 'addSpec', specFile: currentNode.specFile || null, segmentId: currentNode.id, specId: specId, text: text });
+    window.__lidPostMessage({ type: 'addSpec', specFile: currentNode.specFile || null, segmentId: currentNode.id, specId: specId, text: text, specPrefix: currentNode.specPrefix || null });
     if (specIdInput) specIdInput.value = '';
     if (specTextInput) specTextInput.value = '';
     panelBody.querySelector('#add-spec-form') && panelBody.querySelector('#add-spec-form').classList.remove('open');

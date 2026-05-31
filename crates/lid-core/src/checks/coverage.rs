@@ -104,6 +104,7 @@ mod tests {
             specs: spec_lines,
             implementing_artifacts: vec![],
             lld: None,
+            prefix: None,
         }];
         LidRepo {
             root,

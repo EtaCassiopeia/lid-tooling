@@ -1,3 +1,7 @@
+---
+prefix: USH-RDIS
+---
+
 # EARS Specs: redis-store
 
 **Implementing artifacts**: `src/redis_store.rs`, `tests/redis_store_test.rs`

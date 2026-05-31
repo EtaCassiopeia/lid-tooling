@@ -101,6 +101,7 @@ mod tests {
                 specs: vec![],
                 implementing_artifacts: vec![PathBuf::from("src/auth.rs")],
                 lld: None,
+                prefix: None,
             }],
         );
 
@@ -129,6 +130,7 @@ mod tests {
                 specs: vec![],
                 implementing_artifacts: vec![PathBuf::from("src/auth.rs")],
                 lld: None,
+                prefix: None,
             }],
         );
 
@@ -150,6 +152,7 @@ mod tests {
                 specs: vec![],
                 implementing_artifacts: vec![],
                 lld: None,
+                prefix: None,
             }],
         );
 
@@ -170,6 +173,7 @@ mod tests {
                 specs: vec![],
                 implementing_artifacts: vec![abs_path.clone()],
                 lld: None,
+                prefix: None,
             }],
         );
 
@@ -194,6 +198,7 @@ mod tests {
                     PathBuf::from("src/missing.rs"),
                 ],
                 lld: None,
+                prefix: None,
             }],
         );
 

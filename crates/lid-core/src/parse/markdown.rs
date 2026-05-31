@@ -162,9 +162,31 @@ pub fn parse_spec_file(content: &str, source_path: &Path) -> Result<SpecFile> {
     let mut implementing_artifacts: Vec<PathBuf> = Vec::new();
     let mut lld: Option<PathBuf> = None;
     let mut in_artifacts_section = false;
+    let mut prefix: Option<String> = None;
+
+    // YAML frontmatter state: detect `---` on the very first line.
+    let mut first_line = true;
+    let mut in_frontmatter = false;
 
     for (idx, raw_line) in content.lines().enumerate() {
         let line_no = idx + 1;
+
+        if first_line {
+            first_line = false;
+            if raw_line.trim() == "---" {
+                in_frontmatter = true;
+                continue;
+            }
+        }
+
+        if in_frontmatter {
+            if raw_line.trim() == "---" {
+                in_frontmatter = false;
+            } else if let Some(val) = raw_line.strip_prefix("prefix:") {
+                prefix = Some(val.trim().to_owned());
+            }
+            continue;
+        }
 
         if let Some(caps) = SPEC_LINE_RE.captures(raw_line) {
             // Spec lines always close the `Implementing artifacts` bullet list.
@@ -222,6 +244,7 @@ pub fn parse_spec_file(content: &str, source_path: &Path) -> Result<SpecFile> {
         specs,
         implementing_artifacts,
         lld,
+        prefix,
     })
 }
 
@@ -853,6 +876,31 @@ Some prose.
         let content = "- [ ] **AUTH-001**: text.\n";
         let id = SpecId::parse("AUTH-999").unwrap();
         assert!(update_spec_status_in_text(content, &id, SpecStatus::Open).is_none());
+    }
+
+    #[test]
+    fn parse_spec_file_extracts_yaml_frontmatter_prefix() {
+        let content = "---\nprefix: AUTH\n---\n- [ ] **AUTH-001**: text.\n";
+        let path = std::path::Path::new("auth-specs.md");
+        let sf = parse_spec_file(content, path).unwrap();
+        assert_eq!(sf.prefix.as_deref(), Some("AUTH"));
+        assert_eq!(sf.specs.len(), 1);
+    }
+
+    #[test]
+    fn parse_spec_file_no_frontmatter_yields_none_prefix() {
+        let content = "- [ ] **AUTH-001**: text.\n";
+        let path = std::path::Path::new("auth-specs.md");
+        let sf = parse_spec_file(content, path).unwrap();
+        assert!(sf.prefix.is_none());
+    }
+
+    #[test]
+    fn parse_spec_file_frontmatter_without_prefix_key_yields_none() {
+        let content = "---\ntitle: Auth\n---\n- [ ] **AUTH-001**: text.\n";
+        let path = std::path::Path::new("auth-specs.md");
+        let sf = parse_spec_file(content, path).unwrap();
+        assert!(sf.prefix.is_none());
     }
 
     #[test]
