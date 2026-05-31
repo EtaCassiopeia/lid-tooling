@@ -17,6 +17,7 @@ LID answers one recurring problem: *you know what the code does, but you've lost
 | Tool | What it does |
 |------|-------------|
 | **VS Code extension** | LSP diagnostics, hover, go-to-definition, rename, completion, visual Intent Navigator |
+| **IntelliJ IDEA plugin** | LSP diagnostics, hover, go-to-definition, find references, rename, completion, and visual Intent Navigator for all JetBrains IDEs |
 | **`lidc` CLI** | `lidc check` for CI, `lidc init` to scaffold new projects, `lidc status` for a quick summary |
 | **`lid-mcp` MCP server** | 13 tools so AI agents can read and write LID projects with full integrity guarantees |
 
@@ -33,6 +34,47 @@ ext install lid-tools.vscode
 ```
 
 `lid-lsp` is bundled — nothing else to install.
+
+### IntelliJ IDEA / JetBrains IDEs
+
+#### From JetBrains Marketplace (recommended)
+
+1. Open **Settings → Plugins → Marketplace**
+2. Search **LID**
+3. Click **Install** → restart when prompted
+
+Or install directly from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/dev.lid.intellij).
+
+`lid-lsp` is bundled — nothing else to install.
+
+#### From a GitHub release (install from disk)
+
+Download `lid-intellij-<version>.zip` from the [latest release](https://github.com/EtaCassiopeia/lid-tooling/releases/latest), then:
+
+1. **Settings → Plugins → ⚙ → Install Plugin from Disk…**
+2. Select the downloaded `.zip`
+3. Restart when prompted
+
+#### From source
+
+```sh
+# Build the plugin zip (requires JDK 21+)
+cd extensions/intellij
+./gradlew buildPlugin
+# → build/distributions/lid-intellij-<version>.zip
+
+# Or launch a sandboxed IDE with the plugin pre-installed (good for testing)
+./gradlew runIde
+```
+
+If you want `lid-lsp` bundled locally (rather than relying on PATH):
+
+```sh
+# Build lid-lsp first
+cargo build --release --bin lid-lsp
+cp target/release/lid-lsp extensions/intellij/server/lid-lsp
+./gradlew buildPlugin
+```
 
 ### CLI + MCP server — macOS / Linux (Homebrew)
 
@@ -151,6 +193,77 @@ Open with **LID: Show Intent Navigator** (`Cmd+Shift+P`).
 |---------|---------|-------------|
 | `lid.serverPath` | *(bundled)* | Override path to `lid-lsp` binary |
 | `lid.trace.server` | `off` | LSP trace verbosity: `off` / `messages` / `verbose` |
+
+---
+
+## IntelliJ IDEA plugin
+
+The plugin auto-activates in any project containing `docs/arrows/index.yaml`. It works in all JetBrains IDEs (IntelliJ IDEA, GoLand, PyCharm, RustRover, WebStorm, etc.).
+
+### Language server features
+
+| Feature | Trigger |
+|---------|---------|
+| **Hover** | Point at `@spec ID` — shows spec text and status |
+| **Go to Definition** | `F12` on `@spec ID` — jumps to the spec line in the spec file |
+| **Find References** | `Alt+F7` on a spec definition — lists every source citation |
+| **Rename** | `Shift+F6` on a spec ID — renames across the spec file and all `@spec` citations |
+| **Completion** | Type `@spec ` — autocompletes from all known spec IDs |
+| **Diagnostics** | Squiggles on unknown `@spec` references; coverage warnings on spec lines |
+| **Syntax highlighting** | `@spec` keyword and spec IDs highlighted in all supported languages; status markers highlighted in `*-specs.md` files |
+
+Supported languages: Java, Kotlin, Groovy, Markdown, YAML, Rust, Python, Go, TypeScript, JavaScript, Scala, C#, Ruby, C++, C, and Shell Script.
+
+### Intent Navigator
+
+The **LID Navigator** panel appears automatically on the right side of the IDE for any LID project.
+
+- **Single-click** a segment node → detail panel (status badge, spec progress bar, dependency chips, next/drift prose)
+- **Double-click** a segment node → edit mode: change status, cycle spec completion (○ → ✓ → ⊘), edit next/drift notes
+- **Right-click** a segment node → context menu: Open Arrow Doc / Open Spec File / Open LLD / Copy ID
+- **`+ Segment`** button → add a new segment via overlay form
+- **`+ Add spec`** in the panel → append a spec line directly to the spec file
+- Toolbar: filter by status, filter by cluster, fuzzy search, fit graph, focus neighbourhood
+- Auto-refreshes within 400 ms of any save to `index.yaml` or `docs/intent/` markdown files
+
+### Actions
+
+| Action | Location |
+|--------|----------|
+| **Initialize LID Project** | **Tools → Initialize LID Project** — scaffolds `docs/arrows/index.yaml` and a first segment stub |
+
+### Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `lid.serverPath` | *(bundled)* | Override path to the `lid-lsp` binary |
+
+### IntelliJ plugin signing (for maintainers)
+
+Releasing to the JetBrains Marketplace requires a signed plugin. Generate the key pair once and store the output as GitHub repository secrets:
+
+```sh
+# 1. Generate an RSA private key
+openssl genpkey -aes-256-cbc -algorithm RSA \
+  -out private_encrypted.pem -pkeyopt rsa_keygen_bits:4096
+
+# 2. Strip the passphrase (or keep it and set PRIVATE_KEY_PASSWORD)
+openssl rsa -in private_encrypted.pem -out private.pem
+
+# 3. Generate a self-signed certificate (10-year validity)
+openssl req -key private.pem -new -x509 -days 3650 -out chain.crt
+```
+
+Set four secrets in **Settings → Secrets → Actions**:
+
+| Secret | Value |
+|--------|-------|
+| `JETBRAINS_MARKETPLACE_TOKEN` | Token from [plugins.jetbrains.com](https://plugins.jetbrains.com) → your account → Tokens |
+| `CERTIFICATE_CHAIN` | Contents of `chain.crt` |
+| `PRIVATE_KEY` | Contents of `private.pem` |
+| `PRIVATE_KEY_PASSWORD` | Passphrase (empty string if you stripped it in step 2) |
+
+Pushing a `v*` tag triggers the release pipeline, which builds a fat-bundle plugin (all four platform `lid-lsp` binaries in one zip), signs it, and publishes it to the Marketplace automatically.
 
 ---
 

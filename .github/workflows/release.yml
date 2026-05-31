@@ -133,6 +133,30 @@ jobs:
           cp "extensions/vscode/lid-vscode-${{ matrix.vsce_target }}.vsix" \
              "dist/lid-vscode-${{ matrix.vsce_target }}.vsix"
 
+      # ── IntelliJ plugin ──────────────────────────────────────────────────
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Bundle lid-lsp into IntelliJ plugin
+        shell: bash
+        run: |
+          mkdir -p extensions/intellij/server
+          cp "target/${{ matrix.target }}/release/lid-lsp${{ matrix.ext }}" \
+             "extensions/intellij/server/lid-lsp${{ matrix.ext }}"
+
+      - name: Build IntelliJ plugin
+        working-directory: extensions/intellij
+        run: ./gradlew buildPlugin --no-daemon
+
+      - name: Move IntelliJ plugin zip to dist
+        shell: bash
+        run: |
+          find extensions/intellij/build/distributions -name '*.zip' \
+            -exec cp {} "dist/lid-intellij-${{ matrix.vsce_target }}.zip" \;
+
       - uses: actions/upload-artifact@v5
         with:
           name: release-${{ matrix.target }}
@@ -213,6 +237,53 @@ jobs:
           for vsix in vsix/*.vsix; do
             ovsx publish "$vsix" --pat "${{ secrets.OVSX_PAT }}"
           done
+
+  # ── Publish IntelliJ plugin to JetBrains Marketplace ────────────────────────
+  #
+  # Builds a single fat plugin zip containing all four platform lid-lsp binaries
+  # (the plugin's platformBinaryName() picks the right one at runtime).
+  # Requires four GitHub secrets:
+  #   JETBRAINS_MARKETPLACE_TOKEN  – obtain from plugins.jetbrains.com
+  #   CERTIFICATE_CHAIN            – PEM cert chain (see README.md § IntelliJ signing)
+  #   PRIVATE_KEY                  – PEM private key
+  #   PRIVATE_KEY_PASSWORD         – private key passphrase (may be empty)
+
+  publish-intellij:
+    name: Publish IntelliJ plugin
+    if: github.ref_type == 'tag'
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/download-artifact@v5
+        with:
+          path: artifacts
+
+      - name: Bundle all platform lid-lsp binaries
+        shell: bash
+        run: |
+          mkdir -p extensions/intellij/server
+          # Each build matrix job uploaded lid-lsp-<target>[.exe] as a standalone
+          # binary. Collect all four so the fat plugin zip works on every OS.
+          find artifacts -name 'lid-lsp-*' ! -name '*.sha256' \
+            -exec cp {} extensions/intellij/server/ \;
+          chmod +x extensions/intellij/server/lid-lsp-* 2>/dev/null || true
+          ls -la extensions/intellij/server/
+
+      - name: Sign and publish plugin
+        working-directory: extensions/intellij
+        run: ./gradlew signPlugin publishPlugin --no-daemon
+        env:
+          JETBRAINS_MARKETPLACE_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
+          CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
 
   # ── Update Homebrew tap ───────────────────────────────────────────────────────
 

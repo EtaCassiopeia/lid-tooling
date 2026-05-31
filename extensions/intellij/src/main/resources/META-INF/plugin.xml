@@ -1,0 +1,148 @@
+<idea-plugin>
+  <id>dev.lid.intellij</id>
+  <name>LID — Linked-Intent Development</name>
+  <vendor url="https://github.com/EtaCassiopeia/lid-tooling">lid-tools</vendor>
+  <description><![CDATA[
+    Editor support for the <a href="https://github.com/jszmajda/lid">LID (Linked-Intent Development)</a>
+    methodology: hover, go-to-definition, find references, rename, completion, and real-time diagnostics
+    for <code>@spec</code> citations — powered by the bundled <code>lid-lsp</code> language server.
+  ]]></description>
+
+  <depends>com.intellij.modules.platform</depends>
+  <depends>com.redhat.devtools.lsp4ij</depends>
+
+  <!-- ── LSP server registration ─────────────────────────────────────── -->
+
+  <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+
+    <server id="dev.lid.lsp"
+            name="LID Language Server"
+            factoryClass="dev.lid.intellij.LidLanguageServerFactory"/>
+
+    <!-- LID artifact files (always present when the project has LID) -->
+    <fileNamePatternMapping patterns="*-specs.md;*-design.md"
+                            serverId="dev.lid.lsp"
+                            languageId="markdown"
+                            documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <fileNamePatternMapping patterns="index.yaml"
+                            serverId="dev.lid.lsp"
+                            languageId="yaml"
+                            documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <!-- Source languages bundled with IntelliJ IDEA -->
+    <languageMapping language="JAVA"
+                     serverId="dev.lid.lsp"
+                     languageId="java"
+                     documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <languageMapping language="kotlin"
+                     serverId="dev.lid.lsp"
+                     languageId="kotlin"
+                     documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <languageMapping language="Groovy"
+                     serverId="dev.lid.lsp"
+                     languageId="groovy"
+                     documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <languageMapping language="Markdown"
+                     serverId="dev.lid.lsp"
+                     languageId="markdown"
+                     documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <!-- Source languages from common IDE plugins (silently skipped if plugin absent) -->
+    <fileNamePatternMapping patterns="*.rs"
+                            serverId="dev.lid.lsp"
+                            languageId="rust"
+                            documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <fileNamePatternMapping patterns="*.py;*.pyi"
+                            serverId="dev.lid.lsp"
+                            languageId="python"
+                            documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <fileNamePatternMapping patterns="*.go"
+                            serverId="dev.lid.lsp"
+                            languageId="go"
+                            documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <fileNamePatternMapping patterns="*.ts;*.tsx"
+                            serverId="dev.lid.lsp"
+                            languageId="typescript"
+                            documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <fileNamePatternMapping patterns="*.js;*.jsx;*.mjs"
+                            serverId="dev.lid.lsp"
+                            languageId="javascript"
+                            documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <fileNamePatternMapping patterns="*.scala"
+                            serverId="dev.lid.lsp"
+                            languageId="scala"
+                            documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <fileNamePatternMapping patterns="*.cs"
+                            serverId="dev.lid.lsp"
+                            languageId="csharp"
+                            documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <fileNamePatternMapping patterns="*.rb"
+                            serverId="dev.lid.lsp"
+                            languageId="ruby"
+                            documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <fileNamePatternMapping patterns="*.cpp;*.cc;*.cxx;*.hpp"
+                            serverId="dev.lid.lsp"
+                            languageId="cpp"
+                            documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+    <fileNamePatternMapping patterns="*.c;*.h"
+                            serverId="dev.lid.lsp"
+                            languageId="c"
+                            documentMatcher="dev.lid.intellij.LidDocumentMatcher"/>
+
+  </extensions>
+
+  <!-- ── Syntax highlighting ─────────────────────────────────────────── -->
+
+  <extensions defaultExtensionNs="com.intellij">
+
+    <!-- Bundled languages -->
+    <annotator language="JAVA"         implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
+    <annotator language="kotlin"       implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
+    <annotator language="Groovy"       implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
+    <annotator language="Markdown"     implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
+    <annotator language="yaml"         implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
+    <annotator language="Shell Script" implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
+
+    <!-- Plugin-provided languages (ignored if plugin absent) -->
+    <annotator language="Rust"         implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
+    <annotator language="Python"       implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
+    <annotator language="Go"           implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
+    <annotator language="TypeScript"   implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
+    <annotator language="JavaScript"   implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
+    <annotator language="Scala"        implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
+
+    <colorSettingsPage implementation="dev.lid.intellij.highlight.LidColorSettingsPage"/>
+
+    <!-- ── Intent Navigator tool window ─────────────────────────────────── -->
+    <toolWindow id="LID Navigator"
+                anchor="right"
+                factoryClass="dev.lid.intellij.navigator.LidNavigatorToolWindowFactory"
+                canCloseContents="false"/>
+
+  </extensions>
+
+  <!-- ── Commands ────────────────────────────────────────────────────── -->
+
+  <actions>
+    <action id="lid.initProject"
+            class="dev.lid.intellij.actions.InitProjectAction"
+            text="Initialize LID Project"
+            description="Scaffold docs/arrows/index.yaml and the first segment stub">
+      <add-to-group group-id="ToolsMenu" anchor="last"/>
+    </action>
+  </actions>
+
+</idea-plugin>
