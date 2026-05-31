@@ -238,6 +238,10 @@
       <input class="edit-input" id="seg-detail-input" placeholder="my-segment.md">
     </div>
     <div class="seg-field">
+      <div class="seg-label">Spec prefix</div>
+      <input class="edit-input" id="seg-prefix-input" placeholder="MY-SEGMENT">
+    </div>
+    <div class="seg-field">
       <div class="seg-label">Blocks</div>
       <select class="edit-select" id="seg-blocks-select"><option value="">— pick segment —</option></select>
       <div class="chips" id="seg-blocks-chips" style="margin-top:4px"></div>
@@ -283,7 +287,7 @@ function trunc(s, n) { return s && s.length > n ? s.slice(0, n) + '…' : (s || 
 function fmtDate(s) { return s ? String(s).replace(/T.*$/, '') : '—'; }
 
 // ── State ────────────────────────────────────────────────────────────────────
-var cy, _clusters = {}, _allIds = [], _addBlocks = [], _addChildren = [];
+var cy, _clusters = {}, _allIds = [], _addBlocks = [], _addChildren = [], _allSpecPrefixes = [];
 var currentNode = null, editMode = false, focusedId = null;
 
 var LAYOUT = { name:'dagre', rankDir:'TB', ranker:'network-simplex', nodeSep:40, rankSep:60, animate:false };
@@ -295,10 +299,25 @@ function buildLabel(n) {
   return total > 0 ? n.id + '\n' + s.implemented + '/' + total : n.id;
 }
 
+// ── Prefix suggestion ─────────────────────────────────────────────────────────
+function suggestPrefix(segmentId, existingPrefixes) {
+  var upper = segmentId.toUpperCase();
+  if (!existingPrefixes.length) return upper;
+  var counts = {};
+  existingPrefixes.forEach(function(p) {
+    var ns = p.split('-')[0];
+    if (ns) counts[ns] = (counts[ns] || 0) + 1;
+  });
+  var best = Object.keys(counts).reduce(function(a, b) { return counts[a] >= counts[b] ? a : b; }, '');
+  if (best && counts[best] * 2 > existingPrefixes.length) return best + (upper ? '-' + upper : '');
+  return upper;
+}
+
 // ── Render ───────────────────────────────────────────────────────────────────
 function render(payload) {
   _clusters = payload.clusters || {};
   _allIds = (payload.nodes || []).map(function(n){ return n.id; }).sort();
+  _allSpecPrefixes = (payload.nodes || []).filter(function(n){ return n.specPrefix; }).map(function(n){ return n.specPrefix; });
 
   var clusterSel = document.getElementById('filter-cluster');
   var prev = clusterSel.value;
@@ -836,9 +855,14 @@ function populateOverlaySelects() {
   });
 }
 
+document.getElementById('seg-id-input').addEventListener('input', function() {
+  document.getElementById('seg-prefix-input').value = suggestPrefix(this.value.trim(), _allSpecPrefixes);
+});
+
 document.getElementById('btn-add-seg').addEventListener('click', function() {
   document.getElementById('seg-id-input').value = '';
   document.getElementById('seg-detail-input').value = '';
+  document.getElementById('seg-prefix-input').value = suggestPrefix('', _allSpecPrefixes);
   document.getElementById('seg-add-err').textContent = '';
   _addBlocks = []; _addChildren = [];
   populateOverlaySelects();
@@ -877,8 +901,9 @@ document.getElementById('btn-seg-submit').addEventListener('click', function() {
   if (!segId || !/^[a-z][a-z0-9-]*$/.test(segId)) { errEl.textContent = 'ID: lowercase letters, digits, hyphens only'; return; }
   if (!detail) { errEl.textContent = 'Detail path is required'; return; }
   errEl.textContent = '';
+  var specPrefix = document.getElementById('seg-prefix-input').value.trim() || suggestPrefix(segId, _allSpecPrefixes);
   addSegOverlay.classList.remove('open');
-  window.__lidPostMessage({ type: 'addSegment', segmentId: segId, status: status, detail: detail, blocks: _addBlocks.slice(), children: _addChildren.slice() });
+  window.__lidPostMessage({ type: 'addSegment', segmentId: segId, status: status, detail: detail, blocks: _addBlocks.slice(), children: _addChildren.slice(), specPrefix: specPrefix });
 });
 
 // ── Message bridge ─────────────────────────────────────────────────────────

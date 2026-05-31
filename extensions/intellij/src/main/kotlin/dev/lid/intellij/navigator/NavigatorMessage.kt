@@ -27,6 +27,7 @@ sealed class NavigatorMessage {
         val detail: String,
         val blocks: List<String>,
         val children: List<String>,
+        val specPrefix: String? = null,
     ) : NavigatorMessage()
     data class RemoveConnection(
         val kind: String,
@@ -71,6 +72,7 @@ fun parseMessage(json: String): NavigatorMessage {
             obj.get("detail").asString,
             obj.get("blocks")?.asJsonArray?.map { it.asString } ?: emptyList(),
             obj.get("children")?.asJsonArray?.map { it.asString } ?: emptyList(),
+            obj.get("specPrefix")?.takeUnless { it.isJsonNull }?.asString,
         )
         "removeConnection" -> NavigatorMessage.RemoveConnection(
             obj.get("kind").asString,

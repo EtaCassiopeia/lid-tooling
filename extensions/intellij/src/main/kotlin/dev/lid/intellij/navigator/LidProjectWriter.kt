@@ -82,6 +82,41 @@ class LidProjectWriter(private val project: Project) {
         }
     }
 
+    fun scaffoldSegment(segmentId: String, detail: String, specPrefix: String?) {
+        val base = project.basePath ?: return
+        val root = File(base)
+
+        val arrowPath = root.resolve("docs/arrows/$detail")
+        if (!arrowPath.exists()) {
+            arrowPath.parentFile?.mkdirs()
+            val title = segmentId.replace('-', ' ')
+            arrowPath.writeText(
+                "# $title\n\n## Overview\n\n<!-- Describe the $segmentId segment here. -->\n\n" +
+                "## References\n\n### LLD\n- `docs/intent/$segmentId/$segmentId-design.md`\n\n" +
+                "### EARS\n- `docs/intent/$segmentId/$segmentId-specs.md`\n",
+            )
+            refreshVfs(arrowPath.absolutePath)
+        }
+
+        val intentDir = root.resolve("docs/intent/$segmentId")
+        intentDir.mkdirs()
+
+        val prefix = specPrefix ?: segmentId.uppercase()
+        val specsPath = intentDir.resolve("$segmentId-specs.md")
+        if (!specsPath.exists()) {
+            specsPath.writeText("---\nprefix: $prefix\n---\n\n# $segmentId specs\n")
+            refreshVfs(specsPath.absolutePath)
+        }
+
+        val designPath = intentDir.resolve("$segmentId-design.md")
+        if (!designPath.exists()) {
+            designPath.writeText(
+                "# $segmentId design\n\n## Overview\n\n<!-- Describe the design for $segmentId here. -->\n\n## Decisions\n",
+            )
+            refreshVfs(designPath.absolutePath)
+        }
+    }
+
     fun removeConnection(kind: String, segmentId: String, target: String) {
         val reader = LidProjectReader(project)
         when (kind) {

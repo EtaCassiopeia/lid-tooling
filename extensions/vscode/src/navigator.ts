@@ -90,7 +90,7 @@ type WebviewMessage =
     | { type: 'addSpec'; specFile: string | undefined; segmentId: string; specId: string; text: string; specPrefix?: string }
     | { type: 'updateSegmentStatus'; segmentId: string; newStatus: string }
     | { type: 'updateSegmentMeta'; segmentId: string; next: string; drift: string }
-    | { type: 'addSegment'; segmentId: string; status: string; detail: string; blocks: string[]; children: string[] }
+    | { type: 'addSegment'; segmentId: string; status: string; detail: string; blocks: string[]; children: string[]; specPrefix: string }
     | { type: 'removeConnection'; kind: 'blocks' | 'blockedBy' | 'children' | 'parent'; segmentId: string; target: string };
 
 // ── NavigatorPanel ────────────────────────────────────────────────────────────
@@ -228,6 +228,7 @@ export class NavigatorPanel {
                 for (const child of msg.children) {
                     await this._updateIndexEntry(child, { parent: msg.segmentId });
                 }
+                await this._scaffoldSegment(msg.segmentId, msg.detail, msg.specPrefix);
                 this._postMutationResult(true, `Segment ${msg.segmentId} added`);
             } else if (msg.type === 'removeConnection') {
                 await this._removeConnection(msg.kind, msg.segmentId, msg.target);
@@ -283,6 +284,45 @@ export class NavigatorPanel {
             await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(specFile)));
             const frontmatter = specPrefix ? `---\nprefix: ${specPrefix}\n---\n\n` : '';
             await vscode.workspace.fs.writeFile(uri, Buffer.from(`${frontmatter}# ${segmentId} specs\n\n${newLine}`));
+        }
+    }
+
+    private async _scaffoldSegment(segmentId: string, detail: string, specPrefix: string): Promise<void> {
+        const intentDir = vscode.Uri.file(path.join(this._workspaceRoot, 'docs', 'intent', segmentId));
+        await vscode.workspace.fs.createDirectory(intentDir);
+
+        const specsUri = vscode.Uri.file(path.join(intentDir.fsPath, `${segmentId}-specs.md`));
+        await vscode.workspace.fs.writeFile(
+            specsUri,
+            Buffer.from(`---\nprefix: ${specPrefix}\n---\n\n# ${segmentId} specs\n`),
+        );
+
+        const designUri = vscode.Uri.file(path.join(intentDir.fsPath, `${segmentId}-design.md`));
+        await vscode.workspace.fs.writeFile(
+            designUri,
+            Buffer.from(
+                `# ${segmentId} design\n\n` +
+                `## Overview\n\n` +
+                `<!-- Describe the design for ${segmentId} here. -->\n\n` +
+                `## Decisions\n`,
+            ),
+        );
+
+        // Create arrow doc stub only if the detail file doesn't already exist.
+        const arrowUri = vscode.Uri.file(path.join(this._workspaceRoot, 'docs', 'arrows', detail));
+        let arrowExists = true;
+        try { await vscode.workspace.fs.stat(arrowUri); } catch { arrowExists = false; }
+        if (!arrowExists) {
+            await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(arrowUri.fsPath)));
+            const title = segmentId.replace(/-/g, ' ');
+            await vscode.workspace.fs.writeFile(
+                arrowUri,
+                Buffer.from(
+                    `# ${title}\n\n## Overview\n\n<!-- Describe the ${segmentId} segment here. -->\n\n` +
+                    `## References\n\n### LLD\n- \`docs/intent/${segmentId}/${segmentId}-design.md\`\n\n` +
+                    `### EARS\n- \`docs/intent/${segmentId}/${segmentId}-specs.md\`\n`,
+                ),
+            );
         }
     }
 
@@ -940,6 +980,10 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
       <div class="seg-field">
         <label>Detail path (relative to docs/arrows/)</label>
         <input class="edit-input" id="seg-detail-input" placeholder="billing/core.md">
+      </div>
+      <div class="seg-field">
+        <label>Spec prefix</label>
+        <input class="edit-input" id="seg-prefix-input" placeholder="BILLING">
       </div>
       <div class="seg-field">
         <label>Blocks (optional)</label>

@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use lid_core::model::{Segment, SegmentId, Status};
+use lid_core::scaffold;
 use rmcp::model::ErrorData;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -20,6 +21,16 @@ pub struct AddSegmentInput {
     pub status: String,
     /// Path to the detail document, relative to `docs/arrows/`.
     pub detail: String,
+    /// Segment IDs this segment blocks (optional).
+    #[serde(default)]
+    pub blocks: Vec<String>,
+    /// Child segment IDs (optional).
+    #[serde(default)]
+    pub children: Vec<String>,
+    /// Spec-ID prefix (e.g. "MYAPP-AUTH"). If omitted, derived from the
+    /// project's existing prefixes or the segment name.
+    #[serde(default)]
+    pub spec_prefix: Option<String>,
 }
 
 pub async fn lid_add_segment(
@@ -31,19 +42,48 @@ pub async fn lid_add_segment(
         .map_err(ErrorData::from)?;
     let status = parse_status(&input.status).map_err(ErrorData::from)?;
 
+    let blocks: Vec<SegmentId> = input
+        .blocks
+        .iter()
+        .map(|s| {
+            SegmentId::parse(s)
+                .map_err(|_| McpToolError::InvalidSegmentId(s.clone()))
+                .map_err(ErrorData::from)
+        })
+        .collect::<Result<_, _>>()?;
+
+    let children: Vec<SegmentId> = input
+        .children
+        .iter()
+        .map(|s| {
+            SegmentId::parse(s)
+                .map_err(|_| McpToolError::InvalidSegmentId(s.clone()))
+                .map_err(ErrorData::from)
+        })
+        .collect::<Result<_, _>>()?;
+
     let handle = registry
         .get_or_discover(&input.project_root)
         .await
         .map_err(ErrorData::from)?;
 
-    {
+    // Resolve spec prefix: explicit → infer from existing prefixes → derive from name.
+    let spec_prefix = {
         let repo = handle.read().await;
         if repo.index.arrows.contains_key(&seg_id) {
             return Err(ErrorData::from(McpToolError::DuplicateSegment(
                 input.segment_id.clone(),
             )));
         }
-    }
+        input.spec_prefix.clone().unwrap_or_else(|| {
+            let existing: Vec<&str> = repo
+                .specs
+                .iter()
+                .filter_map(|sf| sf.prefix.as_deref())
+                .collect();
+            scaffold::suggest_prefix(&input.segment_id, &existing)
+        })
+    };
 
     let index_path = Path::new(&input.project_root)
         .join("docs")
@@ -52,23 +92,27 @@ pub async fn lid_add_segment(
 
     {
         let mut repo = handle.write().await;
-        repo.index.arrows.insert(
-            seg_id,
-            Segment {
-                status,
-                detail: std::path::PathBuf::from(&input.detail),
-                sampled: None,
-                audited: None,
-                audited_sha: None,
-                blocks: Vec::new(),
-                blocked_by: Vec::new(),
-                next: None,
-                drift: None,
-                merged_into: None,
-                children: Vec::new(),
-                parent: None,
-            },
-        );
+        let new_seg = Segment {
+            status,
+            detail: std::path::PathBuf::from(&input.detail),
+            sampled: None,
+            audited: None,
+            audited_sha: None,
+            blocks: blocks.clone(),
+            blocked_by: Vec::new(),
+            next: None,
+            drift: None,
+            merged_into: None,
+            children: children.clone(),
+            parent: None,
+        };
+        repo.index.arrows.insert(seg_id.clone(), new_seg);
+        // Back-fill parent on each child.
+        for child in &children {
+            if let Some(entry) = repo.index.arrows.get_mut(child) {
+                entry.parent = Some(seg_id.clone());
+            }
+        }
         let yaml = serde_yaml_ng::to_string(&repo.index)
             .map_err(|e| McpToolError::Yaml(e.to_string()))
             .map_err(ErrorData::from)?;
@@ -78,9 +122,25 @@ pub async fn lid_add_segment(
             .map_err(ErrorData::from)?;
     }
 
-    let rediscover_error = registry.rediscover(Path::new(&input.project_root)).await;
+    let root = Path::new(&input.project_root);
+    tokio::task::spawn_blocking({
+        let root = root.to_path_buf();
+        let seg = input.segment_id.clone();
+        let detail = input.detail.clone();
+        let prefix = spec_prefix.clone();
+        move || -> Result<(), McpToolError> {
+            scaffold::scaffold_arrow_doc(&root, &detail, &seg).map_err(McpToolError::Io)?;
+            scaffold::scaffold_intent_dir(&root, &seg, &prefix).map_err(McpToolError::Io)?;
+            Ok(())
+        }
+    })
+    .await
+    .map_err(|e| ErrorData::internal_error(e.to_string(), None))?
+    .map_err(ErrorData::from)?;
+
+    let rediscover_error = registry.rediscover(root).await;
     let out = WriteResult {
-        action: format!("added segment {}", input.segment_id),
+        action: format!("added segment {} (prefix: {spec_prefix})", input.segment_id),
         rediscover_error,
     };
     serde_json::to_string_pretty(&out).map_err(|e| ErrorData::internal_error(e.to_string(), None))

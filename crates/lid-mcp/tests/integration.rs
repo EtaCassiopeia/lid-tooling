@@ -12,6 +12,7 @@ async fn init_creates_project_scaffold() {
     let result = tools::init::lid_init(tools::init::InitInput {
         path: dir.path().to_string_lossy().into_owned(),
         segment: "core".to_owned(),
+        spec_prefix: None,
     })
     .await
     .unwrap();
@@ -20,7 +21,8 @@ async fn init_creates_project_scaffold() {
     assert_eq!(json["segment"], "core");
     assert!(dir.path().join("docs/arrows/index.yaml").exists());
     assert!(dir.path().join("docs/arrows/core/overview.md").exists());
-    assert!(dir.path().join("docs/intent").is_dir());
+    assert!(dir.path().join("docs/intent/core/core-specs.md").exists());
+    assert!(dir.path().join("docs/intent/core/core-design.md").exists());
 
     let index = fs::read_to_string(dir.path().join("docs/arrows/index.yaml")).unwrap();
     assert!(index.contains("schema_version: 2"));
@@ -34,6 +36,7 @@ async fn init_then_discover_succeeds() {
     tools::init::lid_init(tools::init::InitInput {
         path: dir.path().to_string_lossy().into_owned(),
         segment: "payments".to_owned(),
+        spec_prefix: None,
     })
     .await
     .unwrap();
@@ -66,6 +69,7 @@ async fn init_rejects_existing_project() {
     let result = tools::init::lid_init(tools::init::InitInput {
         path: dir.path().to_string_lossy().into_owned(),
         segment: "core".to_owned(),
+        spec_prefix: None,
     })
     .await;
 
@@ -79,6 +83,7 @@ async fn init_rejects_invalid_segment_name() {
     let result = tools::init::lid_init(tools::init::InitInput {
         path: dir.path().to_string_lossy().into_owned(),
         segment: "My Segment".to_owned(),
+        spec_prefix: None,
     })
     .await;
 
@@ -231,6 +236,9 @@ async fn add_segment_and_update_status() {
             segment_id: "billing".to_owned(),
             status: "UNMAPPED".to_owned(),
             detail: "billing/core.md".to_owned(),
+            blocks: vec![],
+            children: vec![],
+            spec_prefix: None,
         },
     )
     .await
