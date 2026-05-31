@@ -238,8 +238,9 @@ export class NavigatorPanel {
                 if (msg.blocks.length)   { entry.blocks   = msg.blocks; }
                 if (msg.children.length) { entry.children = msg.children; }
                 await this._updateIndexEntry(msg.segmentId, entry, true);
+                // Back-fill parent: on each existing child without a full round-trip.
                 for (const child of msg.children) {
-                    await this._updateIndexEntry(child, { parent: msg.segmentId });
+                    await this._patchIndexField(child, 'parent', msg.segmentId);
                 }
                 await this._scaffoldSegment(msg.segmentId, msg.detail, msg.specPrefix);
                 this._postMutationResult(true, `Segment ${msg.segmentId} added`);
@@ -305,21 +306,29 @@ export class NavigatorPanel {
         await vscode.workspace.fs.createDirectory(intentDir);
 
         const specsUri = vscode.Uri.file(path.join(intentDir.fsPath, `${segmentId}-specs.md`));
-        await vscode.workspace.fs.writeFile(
-            specsUri,
-            Buffer.from(`---\nprefix: ${specPrefix}\n---\n\n# ${segmentId} specs\n`),
-        );
+        let specsExists = true;
+        try { await vscode.workspace.fs.stat(specsUri); } catch { specsExists = false; }
+        if (!specsExists) {
+            await vscode.workspace.fs.writeFile(
+                specsUri,
+                Buffer.from(`---\nprefix: ${specPrefix}\n---\n\n# ${segmentId} specs\n`),
+            );
+        }
 
         const designUri = vscode.Uri.file(path.join(intentDir.fsPath, `${segmentId}-design.md`));
-        await vscode.workspace.fs.writeFile(
-            designUri,
-            Buffer.from(
-                `# ${segmentId} design\n\n` +
-                `## Overview\n\n` +
-                `<!-- Describe the design for ${segmentId} here. -->\n\n` +
-                `## Decisions\n`,
-            ),
-        );
+        let designExists = true;
+        try { await vscode.workspace.fs.stat(designUri); } catch { designExists = false; }
+        if (!designExists) {
+            await vscode.workspace.fs.writeFile(
+                designUri,
+                Buffer.from(
+                    `# ${segmentId} design\n\n` +
+                    `## Overview\n\n` +
+                    `<!-- Describe the design for ${segmentId} here. -->\n\n` +
+                    `## Decisions\n`,
+                ),
+            );
+        }
 
         // Create arrow doc stub only if the detail file doesn't already exist.
         const arrowUri = vscode.Uri.file(path.join(this._workspaceRoot, 'docs', 'arrows', detail));
@@ -375,6 +384,14 @@ export class NavigatorPanel {
         // them to block sequences.
         const yamlStr = yaml.dump(index, { lineWidth: -1, noRefs: true, flowLevel: 3 });
         await vscode.workspace.fs.writeFile(vscode.Uri.file(indexPath), Buffer.from(yamlStr));
+    }
+
+    /** Set a single scalar field on an existing segment using text manipulation (no round-trip). */
+    private async _patchIndexField(segmentId: string, field: string, value: string): Promise<void> {
+        const indexPath = path.join(this._workspaceRoot, 'docs', 'arrows', 'index.yaml');
+        const raw = fs.readFileSync(indexPath, 'utf8');
+        const patched = patchSegmentField(raw, segmentId, field, value);
+        await vscode.workspace.fs.writeFile(vscode.Uri.file(indexPath), Buffer.from(patched));
     }
 
     private _loadIndex(): ArrowIndex {
@@ -651,6 +668,41 @@ function insertIntoArrows(content: string, block: string): string {
         }
     }
     return [...lines.slice(0, insertAt), block, ...lines.slice(insertAt)].join('\n');
+}
+
+/**
+ * Add or replace a scalar field on an existing segment entry without
+ * touching any other part of the file.  If the field already exists on that
+ * segment it is replaced; if it doesn't exist it is appended after the last
+ * field of that segment.
+ */
+function patchSegmentField(content: string, segmentId: string, field: string, value: string): string {
+    const lines = content.split('\n');
+    // Find the segment header line (e.g. "  auth:").
+    const headerRe = new RegExp(`^  ${segmentId}:\\s*$`);
+    let headerIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+        if (headerRe.test(lines[i]!)) { headerIdx = i; break; }
+    }
+    if (headerIdx === -1) { return content; }
+
+    // Find the extent of this segment's block (4-space-indented lines after header).
+    let end = headerIdx + 1;
+    while (end < lines.length) {
+        const l = lines[end]!;
+        if (l.length > 0 && !/^    /.test(l)) { break; }
+        end++;
+    }
+
+    const fieldRe = new RegExp(`^    ${field}:`);
+    const newLine = `    ${field}: ${value}`;
+    const existingIdx = lines.findIndex((l, i) => i > headerIdx && i < end && fieldRe.test(l));
+    if (existingIdx !== -1) {
+        lines[existingIdx] = newLine;
+    } else {
+        lines.splice(end, 0, newLine);
+    }
+    return lines.join('\n');
 }
 
 // ── HTML builder ──────────────────────────────────────────────────────────────

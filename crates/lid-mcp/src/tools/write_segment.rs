@@ -33,6 +33,7 @@ pub struct AddSegmentInput {
     pub spec_prefix: Option<String>,
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn lid_add_segment(
     registry: &RepoRegistry,
     input: AddSegmentInput,
@@ -90,7 +91,30 @@ pub async fn lid_add_segment(
         .join("arrows")
         .join("index.yaml");
 
+    // Text-append the new segment so comments, blank lines, and formatting in
+    // the existing file are preserved. Children back-fill (setting parent: on
+    // existing entries) still requires a round-trip, but skipping it when
+    // there are no children is the common case.
     {
+        let raw = tokio::fs::read_to_string(&index_path)
+            .await
+            .map_err(McpToolError::Io)
+            .map_err(ErrorData::from)?;
+        let block = build_segment_block(
+            &input.segment_id,
+            status.as_str(),
+            &input.detail,
+            &blocks,
+            &children,
+        );
+        let updated = insert_into_arrows(&raw, &block);
+        atomic_write(&index_path, &updated)
+            .await
+            .map_err(ErrorData::from)?;
+    }
+
+    if children.is_empty() {
+        // Common case: no children to back-fill. Update in-memory state only.
         let mut repo = handle.write().await;
         let new_seg = Segment {
             status,
@@ -107,7 +131,11 @@ pub async fn lid_add_segment(
             parent: None,
         };
         repo.index.arrows.insert(seg_id.clone(), new_seg);
-        // Back-fill parent on each child.
+        drop(repo);
+    } else {
+        // Back-fill parent on existing children. Requires modifying those entries,
+        // so we do a full round-trip (model now has skip_serializing_if to limit damage).
+        let mut repo = handle.write().await;
         for child in &children {
             if let Some(entry) = repo.index.arrows.get_mut(child) {
                 entry.parent = Some(seg_id.clone());
@@ -239,4 +267,54 @@ async fn atomic_write(path: &Path, content: &str) -> Result<(), McpToolError> {
     tokio::fs::write(&tmp, content).await?;
     tokio::fs::rename(&tmp, path).await?;
     Ok(())
+}
+
+/// Build a two-space-indented YAML block for a new segment (no trailing newline).
+fn build_segment_block(
+    seg_id: &str,
+    status: &str,
+    detail: &str,
+    blocks: &[SegmentId],
+    children: &[SegmentId],
+) -> String {
+    let mut lines = vec![format!("  {seg_id}:")];
+    lines.push(format!("    status: {status}"));
+    // Quote detail if it contains YAML-special characters.
+    if detail.contains([':', '#', '[', ']', '{', '}', '|', '>', '&', '*', '!', ',']) {
+        lines.push(format!("    detail: {detail:?}"));
+    } else {
+        lines.push(format!("    detail: {detail}"));
+    }
+    if !blocks.is_empty() {
+        let list = blocks.iter().map(SegmentId::as_str).collect::<Vec<_>>().join(", ");
+        lines.push(format!("    blocks: [{list}]"));
+    }
+    if !children.is_empty() {
+        let list = children.iter().map(SegmentId::as_str).collect::<Vec<_>>().join(", ");
+        lines.push(format!("    children: [{list}]"));
+    }
+    lines.join("\n")
+}
+
+/// Insert `block` into the `arrows:` section of `content`, immediately before
+/// the first top-level key that follows `arrows:`. Appends at end of file when
+/// `arrows:` is the last top-level section.
+fn insert_into_arrows(content: &str, block: &str) -> String {
+    let lines: Vec<&str> = content.split('\n').collect();
+    let mut insert_at = lines.len();
+    let mut in_arrows = false;
+    for (i, line) in lines.iter().enumerate() {
+        if line.starts_with("arrows:") {
+            in_arrows = true;
+            continue;
+        }
+        if in_arrows && !line.is_empty() && !line.starts_with(|c: char| c.is_whitespace()) {
+            insert_at = i;
+            break;
+        }
+    }
+    let mut result: Vec<&str> = lines[..insert_at].to_vec();
+    result.push(block);
+    result.extend_from_slice(&lines[insert_at..]);
+    result.join("\n")
 }
