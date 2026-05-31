@@ -53,7 +53,7 @@ Always call `lid_discover` first to register the project root, then use any othe
 
 | Tool | Description |
 |------|-------------|
-| `lid_init` | Scaffold a new LID project at a path |
+| `lid_init` | Scaffold a new LID project — creates `index.yaml`, arrow doc stub, and intent files (`*-specs.md` with `prefix:` frontmatter, `*-design.md`) |
 | `lid_discover` | Find and register a LID project; returns root and segment count |
 | `lid_status` | Segment overview with spec counts |
 | `lid_check` | Run coherence checks; returns all findings |
@@ -62,10 +62,14 @@ Always call `lid_discover` first to register the project root, then use any othe
 | `lid_list_specs` | All spec lines; optional segment-ID prefix filter |
 | `lid_find_spec_references` | Source-code locations citing `@spec SPEC-ID` |
 | `lid_search` | Case-insensitive search across segment IDs, spec IDs, and text |
-| `lid_add_segment` | Add a new segment to the arrow index |
+| `lid_add_segment` | Add a new segment to the arrow index and scaffold its intent files |
 | `lid_update_segment` | Update status, next, or drift on an existing segment |
 | `lid_add_spec` | Append a new open spec line to a segment |
 | `lid_update_spec_status` | Mark a spec open / implemented / deferred |
+
+### `spec_prefix` parameter
+
+Both `lid_init` and `lid_add_segment` accept an optional `spec_prefix` field. When omitted, the prefix is inferred: if a strict majority of the project's existing spec prefixes share the same namespace component (e.g. most start with `USH-`), that namespace is prepended to the uppercased segment name (`USH-BILLING`); otherwise the segment name is uppercased directly (`BILLING`).
 
 ---
 

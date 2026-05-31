@@ -78,13 +78,19 @@ arrows:
 
 ## Spec line format
 
-Spec lines live in `docs/intent/<segment>/<segment>-specs.md`:
+Spec lines live in `docs/intent/<segment>/<segment>-specs.md`. The file may start with an optional YAML frontmatter block declaring the authoritative spec-ID prefix for the segment:
 
 ```markdown
+---
+prefix: AUTH
+---
+
 - [ ] **AUTH-001**: the system shall authenticate users via password.
 - [x] **AUTH-002**: sessions shall expire after 30 minutes of inactivity.
 - [D] **AUTH-003**: biometric login is deferred to v2.
 ```
+
+The `prefix:` field is optional. When present, `lidc check` (`spec-id-format` check) warns on any spec ID in that file whose prefix does not match.
 
 | Marker | Status |
 |--------|--------|
@@ -94,7 +100,9 @@ Spec lines live in `docs/intent/<segment>/<segment>-specs.md`:
 
 ### Spec ID format
 
-`<SEGMENT>-<NNN>` where `<SEGMENT>` is the uppercase segment name and `<NNN>` is a zero-padded number. Example: `AUTH-001`, `PAYMENTS-042`.
+`<PREFIX>-<NNN>` where `<PREFIX>` is typically the uppercase segment name (or a project-wide namespace prefix like `USH-AUTH`) and `<NNN>` is a zero-padded number. Examples: `AUTH-001`, `PAY-042`, `USH-AUTH-015`.
+
+For projects with a shared namespace, path-concatenated IDs are also valid: `LID-CORE-001` where `LID` is the project namespace, `CORE` is the segment, and `001` is the sequence number.
 
 ---
 

@@ -40,7 +40,7 @@ Open with **LID: Show Intent Navigator** (`Cmd+Shift+P`).
 
 - **Single-click** a segment node → read-only detail panel (status, specs, dependencies, next/drift prose)
 - **Double-click** a segment node → edit mode: update status, cycle spec status, edit next/drift
-- **`+ Segment`** button → add a new segment via overlay form
+- **`+ Segment`** button → add a new segment via overlay form; scaffolds `index.yaml` entry, arrow doc stub, and intent files (`*-specs.md` with `prefix:` frontmatter, `*-design.md`); the Spec Prefix field is pre-filled by majority-namespace inference and updates live as you type the segment ID
 - **`+ Add spec`** → append a spec line directly from the panel
 - Live-reloads on any file change — whether from the navigator, a manual edit, or an MCP agent write
 

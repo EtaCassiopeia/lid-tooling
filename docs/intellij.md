@@ -44,7 +44,7 @@ The **LID Navigator** panel appears automatically on the right side of the IDE f
 - **Single-click** a segment node → detail panel (status badge, spec progress bar, dependency chips, next/drift prose)
 - **Double-click** a segment node → edit mode: change status, cycle spec completion (○ → ✓ → ⊘), edit next/drift notes
 - **Right-click** a segment node → context menu: Open Arrow Doc / Open Spec File / Open LLD / Copy ID
-- **`+ Segment`** button → add a new segment via overlay form
+- **`+ Segment`** button → add a new segment via overlay form; scaffolds `index.yaml` entry, arrow doc stub, and intent files (`*-specs.md` with `prefix:` frontmatter, `*-design.md`); the Spec Prefix field is pre-filled by majority-namespace inference and updates live as you type the segment ID
 - **`+ Add spec`** in the panel → append a spec line directly to the spec file
 - Toolbar: filter by status, filter by cluster, fuzzy search, fit graph, focus neighbourhood
 - Auto-refreshes within 400 ms of any save to `index.yaml` or `docs/intent/` markdown files
@@ -55,7 +55,7 @@ The **LID Navigator** panel appears automatically on the right side of the IDE f
 
 | Action | Location |
 |--------|----------|
-| **Initialize LID Project** | **Tools → Initialize LID Project** — scaffolds `docs/arrows/index.yaml` and a first segment stub |
+| **Initialize LID Project** | **Tools → Initialize LID Project** — scaffolds `docs/arrows/index.yaml`, a first arrow doc stub, and `docs/intent/` files for the first segment |
 
 ---
 
