@@ -152,9 +152,7 @@ export class NavigatorPanel {
                 } else if (msg.type === 'open') {
                     const entry = this._indexEntry(msg.segmentId);
                     const detailFile = entry?.detail ?? `${msg.segmentId}.md`;
-                    this._openDocAtPath(
-                        path.join(this._workspaceRoot, 'docs', 'arrows', detailFile),
-                    );
+                    void this._openArrowDoc(msg.segmentId, detailFile);
                 } else {
                     void this._handleMutation(msg);
                 }
@@ -179,6 +177,16 @@ export class NavigatorPanel {
     }
 
     // ── Private helpers ─────────────────────────────────────────────────────
+
+    private async _openArrowDoc(segmentId: string, detailFile: string): Promise<void> {
+        const arrowPath = path.join(this._workspaceRoot, 'docs', 'arrows', detailFile);
+        if (!fs.existsSync(arrowPath)) {
+            const specPrefix = this._buildSpecInfo().get(segmentId)?.specPrefix ?? segmentId.toUpperCase();
+            try { await this._scaffoldSegment(segmentId, detailFile, specPrefix); }
+            catch { /* scaffold failed; let _openDocAtPath surface the error */ }
+        }
+        this._openDocAtPath(arrowPath);
+    }
 
     private _openDocAtPath(docPath: string, line?: number): void {
         void Promise.resolve(vscode.workspace.openTextDocument(docPath))

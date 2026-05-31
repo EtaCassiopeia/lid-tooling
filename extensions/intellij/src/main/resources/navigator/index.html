@@ -855,14 +855,27 @@ function populateOverlaySelects() {
   });
 }
 
+var _detailAutoFilled = false;
+
 document.getElementById('seg-id-input').addEventListener('input', function() {
-  document.getElementById('seg-prefix-input').value = suggestPrefix(this.value.trim(), _allSpecPrefixes);
+  var segId = this.value.trim();
+  document.getElementById('seg-prefix-input').value = suggestPrefix(segId, _allSpecPrefixes);
+  var detailInput = document.getElementById('seg-detail-input');
+  if (!detailInput.value || _detailAutoFilled) {
+    detailInput.value = segId ? segId + '/core.md' : '';
+    _detailAutoFilled = !!segId;
+  }
+});
+
+document.getElementById('seg-detail-input').addEventListener('input', function() {
+  _detailAutoFilled = false;
 });
 
 document.getElementById('btn-add-seg').addEventListener('click', function() {
   document.getElementById('seg-id-input').value = '';
   document.getElementById('seg-detail-input').value = '';
   document.getElementById('seg-prefix-input').value = suggestPrefix('', _allSpecPrefixes);
+  _detailAutoFilled = false;
   document.getElementById('seg-add-err').textContent = '';
   _addBlocks = []; _addChildren = [];
   populateOverlaySelects();

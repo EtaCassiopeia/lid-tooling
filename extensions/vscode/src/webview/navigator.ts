@@ -824,6 +824,7 @@ function wireInteractions(): void {
 // ── Add-segment overlay ───────────────────────────────────────────────────────
 
 const addSegOverlay = document.getElementById('add-seg-overlay')!;
+let _detailAutoFilled = false;;
 
 function refreshOverlayChips(): void {
     const blocksChips   = document.getElementById('seg-blocks-chips')!;
@@ -875,6 +876,7 @@ document.getElementById('btn-add-seg')!.addEventListener('click', () => {
     segIdInput.value  = '';
     detailInput.value = '';
     prefixInput.value = suggestPrefix('', _allSpecPrefixes);
+    _detailAutoFilled = false;
     (document.getElementById('seg-add-err') as HTMLElement).textContent = '';
     _addSegBlocks   = [];
     _addSegChildren = [];
@@ -887,6 +889,15 @@ document.getElementById('seg-id-input')!.addEventListener('input', (e) => {
     const segId = (e.target as HTMLInputElement).value.trim();
     const prefixInput = document.getElementById('seg-prefix-input') as HTMLInputElement;
     prefixInput.value = suggestPrefix(segId, _allSpecPrefixes);
+    const detailInput = document.getElementById('seg-detail-input') as HTMLInputElement;
+    if (!detailInput.value || _detailAutoFilled) {
+        detailInput.value = segId ? `${segId}/core.md` : '';
+        _detailAutoFilled = !!segId;
+    }
+});
+
+document.getElementById('seg-detail-input')!.addEventListener('input', () => {
+    _detailAutoFilled = false;
 });
 
 document.getElementById('seg-blocks-select')!.addEventListener('change', (e) => {
