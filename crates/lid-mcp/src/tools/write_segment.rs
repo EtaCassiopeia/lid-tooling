@@ -286,11 +286,19 @@ fn build_segment_block(
         lines.push(format!("    detail: {detail}"));
     }
     if !blocks.is_empty() {
-        let list = blocks.iter().map(SegmentId::as_str).collect::<Vec<_>>().join(", ");
+        let list = blocks
+            .iter()
+            .map(SegmentId::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
         lines.push(format!("    blocks: [{list}]"));
     }
     if !children.is_empty() {
-        let list = children.iter().map(SegmentId::as_str).collect::<Vec<_>>().join(", ");
+        let list = children
+            .iter()
+            .map(SegmentId::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
         lines.push(format!("    children: [{list}]"));
     }
     lines.join("\n")
