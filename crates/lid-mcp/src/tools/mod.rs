@@ -5,6 +5,7 @@ pub mod get_segment;
 pub mod init;
 pub mod list_segments;
 pub mod list_specs;
+pub mod read_file;
 pub mod search;
 pub mod status;
 pub mod write_segment;

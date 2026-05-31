@@ -189,6 +189,15 @@ pub struct UpdateSegmentInput {
     /// When present, set or clear the `drift` field (empty string → clear).
     #[serde(default)]
     pub drift: Option<String>,
+    /// When present, replace the `blocks` array (empty list → remove field).
+    #[serde(default)]
+    pub blocks: Option<Vec<String>>,
+    /// When present, replace the `children` array (empty list → remove field).
+    #[serde(default)]
+    pub children: Option<Vec<String>>,
+    /// When present, set or clear the `parent` field (empty string → clear).
+    #[serde(default)]
+    pub parent: Option<String>,
 }
 
 pub async fn lid_update_segment(
@@ -199,43 +208,77 @@ pub async fn lid_update_segment(
         .map_err(|_| McpToolError::InvalidSegmentId(input.segment_id.clone()))
         .map_err(ErrorData::from)?;
 
+    // Validate blocks/children/parent segment IDs up front.
+    if let Some(ref b) = input.blocks {
+        for s in b {
+            SegmentId::parse(s)
+                .map_err(|_| McpToolError::InvalidSegmentId(s.clone()))
+                .map_err(ErrorData::from)?;
+        }
+    }
+    if let Some(ref c) = input.children {
+        for s in c {
+            SegmentId::parse(s)
+                .map_err(|_| McpToolError::InvalidSegmentId(s.clone()))
+                .map_err(ErrorData::from)?;
+        }
+    }
+
     let handle = registry
         .get_or_discover(&input.project_root)
         .await
         .map_err(ErrorData::from)?;
+
+    // Verify the segment exists.
+    {
+        let repo = handle.read().await;
+        if !repo.index.arrows.contains_key(&seg_id) {
+            return Err(ErrorData::from(McpToolError::SegmentNotFound(
+                input.segment_id.clone(),
+            )));
+        }
+    }
 
     let index_path = Path::new(&input.project_root)
         .join("docs")
         .join("arrows")
         .join("index.yaml");
 
-    {
-        let mut repo = handle.write().await;
-        let seg = repo
-            .index
-            .arrows
-            .get_mut(&seg_id)
-            .ok_or_else(|| McpToolError::SegmentNotFound(input.segment_id.clone()))
-            .map_err(ErrorData::from)?;
+    let mut content = tokio::fs::read_to_string(&index_path)
+        .await
+        .map_err(McpToolError::Io)
+        .map_err(ErrorData::from)?;
 
-        if let Some(s) = &input.status {
-            seg.status = parse_status(s).map_err(ErrorData::from)?;
-        }
-        if let Some(n) = &input.next {
-            seg.next = if n.is_empty() { None } else { Some(n.clone()) };
-        }
-        if let Some(d) = &input.drift {
-            seg.drift = if d.is_empty() { None } else { Some(d.clone()) };
-        }
+    let seg = input.segment_id.as_str();
 
-        let yaml = serde_yaml_ng::to_string(&repo.index)
-            .map_err(|e| McpToolError::Yaml(e.to_string()))
-            .map_err(ErrorData::from)?;
-        drop(repo);
-        atomic_write(&index_path, &yaml)
-            .await
-            .map_err(ErrorData::from)?;
+    if let Some(s) = &input.status {
+        let status = parse_status(s).map_err(ErrorData::from)?;
+        content = patch_segment_scalar(&content, seg, "status", Some(status.as_str()));
     }
+    if let Some(n) = &input.next {
+        let val = if n.is_empty() { None } else { Some(n.as_str()) };
+        content = patch_segment_scalar(&content, seg, "next", val);
+    }
+    if let Some(d) = &input.drift {
+        let val = if d.is_empty() { None } else { Some(d.as_str()) };
+        content = patch_segment_scalar(&content, seg, "drift", val);
+    }
+    if let Some(b) = &input.blocks {
+        let items: Vec<&str> = b.iter().map(String::as_str).collect();
+        content = patch_segment_inline_array(&content, seg, "blocks", &items);
+    }
+    if let Some(c) = &input.children {
+        let items: Vec<&str> = c.iter().map(String::as_str).collect();
+        content = patch_segment_inline_array(&content, seg, "children", &items);
+    }
+    if let Some(p) = &input.parent {
+        let val = if p.is_empty() { None } else { Some(p.as_str()) };
+        content = patch_segment_scalar(&content, seg, "parent", val);
+    }
+
+    atomic_write(&index_path, &content)
+        .await
+        .map_err(ErrorData::from)?;
 
     let rediscover_error = registry.rediscover(Path::new(&input.project_root)).await;
     let out = WriteResult {
@@ -325,4 +368,129 @@ fn insert_into_arrows(content: &str, block: &str) -> String {
     result.push(block);
     result.extend_from_slice(&lines[insert_at..]);
     result.join("\n")
+}
+
+/// Patch a scalar field on an existing segment in raw `index.yaml` text.
+/// `value = Some(v)` adds or replaces the field; `value = None` removes it.
+/// All other content (comments, dates, inline arrays) is untouched.
+pub(crate) fn patch_segment_scalar(
+    content: &str,
+    seg_id: &str,
+    field: &str,
+    value: Option<&str>,
+) -> String {
+    let seg_key = format!("  {seg_id}:");
+    let field_prefix = format!("    {field}: ");
+
+    let lines: Vec<&str> = content.split('\n').collect();
+
+    let Some(seg_start) = lines.iter().position(|&l| l == seg_key.as_str()) else {
+        return content.to_owned();
+    };
+
+    let mut field_idx: Option<usize> = None;
+    let mut last_field_idx = seg_start;
+
+    for (i, line) in lines.iter().enumerate().skip(seg_start + 1) {
+        if line.is_empty() {
+            continue;
+        }
+        if !line.starts_with("    ") {
+            break;
+        }
+        last_field_idx = i;
+        if line.starts_with(&field_prefix) {
+            field_idx = Some(i);
+        }
+    }
+
+    let mut out: Vec<String> = lines.iter().map(ToString::to_string).collect();
+
+    match (field_idx, value) {
+        (Some(idx), Some(val)) => {
+            out[idx] = format!("    {field}: {}", yaml_scalar(val));
+        }
+        (Some(idx), None) => {
+            out.remove(idx);
+        }
+        (None, Some(val)) => {
+            out.insert(
+                last_field_idx + 1,
+                format!("    {field}: {}", yaml_scalar(val)),
+            );
+        }
+        (None, None) => {}
+    }
+
+    out.join("\n")
+}
+
+/// Patch an inline-array field on an existing segment in raw `index.yaml` text.
+/// An empty `items` slice removes the field; non-empty replaces or inserts it
+/// as `    {field}: [{item1}, {item2}, ...]`.
+pub(crate) fn patch_segment_inline_array(
+    content: &str,
+    seg_id: &str,
+    field: &str,
+    items: &[&str],
+) -> String {
+    let seg_key = format!("  {seg_id}:");
+    let field_key = format!("    {field}:");
+
+    let lines: Vec<&str> = content.split('\n').collect();
+
+    let Some(seg_start) = lines.iter().position(|&l| l == seg_key.as_str()) else {
+        return content.to_owned();
+    };
+
+    let mut field_idx: Option<usize> = None;
+    let mut last_field_idx = seg_start;
+
+    for (i, line) in lines.iter().enumerate().skip(seg_start + 1) {
+        if line.is_empty() {
+            continue;
+        }
+        if !line.starts_with("    ") {
+            break;
+        }
+        last_field_idx = i;
+        if line.starts_with(&field_key) {
+            field_idx = Some(i);
+        }
+    }
+
+    let mut out: Vec<String> = lines.iter().map(ToString::to_string).collect();
+
+    if items.is_empty() {
+        if let Some(idx) = field_idx {
+            out.remove(idx);
+        }
+    } else {
+        let list = items.join(", ");
+        let new_line = format!("    {field}: [{list}]");
+        match field_idx {
+            Some(idx) => out[idx] = new_line,
+            None => out.insert(last_field_idx + 1, new_line),
+        }
+    }
+
+    out.join("\n")
+}
+
+/// Serialize a scalar value for inline YAML. Wraps in double quotes if the
+/// value contains YAML-special characters or whitespace that could mislead
+/// a parser.
+fn yaml_scalar(s: &str) -> String {
+    let needs_quotes = s.is_empty()
+        || s.contains([
+            ':', '#', '[', ']', '{', '}', '|', '>', '&', '*', '!', ',', '\'', '"', '\n',
+        ])
+        || s.starts_with('-')
+        || s.starts_with('?');
+    if needs_quotes {
+        let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
+        format!("\"{escaped}\"")
+    } else {
+        s.to_owned()
+    }
 }

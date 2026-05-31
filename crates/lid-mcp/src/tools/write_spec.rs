@@ -63,6 +63,60 @@ pub async fn lid_update_spec_status(
     serde_json::to_string_pretty(&out).map_err(|e| ErrorData::internal_error(e.to_string(), None))
 }
 
+// ── lid_update_spec_text ──────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UpdateSpecTextInput {
+    pub project_root: String,
+    /// The spec ID whose text to update (e.g. "AUTH-001").
+    pub spec_id: String,
+    /// The new requirement text (without the ID prefix).
+    pub new_text: String,
+}
+
+pub async fn lid_update_spec_text(
+    registry: &RepoRegistry,
+    input: UpdateSpecTextInput,
+) -> Result<String, ErrorData> {
+    let spec_id = SpecId::parse(&input.spec_id)
+        .map_err(|_| McpToolError::InvalidSpecId(input.spec_id.clone()))
+        .map_err(ErrorData::from)?;
+
+    let handle = registry
+        .get_or_discover(&input.project_root)
+        .await
+        .map_err(ErrorData::from)?;
+
+    let spec_path = {
+        let repo = handle.read().await;
+        repo.specs
+            .iter()
+            .find(|sf| sf.specs.iter().any(|sl| sl.id == spec_id))
+            .map(|sf| repo.root.join(&sf.path))
+            .ok_or_else(|| McpToolError::SpecNotFound(input.spec_id.clone()))
+            .map_err(ErrorData::from)?
+    };
+
+    let content = tokio::fs::read_to_string(&spec_path)
+        .await
+        .map_err(McpToolError::Io)
+        .map_err(ErrorData::from)?;
+    let updated = markdown::update_spec_text_in_text(&content, &spec_id, &input.new_text)
+        .ok_or_else(|| McpToolError::SpecNotFound(input.spec_id.clone()))
+        .map_err(ErrorData::from)?;
+    atomic_write(&spec_path, &updated)
+        .await
+        .map_err(ErrorData::from)?;
+
+    let rediscover_error = registry.rediscover(Path::new(&input.project_root)).await;
+
+    let out = WriteResult {
+        action: format!("updated text of {}", input.spec_id),
+        rediscover_error,
+    };
+    serde_json::to_string_pretty(&out).map_err(|e| ErrorData::internal_error(e.to_string(), None))
+}
+
 // ── lid_add_spec ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, JsonSchema)]
