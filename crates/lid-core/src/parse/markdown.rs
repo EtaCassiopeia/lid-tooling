@@ -138,6 +138,44 @@ pub fn update_spec_status_in_text(
     }
 }
 
+/// Replace the text on the line that defines `spec_id`, preserving its status marker.
+///
+/// Returns the updated file content, or `None` if `spec_id` is not found.
+#[must_use]
+pub fn update_spec_text_in_text(content: &str, spec_id: &SpecId, new_text: &str) -> Option<String> {
+    let target = spec_id.as_ref();
+    let mut found = false;
+    let updated = content
+        .lines()
+        .map(|line| {
+            if !found {
+                if let Some(m) = find_spec_line_match(line) {
+                    if m.id.as_ref() == target {
+                        found = true;
+                        let marker = match m.status {
+                            SpecStatus::Implemented => 'x',
+                            SpecStatus::Open => ' ',
+                            SpecStatus::Deferred => 'D',
+                        };
+                        return format!("- [{marker}] **{target}**: {new_text}");
+                    }
+                }
+            }
+            line.to_owned()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    if found {
+        if content.ends_with('\n') {
+            Some(updated + "\n")
+        } else {
+            Some(updated)
+        }
+    } else {
+        None
+    }
+}
+
 /// Load and parse an EARS spec file.
 ///
 /// # Errors

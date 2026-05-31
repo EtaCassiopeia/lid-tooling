@@ -252,6 +252,9 @@ async fn add_segment_and_update_status() {
             status: Some("MAPPED".to_owned()),
             next: None,
             drift: None,
+            blocks: None,
+            children: None,
+            parent: None,
         },
     )
     .await
@@ -428,5 +431,187 @@ async fn add_segment_does_not_reformat_realistic_yaml() {
     assert!(
         dir.path().join("docs/arrows/billing/core.md").exists(),
         "arrow doc must be created"
+    );
+}
+
+#[tokio::test]
+async fn read_file_returns_content() {
+    let dir = tempfile::tempdir().unwrap();
+    make_repo(dir.path());
+    let root = dir.path().to_string_lossy().into_owned();
+    let registry = RepoRegistry::new();
+
+    let result = tools::read_file::lid_read_file(
+        &registry,
+        tools::read_file::ReadFileInput {
+            project_root: root.clone(),
+            path: "docs/intent/auth/auth-specs.md".to_owned(),
+        },
+    )
+    .await
+    .unwrap();
+
+    assert!(result.contains("AUTH-001"));
+}
+
+#[tokio::test]
+async fn read_file_rejects_path_traversal() {
+    let dir = tempfile::tempdir().unwrap();
+    make_repo(dir.path());
+    let root = dir.path().to_string_lossy().into_owned();
+    let registry = RepoRegistry::new();
+
+    let result = tools::read_file::lid_read_file(
+        &registry,
+        tools::read_file::ReadFileInput {
+            project_root: root.clone(),
+            path: "../../etc/passwd".to_owned(),
+        },
+    )
+    .await;
+
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn append_to_design_doc_creates_and_appends() {
+    let dir = tempfile::tempdir().unwrap();
+    make_repo(dir.path());
+    let root = dir.path().to_string_lossy().into_owned();
+    let registry = RepoRegistry::new();
+    tools::discover::lid_discover(
+        &registry,
+        tools::discover::DiscoverInput { path: root.clone() },
+    )
+    .await
+    .unwrap();
+
+    // First call creates the file.
+    tools::read_file::lid_append_to_design_doc(
+        &registry,
+        tools::read_file::AppendToDesignDocInput {
+            project_root: root.clone(),
+            segment_id: "auth".to_owned(),
+            content: "## Decision\n\nUse HMAC-SHA256 for API key signing.".to_owned(),
+        },
+    )
+    .await
+    .unwrap();
+
+    let content = fs::read_to_string(dir.path().join("docs/intent/auth/auth-design.md")).unwrap();
+    assert!(content.contains("HMAC-SHA256"));
+    assert!(content.contains("## Decision"));
+
+    // Second call appends.
+    tools::read_file::lid_append_to_design_doc(
+        &registry,
+        tools::read_file::AppendToDesignDocInput {
+            project_root: root.clone(),
+            segment_id: "auth".to_owned(),
+            content: "## Open Questions\n\nToken rotation interval TBD.".to_owned(),
+        },
+    )
+    .await
+    .unwrap();
+
+    let content2 = fs::read_to_string(dir.path().join("docs/intent/auth/auth-design.md")).unwrap();
+    assert!(content2.contains("HMAC-SHA256"));
+    assert!(content2.contains("Token rotation interval"));
+}
+
+#[tokio::test]
+async fn update_spec_text_rewrites_text_preserves_status() {
+    let dir = tempfile::tempdir().unwrap();
+    make_repo(dir.path());
+    let root = dir.path().to_string_lossy().into_owned();
+    let registry = RepoRegistry::new();
+    tools::discover::lid_discover(
+        &registry,
+        tools::discover::DiscoverInput { path: root.clone() },
+    )
+    .await
+    .unwrap();
+
+    tools::write_spec::lid_update_spec_text(
+        &registry,
+        tools::write_spec::UpdateSpecTextInput {
+            project_root: root.clone(),
+            spec_id: "AUTH-001".to_owned(),
+            new_text: "the system SHALL authenticate users via HMAC-signed tokens.".to_owned(),
+        },
+    )
+    .await
+    .unwrap();
+
+    let content = fs::read_to_string(dir.path().join("docs/intent/auth/auth-specs.md")).unwrap();
+    assert!(content.contains(
+        "- [ ] **AUTH-001**: the system SHALL authenticate users via HMAC-signed tokens."
+    ));
+    // AUTH-002 (implemented) must be untouched.
+    assert!(content.contains("- [x] **AUTH-002**: sessions shall expire."));
+}
+
+#[tokio::test]
+async fn update_segment_patches_blocks_without_round_trip() {
+    let dir = tempfile::tempdir().unwrap();
+    // Use a realistic fixture to prove inline arrays and comments are preserved.
+    fs::create_dir_all(dir.path().join("docs/arrows")).unwrap();
+    fs::create_dir_all(dir.path().join("docs/intent/auth")).unwrap();
+    fs::write(dir.path().join("docs/arrows/index.yaml"), REALISTIC_INDEX).unwrap();
+    fs::write(
+        dir.path().join("docs/intent/auth/auth-specs.md"),
+        "---\nprefix: USH-AUTH\n---\n",
+    )
+    .unwrap();
+    let root = dir.path().to_string_lossy().into_owned();
+    let registry = RepoRegistry::new();
+    tools::discover::lid_discover(
+        &registry,
+        tools::discover::DiscoverInput { path: root.clone() },
+    )
+    .await
+    .unwrap();
+
+    tools::write_segment::lid_update_segment(
+        &registry,
+        tools::write_segment::UpdateSegmentInput {
+            project_root: root.clone(),
+            segment_id: "auth".to_owned(),
+            status: Some("MAPPED".to_owned()),
+            next: None,
+            drift: None,
+            blocks: Some(vec!["shortener-core".to_owned(), "storage".to_owned()]),
+            children: None,
+            parent: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let after = fs::read_to_string(dir.path().join("docs/arrows/index.yaml")).unwrap();
+
+    // Status updated.
+    assert!(
+        after.contains("    status: MAPPED"),
+        "status must be updated"
+    );
+    // Blocks updated.
+    assert!(
+        after.contains("blocks: [shortener-core, storage]"),
+        "blocks must be updated"
+    );
+    // Dates and comments still intact.
+    assert!(
+        after.contains("sampled: 2026-04-10"),
+        "dates must be preserved"
+    );
+    assert!(
+        after.contains("# ── Storage layer"),
+        "comments must be preserved"
+    );
+    // Other inline arrays untouched.
+    assert!(
+        after.contains("children: [in-memory-store]"),
+        "other segment's arrays must be intact"
     );
 }

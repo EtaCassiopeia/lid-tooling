@@ -16,10 +16,11 @@ use crate::tools::{
     init::InitInput,
     list_segments::ListSegmentsInput,
     list_specs::ListSpecsInput,
+    read_file::{AppendToDesignDocInput, ReadFileInput},
     search::SearchInput,
     status::StatusInput,
     write_segment::{AddSegmentInput, UpdateSegmentInput},
-    write_spec::{AddSpecInput, UpdateSpecStatusInput},
+    write_spec::{AddSpecInput, UpdateSpecStatusInput, UpdateSpecTextInput},
 };
 
 #[derive(Clone)]
@@ -167,6 +168,39 @@ impl LidMcpServer {
     )]
     async fn lid_add_spec(&self, Parameters(input): Parameters<AddSpecInput>) -> String {
         crate::tools::write_spec::lid_add_spec(&self.registry, input)
+            .await
+            .unwrap_or_else(|e| format!("error: {}", e.message))
+    }
+
+    #[tool(
+        description = "Update the requirement text of an existing spec line, preserving its status marker and ID."
+    )]
+    async fn lid_update_spec_text(
+        &self,
+        Parameters(input): Parameters<UpdateSpecTextInput>,
+    ) -> String {
+        crate::tools::write_spec::lid_update_spec_text(&self.registry, input)
+            .await
+            .unwrap_or_else(|e| format!("error: {}", e.message))
+    }
+
+    #[tool(
+        description = "Read the full content of a file within the LID project (e.g. a design doc, arrow doc, or spec file). Path must be relative to project_root and must not contain '..'."
+    )]
+    async fn lid_read_file(&self, Parameters(input): Parameters<ReadFileInput>) -> String {
+        crate::tools::read_file::lid_read_file(&self.registry, input)
+            .await
+            .unwrap_or_else(|e| format!("error: {}", e.message))
+    }
+
+    #[tool(
+        description = "Append markdown content to a segment's design doc (docs/intent/{segment}/{segment}-design.md). Creates the file with a stub header if it does not exist."
+    )]
+    async fn lid_append_to_design_doc(
+        &self,
+        Parameters(input): Parameters<AppendToDesignDocInput>,
+    ) -> String {
+        crate::tools::read_file::lid_append_to_design_doc(&self.registry, input)
             .await
             .unwrap_or_else(|e| format!("error: {}", e.message))
     }

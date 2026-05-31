@@ -63,9 +63,12 @@ Always call `lid_discover` first to register the project root, then use any othe
 | `lid_find_spec_references` | Source-code locations citing `@spec SPEC-ID` |
 | `lid_search` | Case-insensitive search across segment IDs, spec IDs, and text |
 | `lid_add_segment` | Add a new segment to the arrow index and scaffold its intent files |
-| `lid_update_segment` | Update status, next, or drift on an existing segment |
+| `lid_update_segment` | Update status, next, drift, blocks, children, or parent on an existing segment |
 | `lid_add_spec` | Append a new open spec line to a segment |
 | `lid_update_spec_status` | Mark a spec open / implemented / deferred |
+| `lid_update_spec_text` | Rewrite the requirement text of an existing spec line (preserves ID and status) |
+| `lid_read_file` | Read any file within the project root (design docs, arrow docs, spec files) |
+| `lid_append_to_design_doc` | Append markdown content to a segment's design doc; creates file with stub header if absent |
 
 ### `spec_prefix` parameter
 
@@ -76,10 +79,13 @@ Both `lid_init` and `lid_add_segment` accept an optional `spec_prefix` field. Wh
 ## Typical agent workflow
 
 ```
-1. lid_discover("/path/to/project")   → registers root, returns segment count
-2. lid_status()                        → overview of all segments and spec coverage
-3. lid_get_segment("auth")             → full detail including spec lines
-4. lid_find_spec_references("AUTH-002")→ source files citing this spec
-5. lid_update_spec_status("AUTH-002", "implemented")
-6. lid_check()                         → verify no coherence regressions
+1. lid_discover("/path/to/project")           → registers root, returns segment count
+2. lid_status()                               → overview of all segments and spec coverage
+3. lid_get_segment("auth")                    → full detail including spec lines
+4. lid_read_file("docs/intent/auth/auth-design.md") → read design doc prose
+5. lid_append_to_design_doc("auth", "## Decision\n...") → record intent in LLD
+6. lid_add_spec("auth", "AUTH-042", "The system shall …") → add EARS spec line
+7. lid_find_spec_references("AUTH-002")       → source files citing this spec
+8. lid_update_spec_status("AUTH-002", "implemented")
+9. lid_check()                                → verify no coherence regressions
 ```
