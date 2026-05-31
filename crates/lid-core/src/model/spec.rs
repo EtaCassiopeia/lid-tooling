@@ -77,6 +77,10 @@ pub struct SpecFile {
     /// line when present.
     #[serde(default)]
     pub lld: Option<PathBuf>,
+    /// LID 1.2.0 path-concatenated EARS prefix declared in YAML frontmatter
+    /// (`prefix: LID-CORE`). Authoritative over ID heuristics when present.
+    #[serde(default)]
+    pub prefix: Option<String>,
 }
 
 #[cfg(test)]

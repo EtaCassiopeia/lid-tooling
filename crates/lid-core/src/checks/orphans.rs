@@ -199,6 +199,7 @@ mod tests {
                 specs: vec![],
                 implementing_artifacts: vec![],
                 lld: None,
+                prefix: None,
             })
             .collect();
 

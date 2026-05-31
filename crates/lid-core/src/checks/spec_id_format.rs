@@ -37,7 +37,35 @@ impl Check for SpecIdFormatCheck {
             }
         }
 
+        // Prefix-consistency: if a spec file declares `prefix: P`, every ID must start with `{P}-`.
         let mut findings = Vec::new();
+        for spec_file in &repo.specs {
+            if let Some(prefix) = &spec_file.prefix {
+                let expected = format!("{prefix}-");
+                for line in &spec_file.specs {
+                    if !line.id.as_str().starts_with(&expected) {
+                        findings.push(Finding {
+                            check: CheckId::SpecIdFormat,
+                            severity: Severity::Warning,
+                            category: Category::Schema,
+                            message: format!(
+                                "spec ID `{}` does not start with declared prefix `{prefix}`",
+                                line.id
+                            ),
+                            location: Some(Location {
+                                path: spec_file.path.clone(),
+                                line: Some(line.line),
+                            }),
+                            spec: Some(line.id.clone()),
+                            remediation: Some(format!(
+                                "rename ID to start with `{prefix}-` or update the `prefix:` frontmatter"
+                            )),
+                        });
+                    }
+                }
+            }
+        }
+
         for (id, locs) in &occurrences {
             if locs.len() < 2 {
                 continue;
@@ -103,6 +131,7 @@ mod tests {
                 specs: lines,
                 implementing_artifacts: vec![],
                 lld: None,
+                prefix: None,
             })
             .collect();
         LidRepo {
@@ -196,5 +225,64 @@ mod tests {
     #[test]
     fn check_id_is_spec_id_format() {
         assert_eq!(SpecIdFormatCheck.id(), CheckId::SpecIdFormat);
+    }
+
+    #[test]
+    fn prefix_consistent_ids_yield_no_findings() {
+        let root = PathBuf::from("/fake/root");
+        let specs = vec![SpecFile {
+            path: root.join("docs/specs/auth-specs.md"),
+            specs: vec![spec_line("AUTH-001", 5), spec_line("AUTH-002", 6)],
+            implementing_artifacts: vec![],
+            lld: None,
+            prefix: Some("AUTH".to_owned()),
+        }];
+        let repo = LidRepo {
+            root,
+            index: ArrowIndex {
+                schema_version: 1,
+                last_updated: None,
+                taxonomy: BTreeMap::new(),
+                arrows: BTreeMap::new(),
+                unmapped: Unmapped::default(),
+            },
+            specs,
+            llds: vec![],
+            arrow_docs: vec![],
+            citations: vec![],
+        };
+        let findings = SpecIdFormatCheck.run(&repo);
+        assert!(findings.is_empty(), "got {findings:?}");
+    }
+
+    #[test]
+    fn prefix_mismatch_yields_warning() {
+        let root = PathBuf::from("/fake/root");
+        let specs = vec![SpecFile {
+            path: root.join("docs/specs/auth-specs.md"),
+            specs: vec![spec_line("AUTH-001", 5), spec_line("BILL-001", 6)],
+            implementing_artifacts: vec![],
+            lld: None,
+            prefix: Some("AUTH".to_owned()),
+        }];
+        let repo = LidRepo {
+            root,
+            index: ArrowIndex {
+                schema_version: 1,
+                last_updated: None,
+                taxonomy: BTreeMap::new(),
+                arrows: BTreeMap::new(),
+                unmapped: Unmapped::default(),
+            },
+            specs,
+            llds: vec![],
+            arrow_docs: vec![],
+            citations: vec![],
+        };
+        let findings = SpecIdFormatCheck.run(&repo);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].severity, Severity::Warning);
+        assert!(findings[0].message.contains("BILL-001"));
+        assert!(findings[0].message.contains("AUTH"));
     }
 }

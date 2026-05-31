@@ -95,6 +95,7 @@ mod tests {
                     .collect(),
                 implementing_artifacts: vec![],
                 lld: None,
+                prefix: None,
             })
             .collect();
         LidRepo {

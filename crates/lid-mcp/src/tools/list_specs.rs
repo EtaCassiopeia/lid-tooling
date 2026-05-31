@@ -18,6 +18,8 @@ struct SpecEntry {
     status: String,
     text: String,
     file: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prefix: Option<String>,
 }
 
 pub async fn lid_list_specs(
@@ -35,17 +37,22 @@ pub async fn lid_list_specs(
     let entries: Vec<SpecEntry> = repo
         .specs
         .iter()
-        .flat_map(|sf| sf.specs.iter().map(|sl| (sf.path.clone(), sl.clone())))
-        .filter(|(_, sl)| {
+        .flat_map(|sf| {
+            sf.specs
+                .iter()
+                .map(|sl| (sf.path.clone(), sf.prefix.clone(), sl.clone()))
+        })
+        .filter(|(_, _, sl)| {
             prefix
                 .as_deref()
                 .is_none_or(|p| sl.id.as_ref().starts_with(p))
         })
-        .map(|(path, sl)| SpecEntry {
+        .map(|(path, file_prefix, sl)| SpecEntry {
             id: sl.id.to_string(),
             status: sl.status.to_string(),
             text: sl.text.clone(),
             file: path.to_string_lossy().into_owned(),
+            prefix: file_prefix,
         })
         .collect();
 
