@@ -239,10 +239,18 @@ jobs:
           done
 
   # ── Publish IntelliJ plugin to JetBrains Marketplace ────────────────────────
+  #
+  # Builds a single fat plugin zip containing all four platform lid-lsp binaries
+  # (the plugin's platformBinaryName() picks the right one at runtime).
+  # Requires four GitHub secrets:
+  #   JETBRAINS_MARKETPLACE_TOKEN  – obtain from plugins.jetbrains.com
+  #   CERTIFICATE_CHAIN            – PEM cert chain (see docs/releasing.md)
+  #   PRIVATE_KEY                  – PEM private key
+  #   PRIVATE_KEY_PASSWORD         – private key passphrase (may be empty)
 
   publish-intellij:
     name: Publish IntelliJ plugin
-    if: github.ref_type == 'tag' && secrets.JETBRAINS_MARKETPLACE_TOKEN != ''
+    if: github.ref_type == 'tag'
     needs: release
     runs-on: ubuntu-latest
     steps:
@@ -257,17 +265,25 @@ jobs:
         with:
           path: artifacts
 
-      - name: Collect IntelliJ plugin zips
+      - name: Bundle all platform lid-lsp binaries
+        shell: bash
         run: |
-          mkdir -p intellij-zips
-          find artifacts -name 'lid-intellij-*.zip' -exec cp {} intellij-zips/ \;
-          ls intellij-zips/
+          mkdir -p extensions/intellij/server
+          # Each build matrix job uploaded lid-lsp-<target>[.exe] as a standalone
+          # binary. Collect all four so the fat plugin zip works on every OS.
+          find artifacts -name 'lid-lsp-*' ! -name '*.sha256' \
+            -exec cp {} extensions/intellij/server/ \;
+          chmod +x extensions/intellij/server/lid-lsp-* 2>/dev/null || true
+          ls -la extensions/intellij/server/
 
-      - name: Publish to JetBrains Marketplace
+      - name: Sign and publish plugin
         working-directory: extensions/intellij
-        run: ./gradlew publishPlugin --no-daemon
+        run: ./gradlew signPlugin publishPlugin --no-daemon
         env:
           JETBRAINS_MARKETPLACE_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
+          CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
 
   # ── Update Homebrew tap ───────────────────────────────────────────────────────
 

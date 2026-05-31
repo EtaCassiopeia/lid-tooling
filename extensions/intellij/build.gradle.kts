@@ -16,6 +16,7 @@ dependencies {
     intellijPlatform {
         intellijIdeaCommunity("2024.3")
         plugin("com.redhat.devtools.lsp4ij:0.9.0")
+        instrumentationTools()
     }
 }
 
@@ -32,6 +33,9 @@ intellijPlatform {
         certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN")
         privateKey        = providers.environmentVariable("PRIVATE_KEY")
         password          = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
+    }
+    pluginVerification {
+        ides { recommended() }
     }
 }
 

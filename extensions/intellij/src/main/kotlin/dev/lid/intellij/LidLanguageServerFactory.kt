@@ -24,9 +24,20 @@ private class LidLanguageServer(project: Project) : OSProcessStreamConnectionPro
     private fun resolveServerPath(): String {
         val pluginDir = PluginManagerCore.getPlugin(PluginId.getId("dev.lid.intellij"))?.pluginPath
         if (pluginDir != null) {
-            val binary = pluginDir.resolve("server/lid-lsp").toFile()
+            val binary = pluginDir.resolve("server/${platformBinaryName()}").toFile()
             if (binary.canExecute()) return binary.absolutePath
         }
         return "lid-lsp"
+    }
+
+    private fun platformBinaryName(): String {
+        val os   = System.getProperty("os.name").lowercase()
+        val arch = System.getProperty("os.arch").lowercase()
+        return when {
+            os.contains("win")                              -> "lid-lsp-x86_64-pc-windows-msvc.exe"
+            os.contains("mac") && arch in listOf("aarch64", "arm64") -> "lid-lsp-aarch64-apple-darwin"
+            os.contains("mac")                             -> "lid-lsp-x86_64-apple-darwin"
+            else                                           -> "lid-lsp-x86_64-unknown-linux-gnu"
+        }
     }
 }
