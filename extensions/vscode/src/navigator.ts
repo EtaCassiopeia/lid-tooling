@@ -182,8 +182,13 @@ export class NavigatorPanel {
         const arrowPath = path.join(this._workspaceRoot, 'docs', 'arrows', detailFile);
         if (!fs.existsSync(arrowPath)) {
             const specPrefix = this._buildSpecInfo().get(segmentId)?.specPrefix ?? segmentId.toUpperCase();
-            try { await this._scaffoldSegment(segmentId, detailFile, specPrefix); }
-            catch { /* scaffold failed; let _openDocAtPath surface the error */ }
+            try {
+                await this._scaffoldSegment(segmentId, detailFile, specPrefix);
+            } catch (e) {
+                void vscode.window.showWarningMessage(
+                    `LID: could not scaffold files for ${segmentId} — ${String(e)}`,
+                );
+            }
         }
         this._openDocAtPath(arrowPath);
     }
@@ -340,9 +345,23 @@ export class NavigatorPanel {
         create = false,
     ): Promise<void> {
         const indexPath = path.join(this._workspaceRoot, 'docs', 'arrows', 'index.yaml');
+
+        if (create) {
+            // Text-append to avoid reformatting the whole file.
+            const raw = fs.readFileSync(indexPath, 'utf8');
+            const block = buildSegmentBlock(segmentId, changes);
+            await vscode.workspace.fs.writeFile(
+                vscode.Uri.file(indexPath),
+                Buffer.from(insertIntoArrows(raw, block)),
+            );
+            return;
+        }
+
+        // Existing-entry update: load with JSON_SCHEMA so date strings (e.g.
+        // "2026-04-10") are not coerced to Date objects on re-serialisation.
         const index = this._loadIndex();
         if (!index.arrows) { index.arrows = {}; }
-        if (!create && !index.arrows[segmentId]) {
+        if (!index.arrows[segmentId]) {
             throw new Error(`Segment '${segmentId}' not found in index.yaml`);
         }
         const merged = { ...(index.arrows[segmentId] ?? {}), ...changes };
@@ -352,14 +371,17 @@ export class NavigatorPanel {
             }
         }
         index.arrows[segmentId] = merged;
-        const yamlStr = yaml.dump(index, { lineWidth: -1 });
+        // flowLevel: 3 keeps short arrays ([a, b]) inline rather than expanding
+        // them to block sequences.
+        const yamlStr = yaml.dump(index, { lineWidth: -1, noRefs: true, flowLevel: 3 });
         await vscode.workspace.fs.writeFile(vscode.Uri.file(indexPath), Buffer.from(yamlStr));
     }
 
     private _loadIndex(): ArrowIndex {
         const indexPath = path.join(this._workspaceRoot, 'docs', 'arrows', 'index.yaml');
         try {
-            return yaml.load(fs.readFileSync(indexPath, 'utf8')) as ArrowIndex;
+            // JSON_SCHEMA prevents js-yaml from coercing bare date strings to Date objects.
+            return (yaml.load(fs.readFileSync(indexPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) ?? {}) as ArrowIndex;
         } catch {
             return {};
         }
@@ -579,6 +601,56 @@ export class NavigatorPanelSerializer implements vscode.WebviewPanelSerializer {
         }
         NavigatorPanel.revive(panel, this._extensionUri, workspaceRoot);
     }
+}
+
+// ── YAML helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Serialise a new segment entry as indented YAML lines (no trailing newline).
+ * Keeps array values inline (`[a, b]`) to match the usual index.yaml style.
+ */
+function buildSegmentBlock(segmentId: string, entry: Partial<ArrowEntry>): string {
+    const lines: string[] = [`  ${segmentId}:`];
+    const FIELD_ORDER: ReadonlyArray<keyof ArrowEntry> = [
+        'status', 'detail', 'parent', 'blocks', 'children',
+        'sampled', 'audited', 'next', 'drift',
+    ];
+    for (const k of FIELD_ORDER) {
+        const v = entry[k];
+        if (v === undefined || v === null) { continue; }
+        if (Array.isArray(v)) {
+            if (v.length === 0) { continue; }
+            lines.push(`    ${k}: [${v.join(', ')}]`);
+        } else if (typeof v === 'string') {
+            // Quote strings that contain YAML-special characters.
+            const needsQuote = /[:#[\]{}|>&*!,?@`]/.test(v) || v.trim() !== v;
+            lines.push(`    ${k}: ${needsQuote ? JSON.stringify(v) : v}`);
+        } else {
+            lines.push(`    ${k}: ${String(v)}`);
+        }
+    }
+    return lines.join('\n');
+}
+
+/**
+ * Insert `block` (a multi-line segment entry, no trailing newline) into the
+ * `arrows:` section of `content`, immediately before the first top-level key
+ * that follows the section.  If the file ends with the arrows section, appends.
+ */
+function insertIntoArrows(content: string, block: string): string {
+    const lines = content.split('\n');
+    let insertAt = lines.length;
+    let inArrows = false;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]!;
+        if (/^arrows:/.test(line)) { inArrows = true; continue; }
+        // A non-empty line with no leading whitespace after arrows: is the next top-level key.
+        if (inArrows && line.length > 0 && !/^\s/.test(line)) {
+            insertAt = i;
+            break;
+        }
+    }
+    return [...lines.slice(0, insertAt), block, ...lines.slice(insertAt)].join('\n');
 }
 
 // ── HTML builder ──────────────────────────────────────────────────────────────
