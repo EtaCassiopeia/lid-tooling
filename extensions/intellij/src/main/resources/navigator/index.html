@@ -29,7 +29,7 @@
   #toolbar button.primary:hover { background: #4f52d3; }
 
   #main { display: flex; flex: 1; overflow: hidden; position: relative; }
-  #cy { flex: 1; }
+  #cy { flex: 1; min-width: 0; overflow: hidden; }
 
   #empty {
     display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
@@ -47,7 +47,7 @@
 
   /* ── Side panel ──────────────────────────────────────────── */
   #panel {
-    width: 0; overflow: hidden; transition: width 0.2s ease;
+    width: 0; flex-shrink: 0; overflow: hidden; transition: width 0.2s ease;
     background: #1a1d2e; border-left: 1px solid #2d3250; display: flex; flex-direction: column;
   }
   #panel.open { width: 300px; }
@@ -569,7 +569,7 @@ function openPanel(node, edit) {
 
   panelBody.innerHTML = html;
   sidePanel.classList.add('open');
-  cy && cy.resize();
+  setTimeout(function() { cy && cy.resize(); }, 220);
 }
 
 panelBody.addEventListener('click', function(e) {
@@ -664,7 +664,7 @@ function closePanel() {
   btnEdit.textContent = '✎ Edit'; btnEdit.classList.remove('active');
   clearFocus();
   sidePanel.classList.remove('open');
-  cy && cy.resize();
+  setTimeout(function() { cy && cy.resize(); }, 220);
 }
 
 // ── Context menu ──────────────────────────────────────────────────────────────
