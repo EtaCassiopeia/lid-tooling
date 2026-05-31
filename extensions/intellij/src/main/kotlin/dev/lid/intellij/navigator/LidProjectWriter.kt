@@ -2,8 +2,6 @@ package dev.lid.intellij.navigator
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
-import org.yaml.snakeyaml.DumperOptions
-import org.yaml.snakeyaml.Yaml
 import java.io.File
 
 class LidProjectWriter(private val project: Project) {
@@ -46,29 +44,29 @@ class LidProjectWriter(private val project: Project) {
         refreshVfs(resolved)
     }
 
-    @Suppress("UNCHECKED_CAST")
     fun updateIndexEntry(segmentId: String, changes: Map<String, Any?>, create: Boolean = false) {
         val indexFile = File(project.basePath ?: error("No project base"), "docs/arrows/index.yaml")
-        val yaml = buildYaml()
-        val raw: MutableMap<String, Any> = if (indexFile.exists()) {
-            yaml.load<Map<String, Any>>(indexFile.readText())?.toMutableMap() ?: mutableMapOf()
+        var content = if (indexFile.exists()) indexFile.readText() else "schema_version: 2\narrows:\n"
+
+        if (create) {
+            val block = IndexYamlWriter.buildSegmentBlock(segmentId, changes)
+            content = IndexYamlWriter.insertIntoArrows(content, block)
         } else {
-            mutableMapOf()
+            for ((k, v) in changes) {
+                content = when (v) {
+                    null -> IndexYamlWriter.patchSegmentField(content, segmentId, k, null)
+                    is List<*> -> {
+                        @Suppress("UNCHECKED_CAST")
+                        IndexYamlWriter.patchSegmentInlineArray(
+                            content, segmentId, k, (v as List<String?>).filterNotNull(),
+                        )
+                    }
+                    else -> IndexYamlWriter.patchSegmentField(content, segmentId, k, v.toString())
+                }
+            }
         }
 
-        val arrows = raw.getOrPut("arrows") { mutableMapOf<String, Any>() }
-            .let { it as? MutableMap<String, Any> ?: mutableMapOf<String, Any>().also { m -> raw["arrows"] = m } }
-
-        if (!create) check(arrows.containsKey(segmentId)) { "Segment '$segmentId' not found in index.yaml" }
-
-        val entry = (arrows[segmentId] as? MutableMap<String, Any>)
-            ?: mutableMapOf<String, Any>().also { arrows[segmentId] = it }
-
-        for ((k, v) in changes) {
-            if (v == null) entry.remove(k) else entry[k] = v
-        }
-
-        indexFile.writeText(yaml.dump(raw))
+        indexFile.writeText(content)
         refreshVfs(indexFile.absolutePath)
     }
 
@@ -79,6 +77,41 @@ class LidProjectWriter(private val project: Project) {
         updateIndexEntry(segmentId, entry, create = true)
         for (child in children) {
             updateIndexEntry(child, mapOf("parent" to segmentId))
+        }
+    }
+
+    fun scaffoldSegment(segmentId: String, detail: String, specPrefix: String?) {
+        val base = project.basePath ?: return
+        val root = File(base)
+
+        val arrowPath = root.resolve("docs/arrows/$detail")
+        if (!arrowPath.exists()) {
+            arrowPath.parentFile?.mkdirs()
+            val title = segmentId.replace('-', ' ')
+            arrowPath.writeText(
+                "# $title\n\n## Overview\n\n<!-- Describe the $segmentId segment here. -->\n\n" +
+                "## References\n\n### LLD\n- `docs/intent/$segmentId/$segmentId-design.md`\n\n" +
+                "### EARS\n- `docs/intent/$segmentId/$segmentId-specs.md`\n",
+            )
+            refreshVfs(arrowPath.absolutePath)
+        }
+
+        val intentDir = root.resolve("docs/intent/$segmentId")
+        intentDir.mkdirs()
+
+        val prefix = specPrefix ?: segmentId.uppercase()
+        val specsPath = intentDir.resolve("$segmentId-specs.md")
+        if (!specsPath.exists()) {
+            specsPath.writeText("---\nprefix: $prefix\n---\n\n# $segmentId specs\n")
+            refreshVfs(specsPath.absolutePath)
+        }
+
+        val designPath = intentDir.resolve("$segmentId-design.md")
+        if (!designPath.exists()) {
+            designPath.writeText(
+                "# $segmentId design\n\n## Overview\n\n<!-- Describe the design for $segmentId here. -->\n\n## Decisions\n",
+            )
+            refreshVfs(designPath.absolutePath)
         }
     }
 
@@ -114,14 +147,5 @@ class LidProjectWriter(private val project: Project) {
 
     private fun refreshVfs(path: String) {
         LocalFileSystem.getInstance().refreshAndFindFileByPath(path)?.refresh(false, false)
-    }
-
-    private fun buildYaml(): Yaml {
-        val opts = DumperOptions().apply {
-            defaultFlowStyle = DumperOptions.FlowStyle.BLOCK
-            indent = 2
-            isPrettyFlow = true
-        }
-        return Yaml(opts)
     }
 }

@@ -130,7 +130,9 @@ class LidNavigatorPanel(private val project: Project) : JPanel(BorderLayout()), 
                 postResult(true, "Segment ${msg.segmentId} metadata saved")
             }
             is NavigatorMessage.AddSegment -> {
-                LidProjectWriter(project).addSegment(msg.segmentId, msg.status, msg.detail, msg.blocks, msg.children)
+                val writer = LidProjectWriter(project)
+                writer.addSegment(msg.segmentId, msg.status, msg.detail, msg.blocks, msg.children)
+                writer.scaffoldSegment(msg.segmentId, msg.detail, msg.specPrefix)
                 postResult(true, "Segment ${msg.segmentId} added")
             }
             is NavigatorMessage.RemoveConnection -> {

@@ -61,24 +61,23 @@ impl std::fmt::Display for Status {
 ///
 /// All optional fields default to `None` / empty so that minimal YAML
 /// entries (just `status: UNMAPPED` plus `detail: …`) deserialize cleanly.
+/// Field order matches the conventional YAML layout so that round-trips
+/// (`parse → serialize`) produce minimal diffs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Segment {
     pub status: Status,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sampled: Option<NaiveDate>,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audited: Option<NaiveDate>,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audited_sha: Option<GitSha>,
 
-    #[serde(default)]
-    pub blocks: Vec<SegmentId>,
-
-    #[serde(default, rename = "blockedBy")]
-    pub blocked_by: Vec<SegmentId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<SegmentId>,
 
     /// Path to the segment's detail document. For leaf segments this is
     /// a path relative to `docs/arrows/` (e.g. `linked-intent-dev/core.md`).
@@ -87,26 +86,25 @@ pub struct Segment {
     /// `../intent/linked-intent-dev/linked-intent-dev-design.md`).
     pub detail: PathBuf,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub blocks: Vec<SegmentId>,
+
+    #[serde(default, rename = "blockedBy", skip_serializing_if = "Vec::is_empty")]
+    pub blocked_by: Vec<SegmentId>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<SegmentId>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Option<String>,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drift: Option<String>,
 
     /// Target segment when `status == Status::Merged`. Required only in
     /// that state; absent otherwise.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merged_into: Option<SegmentId>,
-
-    /// Child segment IDs for hierarchical arrow trees (PR #12 layout).
-    /// Present only on parent segments; absent on leaves.
-    #[serde(default)]
-    pub children: Vec<SegmentId>,
-
-    /// Parent segment ID for child segments in a hierarchical arrow tree.
-    /// Present only on children; absent on root/top-level segments.
-    #[serde(default)]
-    pub parent: Option<SegmentId>,
 }
 
 /// Orphans — files known to exist under the intent tree or spec files but
@@ -114,17 +112,17 @@ pub struct Segment {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnmappedDocs {
     /// Legacy field (pre-PR #12 layout). Kept for backward compatibility.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub llds: Vec<PathBuf>,
 
     /// Legacy field (pre-PR #12 layout). Kept for backward compatibility.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub specs: Vec<PathBuf>,
 
     /// Intent-tree files (design docs, spec files) that exist but are not
     /// yet referenced from any arrow segment. Used in the PR #12 layout
     /// where both LLDs and specs live under `docs/intent/`.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub intent: Vec<PathBuf>,
 }
 
@@ -139,13 +137,13 @@ pub struct Unmapped {
 pub struct ArrowIndex {
     pub schema_version: u32,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_updated: Option<NaiveDate>,
 
     /// Free-form grouping of segments under named clusters (e.g. `core`,
     /// `experimental`). `BTreeMap` keeps cluster order stable across
     /// serialize round-trips.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub taxonomy: BTreeMap<String, Vec<SegmentId>>,
 
     #[serde(default)]
@@ -238,10 +236,8 @@ mod tests {
             json["arrows"]["linked-intent-dev"]["status"],
             serde_json::Value::String("MAPPED".into())
         );
-        assert_eq!(
-            json["arrows"]["linked-intent-dev"]["blockedBy"],
-            serde_json::json!([])
-        );
+        // blockedBy is empty → skipped during serialization
+        assert!(json["arrows"]["linked-intent-dev"]["blockedBy"].is_null());
         assert_eq!(
             json["arrows"]["linked-intent-dev"]["blocks"],
             serde_json::json!(["lid-coach"])

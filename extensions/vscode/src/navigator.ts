@@ -12,21 +12,17 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import * as yaml from 'js-yaml';
 
+import {
+    type ArrowEntry,
+    buildScaffoldContents,
+    buildSegmentBlock,
+    insertIntoArrows,
+    patchSegmentField,
+} from './lib/index-yaml';
+
 const VIEW_TYPE = 'lid.intentNavigator';
 
 // ── Shared types (must stay in sync with src/webview/navigator.ts) ───────────
-
-interface ArrowEntry {
-    status?: string;
-    detail?: string;
-    blocks?: string[];
-    children?: string[];
-    parent?: string;
-    next?: string;
-    drift?: string;
-    sampled?: string;
-    audited?: string;
-}
 
 interface ArrowIndex {
     arrows?: Record<string, ArrowEntry>;
@@ -90,7 +86,7 @@ type WebviewMessage =
     | { type: 'addSpec'; specFile: string | undefined; segmentId: string; specId: string; text: string; specPrefix?: string }
     | { type: 'updateSegmentStatus'; segmentId: string; newStatus: string }
     | { type: 'updateSegmentMeta'; segmentId: string; next: string; drift: string }
-    | { type: 'addSegment'; segmentId: string; status: string; detail: string; blocks: string[]; children: string[] }
+    | { type: 'addSegment'; segmentId: string; status: string; detail: string; blocks: string[]; children: string[]; specPrefix: string }
     | { type: 'removeConnection'; kind: 'blocks' | 'blockedBy' | 'children' | 'parent'; segmentId: string; target: string };
 
 // ── NavigatorPanel ────────────────────────────────────────────────────────────
@@ -152,9 +148,7 @@ export class NavigatorPanel {
                 } else if (msg.type === 'open') {
                     const entry = this._indexEntry(msg.segmentId);
                     const detailFile = entry?.detail ?? `${msg.segmentId}.md`;
-                    this._openDocAtPath(
-                        path.join(this._workspaceRoot, 'docs', 'arrows', detailFile),
-                    );
+                    void this._openArrowDoc(msg.segmentId, detailFile);
                 } else {
                     void this._handleMutation(msg);
                 }
@@ -179,6 +173,21 @@ export class NavigatorPanel {
     }
 
     // ── Private helpers ─────────────────────────────────────────────────────
+
+    private async _openArrowDoc(segmentId: string, detailFile: string): Promise<void> {
+        const arrowPath = path.join(this._workspaceRoot, 'docs', 'arrows', detailFile);
+        if (!fs.existsSync(arrowPath)) {
+            const specPrefix = this._buildSpecInfo().get(segmentId)?.specPrefix ?? segmentId.toUpperCase();
+            try {
+                await this._scaffoldSegment(segmentId, detailFile, specPrefix);
+            } catch (e) {
+                void vscode.window.showWarningMessage(
+                    `LID: could not scaffold files for ${segmentId} — ${String(e)}`,
+                );
+            }
+        }
+        this._openDocAtPath(arrowPath);
+    }
 
     private _openDocAtPath(docPath: string, line?: number): void {
         void Promise.resolve(vscode.workspace.openTextDocument(docPath))
@@ -225,9 +234,11 @@ export class NavigatorPanel {
                 if (msg.blocks.length)   { entry.blocks   = msg.blocks; }
                 if (msg.children.length) { entry.children = msg.children; }
                 await this._updateIndexEntry(msg.segmentId, entry, true);
+                // Back-fill parent: on each existing child without a full round-trip.
                 for (const child of msg.children) {
-                    await this._updateIndexEntry(child, { parent: msg.segmentId });
+                    await this._patchIndexField(child, 'parent', msg.segmentId);
                 }
+                await this._scaffoldSegment(msg.segmentId, msg.detail, msg.specPrefix);
                 this._postMutationResult(true, `Segment ${msg.segmentId} added`);
             } else if (msg.type === 'removeConnection') {
                 await this._removeConnection(msg.kind, msg.segmentId, msg.target);
@@ -286,15 +297,59 @@ export class NavigatorPanel {
         }
     }
 
+    private async _scaffoldSegment(segmentId: string, detail: string, specPrefix: string): Promise<void> {
+        const contents = buildScaffoldContents(segmentId, detail, specPrefix);
+        const root = this._workspaceRoot;
+
+        const intentDir = vscode.Uri.file(path.join(root, 'docs', 'intent', segmentId));
+        await vscode.workspace.fs.createDirectory(intentDir);
+
+        const specsUri = vscode.Uri.file(path.join(root, contents.specsPath));
+        let specsExists = true;
+        try { await vscode.workspace.fs.stat(specsUri); } catch { specsExists = false; }
+        if (!specsExists) {
+            await vscode.workspace.fs.writeFile(specsUri, Buffer.from(contents.specsContent));
+        }
+
+        const designUri = vscode.Uri.file(path.join(root, contents.designPath));
+        let designExists = true;
+        try { await vscode.workspace.fs.stat(designUri); } catch { designExists = false; }
+        if (!designExists) {
+            await vscode.workspace.fs.writeFile(designUri, Buffer.from(contents.designContent));
+        }
+
+        const arrowUri = vscode.Uri.file(path.join(root, contents.arrowPath));
+        let arrowExists = true;
+        try { await vscode.workspace.fs.stat(arrowUri); } catch { arrowExists = false; }
+        if (!arrowExists) {
+            await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(arrowUri.fsPath)));
+            await vscode.workspace.fs.writeFile(arrowUri, Buffer.from(contents.arrowContent));
+        }
+    }
+
     private async _updateIndexEntry(
         segmentId: string,
         changes: Partial<ArrowEntry>,
         create = false,
     ): Promise<void> {
         const indexPath = path.join(this._workspaceRoot, 'docs', 'arrows', 'index.yaml');
+
+        if (create) {
+            // Text-append to avoid reformatting the whole file.
+            const raw = fs.readFileSync(indexPath, 'utf8');
+            const block = buildSegmentBlock(segmentId, changes);
+            await vscode.workspace.fs.writeFile(
+                vscode.Uri.file(indexPath),
+                Buffer.from(insertIntoArrows(raw, block)),
+            );
+            return;
+        }
+
+        // Existing-entry update: load with JSON_SCHEMA so date strings (e.g.
+        // "2026-04-10") are not coerced to Date objects on re-serialisation.
         const index = this._loadIndex();
         if (!index.arrows) { index.arrows = {}; }
-        if (!create && !index.arrows[segmentId]) {
+        if (!index.arrows[segmentId]) {
             throw new Error(`Segment '${segmentId}' not found in index.yaml`);
         }
         const merged = { ...(index.arrows[segmentId] ?? {}), ...changes };
@@ -304,14 +359,25 @@ export class NavigatorPanel {
             }
         }
         index.arrows[segmentId] = merged;
-        const yamlStr = yaml.dump(index, { lineWidth: -1 });
+        // flowLevel: 3 keeps short arrays ([a, b]) inline rather than expanding
+        // them to block sequences.
+        const yamlStr = yaml.dump(index, { lineWidth: -1, noRefs: true, flowLevel: 3 });
         await vscode.workspace.fs.writeFile(vscode.Uri.file(indexPath), Buffer.from(yamlStr));
+    }
+
+    /** Set a single scalar field on an existing segment using text manipulation (no round-trip). */
+    private async _patchIndexField(segmentId: string, field: string, value: string): Promise<void> {
+        const indexPath = path.join(this._workspaceRoot, 'docs', 'arrows', 'index.yaml');
+        const raw = fs.readFileSync(indexPath, 'utf8');
+        const patched = patchSegmentField(raw, segmentId, field, value);
+        await vscode.workspace.fs.writeFile(vscode.Uri.file(indexPath), Buffer.from(patched));
     }
 
     private _loadIndex(): ArrowIndex {
         const indexPath = path.join(this._workspaceRoot, 'docs', 'arrows', 'index.yaml');
         try {
-            return yaml.load(fs.readFileSync(indexPath, 'utf8')) as ArrowIndex;
+            // JSON_SCHEMA prevents js-yaml from coercing bare date strings to Date objects.
+            return (yaml.load(fs.readFileSync(indexPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) ?? {}) as ArrowIndex;
         } catch {
             return {};
         }
@@ -532,6 +598,7 @@ export class NavigatorPanelSerializer implements vscode.WebviewPanelSerializer {
         NavigatorPanel.revive(panel, this._extensionUri, workspaceRoot);
     }
 }
+
 
 // ── HTML builder ──────────────────────────────────────────────────────────────
 
@@ -940,6 +1007,10 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
       <div class="seg-field">
         <label>Detail path (relative to docs/arrows/)</label>
         <input class="edit-input" id="seg-detail-input" placeholder="billing/core.md">
+      </div>
+      <div class="seg-field">
+        <label>Spec prefix</label>
+        <input class="edit-input" id="seg-prefix-input" placeholder="BILLING">
       </div>
       <div class="seg-field">
         <label>Blocks (optional)</label>

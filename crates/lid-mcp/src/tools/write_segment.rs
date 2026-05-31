@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use lid_core::model::{Segment, SegmentId, Status};
+use lid_core::scaffold;
 use rmcp::model::ErrorData;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -20,8 +21,19 @@ pub struct AddSegmentInput {
     pub status: String,
     /// Path to the detail document, relative to `docs/arrows/`.
     pub detail: String,
+    /// Segment IDs this segment blocks (optional).
+    #[serde(default)]
+    pub blocks: Vec<String>,
+    /// Child segment IDs (optional).
+    #[serde(default)]
+    pub children: Vec<String>,
+    /// Spec-ID prefix (e.g. "MYAPP-AUTH"). If omitted, derived from the
+    /// project's existing prefixes or the segment name.
+    #[serde(default)]
+    pub spec_prefix: Option<String>,
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn lid_add_segment(
     registry: &RepoRegistry,
     input: AddSegmentInput,
@@ -31,44 +43,104 @@ pub async fn lid_add_segment(
         .map_err(ErrorData::from)?;
     let status = parse_status(&input.status).map_err(ErrorData::from)?;
 
+    let blocks: Vec<SegmentId> = input
+        .blocks
+        .iter()
+        .map(|s| {
+            SegmentId::parse(s)
+                .map_err(|_| McpToolError::InvalidSegmentId(s.clone()))
+                .map_err(ErrorData::from)
+        })
+        .collect::<Result<_, _>>()?;
+
+    let children: Vec<SegmentId> = input
+        .children
+        .iter()
+        .map(|s| {
+            SegmentId::parse(s)
+                .map_err(|_| McpToolError::InvalidSegmentId(s.clone()))
+                .map_err(ErrorData::from)
+        })
+        .collect::<Result<_, _>>()?;
+
     let handle = registry
         .get_or_discover(&input.project_root)
         .await
         .map_err(ErrorData::from)?;
 
-    {
+    // Resolve spec prefix: explicit → infer from existing prefixes → derive from name.
+    let spec_prefix = {
         let repo = handle.read().await;
         if repo.index.arrows.contains_key(&seg_id) {
             return Err(ErrorData::from(McpToolError::DuplicateSegment(
                 input.segment_id.clone(),
             )));
         }
-    }
+        input.spec_prefix.clone().unwrap_or_else(|| {
+            let existing: Vec<&str> = repo
+                .specs
+                .iter()
+                .filter_map(|sf| sf.prefix.as_deref())
+                .collect();
+            scaffold::suggest_prefix(&input.segment_id, &existing)
+        })
+    };
 
     let index_path = Path::new(&input.project_root)
         .join("docs")
         .join("arrows")
         .join("index.yaml");
 
+    // Text-append the new segment so comments, blank lines, and formatting in
+    // the existing file are preserved. Children back-fill (setting parent: on
+    // existing entries) still requires a round-trip, but skipping it when
+    // there are no children is the common case.
     {
-        let mut repo = handle.write().await;
-        repo.index.arrows.insert(
-            seg_id,
-            Segment {
-                status,
-                detail: std::path::PathBuf::from(&input.detail),
-                sampled: None,
-                audited: None,
-                audited_sha: None,
-                blocks: Vec::new(),
-                blocked_by: Vec::new(),
-                next: None,
-                drift: None,
-                merged_into: None,
-                children: Vec::new(),
-                parent: None,
-            },
+        let raw = tokio::fs::read_to_string(&index_path)
+            .await
+            .map_err(McpToolError::Io)
+            .map_err(ErrorData::from)?;
+        let block = build_segment_block(
+            &input.segment_id,
+            status.as_str(),
+            &input.detail,
+            &blocks,
+            &children,
         );
+        let updated = insert_into_arrows(&raw, &block);
+        atomic_write(&index_path, &updated)
+            .await
+            .map_err(ErrorData::from)?;
+    }
+
+    if children.is_empty() {
+        // Common case: no children to back-fill. Update in-memory state only.
+        let mut repo = handle.write().await;
+        let new_seg = Segment {
+            status,
+            detail: std::path::PathBuf::from(&input.detail),
+            sampled: None,
+            audited: None,
+            audited_sha: None,
+            blocks: blocks.clone(),
+            blocked_by: Vec::new(),
+            next: None,
+            drift: None,
+            merged_into: None,
+            children: children.clone(),
+            parent: None,
+        };
+        repo.index.arrows.insert(seg_id.clone(), new_seg);
+        drop(repo);
+    } else {
+        // Back-fill parent on existing children. Requires modifying those entries,
+        // so we do a full round-trip (model now has skip_serializing_if to limit damage).
+        let mut repo = handle.write().await;
+        for child in &children {
+            if let Some(entry) = repo.index.arrows.get_mut(child) {
+                entry.parent = Some(seg_id.clone());
+            }
+        }
         let yaml = serde_yaml_ng::to_string(&repo.index)
             .map_err(|e| McpToolError::Yaml(e.to_string()))
             .map_err(ErrorData::from)?;
@@ -78,9 +150,25 @@ pub async fn lid_add_segment(
             .map_err(ErrorData::from)?;
     }
 
-    let rediscover_error = registry.rediscover(Path::new(&input.project_root)).await;
+    let root = Path::new(&input.project_root);
+    tokio::task::spawn_blocking({
+        let root = root.to_path_buf();
+        let seg = input.segment_id.clone();
+        let detail = input.detail.clone();
+        let prefix = spec_prefix.clone();
+        move || -> Result<(), McpToolError> {
+            scaffold::scaffold_arrow_doc(&root, &detail, &seg).map_err(McpToolError::Io)?;
+            scaffold::scaffold_intent_dir(&root, &seg, &prefix).map_err(McpToolError::Io)?;
+            Ok(())
+        }
+    })
+    .await
+    .map_err(|e| ErrorData::internal_error(e.to_string(), None))?
+    .map_err(ErrorData::from)?;
+
+    let rediscover_error = registry.rediscover(root).await;
     let out = WriteResult {
-        action: format!("added segment {}", input.segment_id),
+        action: format!("added segment {} (prefix: {spec_prefix})", input.segment_id),
         rediscover_error,
     };
     serde_json::to_string_pretty(&out).map_err(|e| ErrorData::internal_error(e.to_string(), None))
@@ -179,4 +267,62 @@ async fn atomic_write(path: &Path, content: &str) -> Result<(), McpToolError> {
     tokio::fs::write(&tmp, content).await?;
     tokio::fs::rename(&tmp, path).await?;
     Ok(())
+}
+
+/// Build a two-space-indented YAML block for a new segment (no trailing newline).
+fn build_segment_block(
+    seg_id: &str,
+    status: &str,
+    detail: &str,
+    blocks: &[SegmentId],
+    children: &[SegmentId],
+) -> String {
+    let mut lines = vec![format!("  {seg_id}:")];
+    lines.push(format!("    status: {status}"));
+    // Quote detail if it contains YAML-special characters.
+    if detail.contains([':', '#', '[', ']', '{', '}', '|', '>', '&', '*', '!', ',']) {
+        lines.push(format!("    detail: {detail:?}"));
+    } else {
+        lines.push(format!("    detail: {detail}"));
+    }
+    if !blocks.is_empty() {
+        let list = blocks
+            .iter()
+            .map(SegmentId::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
+        lines.push(format!("    blocks: [{list}]"));
+    }
+    if !children.is_empty() {
+        let list = children
+            .iter()
+            .map(SegmentId::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
+        lines.push(format!("    children: [{list}]"));
+    }
+    lines.join("\n")
+}
+
+/// Insert `block` into the `arrows:` section of `content`, immediately before
+/// the first top-level key that follows `arrows:`. Appends at end of file when
+/// `arrows:` is the last top-level section.
+fn insert_into_arrows(content: &str, block: &str) -> String {
+    let lines: Vec<&str> = content.split('\n').collect();
+    let mut insert_at = lines.len();
+    let mut in_arrows = false;
+    for (i, line) in lines.iter().enumerate() {
+        if line.starts_with("arrows:") {
+            in_arrows = true;
+            continue;
+        }
+        if in_arrows && !line.is_empty() && !line.starts_with(|c: char| c.is_whitespace()) {
+            insert_at = i;
+            break;
+        }
+    }
+    let mut result: Vec<&str> = lines[..insert_at].to_vec();
+    result.push(block);
+    result.extend_from_slice(&lines[insert_at..]);
+    result.join("\n")
 }

@@ -12,6 +12,7 @@ pub mod error;
 pub mod model;
 pub mod parse;
 pub mod repo;
+pub mod scaffold;
 pub mod store;
 
 pub use checks::{Category, Check, CheckId, Finding, Location, Severity};

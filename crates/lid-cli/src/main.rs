@@ -58,6 +58,10 @@ struct InitArgs {
     /// Name of the first segment to create (default: "core").
     #[arg(long, default_value = "core")]
     segment: String,
+    /// Spec-ID prefix for the first segment (e.g. "MYAPP").
+    /// Defaults to the uppercased segment name.
+    #[arg(long)]
+    spec_prefix: Option<String>,
 }
 
 #[derive(Args)]
@@ -111,36 +115,35 @@ fn cmd_init(root: Option<&Path>, args: &InitArgs) -> Result<ExitCode> {
     }
 
     let seg = &args.segment;
-    let arrows_seg_dir = dir.join("docs").join("arrows").join(seg);
-    let intent_dir = dir.join("docs").join("intent");
+    let spec_prefix = args
+        .spec_prefix
+        .clone()
+        .unwrap_or_else(|| seg.to_uppercase());
+    let detail = format!("{seg}/overview.md");
 
-    fs::create_dir_all(&arrows_seg_dir).with_context(|| format!("creating docs/arrows/{seg}/"))?;
-    fs::create_dir_all(&intent_dir).context("creating docs/intent/")?;
+    fs::create_dir_all(dir.join("docs").join("arrows").join(seg))
+        .with_context(|| format!("creating docs/arrows/{seg}/"))?;
 
     fs::write(
         &index_path,
-        format!("schema_version: 2\narrows:\n  {seg}:\n    status: UNMAPPED\n    detail: {seg}/overview.md\n"),
+        format!(
+            "schema_version: 2\narrows:\n  {seg}:\n    status: UNMAPPED\n    detail: {detail}\n"
+        ),
     )
     .context("writing docs/arrows/index.yaml")?;
 
-    fs::write(
-        arrows_seg_dir.join("overview.md"),
-        format!(
-            "# {seg}\n\n\
-             ## Overview\n\n\
-             <!-- Describe the {seg} segment here. -->\n\n\
-             ## References\n\n\
-             <!-- List related documents and spec files here. -->\n"
-        ),
-    )
-    .with_context(|| format!("writing docs/arrows/{seg}/overview.md"))?;
+    lid_core::scaffold::scaffold_arrow_doc(&dir, &detail, seg)
+        .with_context(|| format!("writing docs/arrows/{detail}"))?;
+    lid_core::scaffold::scaffold_intent_dir(&dir, seg, &spec_prefix)
+        .with_context(|| format!("scaffolding docs/intent/{seg}/"))?;
 
     println!("Initialized LID project at {}", dir.display());
     println!();
     println!("Created:");
-    println!("  docs/arrows/index.yaml            schema v2, segment '{seg}'");
-    println!("  docs/arrows/{seg}/overview.md     stub arrow document");
-    println!("  docs/intent/                      home for spec files (e.g. {seg}-specs.md)");
+    println!("  docs/arrows/index.yaml               schema v2, segment '{seg}'");
+    println!("  docs/arrows/{detail:<28} stub arrow document");
+    println!("  docs/intent/{seg}/{seg}-specs.md");
+    println!("  docs/intent/{seg}/{seg}-design.md");
     println!();
     println!("Next:");
     println!("  lidc check                        verify coherence");
