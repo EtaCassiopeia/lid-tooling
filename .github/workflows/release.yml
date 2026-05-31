@@ -244,7 +244,7 @@ jobs:
   # (the plugin's platformBinaryName() picks the right one at runtime).
   # Requires four GitHub secrets:
   #   JETBRAINS_MARKETPLACE_TOKEN  – obtain from plugins.jetbrains.com
-  #   CERTIFICATE_CHAIN            – PEM cert chain (see docs/releasing.md)
+  #   CERTIFICATE_CHAIN            – PEM cert chain (see README.md § IntelliJ signing)
   #   PRIVATE_KEY                  – PEM private key
   #   PRIVATE_KEY_PASSWORD         – private key passphrase (may be empty)
 
