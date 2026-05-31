@@ -231,11 +231,16 @@ jobs:
           done
 
       - name: Publish to Open VSX
-        if: ${{ secrets.OVSX_PAT != '' }}
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
+          if [ -z "${OVSX_PAT}" ]; then
+            echo "OVSX_PAT not configured, skipping Open VSX publish"
+            exit 0
+          fi
           npm install -g ovsx
           for vsix in vsix/*.vsix; do
-            ovsx publish "$vsix" --pat "${{ secrets.OVSX_PAT }}"
+            ovsx publish "$vsix" --pat "${OVSX_PAT}"
           done
 
   # ── Publish IntelliJ plugin to JetBrains Marketplace ────────────────────────
