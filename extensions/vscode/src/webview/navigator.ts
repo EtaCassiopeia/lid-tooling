@@ -38,6 +38,7 @@ interface GraphNode {
     specItems?: SpecItem[];
     specFile?: string;
     lldFile?: string;
+    specPrefix?: string;
     children?: string[];
     parent?: string;
 }
@@ -381,7 +382,7 @@ function openPanel(node: GraphNode, edit = false): void {
     editMode = edit;
     btnEdit.textContent = editMode ? '● Done' : '✎ Edit';
     btnEdit.classList.toggle('active', editMode);
-    const { id, status, specs, specItems, specFile, lldFile, sampled, audited, next, drift } = node;
+    const { id, status, specs, specItems, specFile, lldFile, specPrefix, sampled, audited, next, drift } = node;
 
     panelTitle.textContent = id;
 
@@ -493,7 +494,7 @@ function openPanel(node: GraphNode, edit = false): void {
                 html += `<button class="add-spec-btn" id="btn-add-spec">+ Add spec</button>
                   <div class="add-spec-form" id="add-spec-form">
                     <div class="add-spec-row">
-                      <input class="edit-input" id="new-spec-id" placeholder="${esc(id.toUpperCase())}-001" style="flex:0 0 110px">
+                      <input class="edit-input" id="new-spec-id" placeholder="${esc(specPrefix ?? id.toUpperCase())}-001" style="flex:0 0 110px">
                       <input class="edit-input" id="new-spec-text" placeholder="spec text…">
                     </div>
                     <div class="add-spec-row">
@@ -619,7 +620,7 @@ panelBody.addEventListener('click', (e) => {
         const errSpan = panelBody.querySelector<HTMLElement>('#spec-id-err');
         const specId = specIdInput?.value.trim() ?? '';
         const text = specTextInput?.value.trim() ?? '';
-        const prefix = currentPanelNode.id.toUpperCase();
+        const prefix = currentPanelNode.specPrefix ?? currentPanelNode.id.toUpperCase();
         const valid = /^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$/.test(specId)
             && specId.startsWith(prefix + '-')
             && /\d/.test(specId);

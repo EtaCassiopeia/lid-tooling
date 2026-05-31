@@ -51,6 +51,7 @@ interface SpecInfo {
     items: SpecItem[];
     specFile?: string;
     lldFile?: string;
+    specPrefix?: string;
 }
 
 interface GraphNode {
@@ -65,6 +66,7 @@ interface GraphNode {
     specItems?: SpecItem[];
     specFile?: string;
     lldFile?: string;
+    specPrefix?: string;
     children?: string[];
     parent?: string;
 }
@@ -378,7 +380,18 @@ export class NavigatorPanel {
                         const info = ensureEntry(segId);
                         if (!info.specFile) info.specFile = fullPath;
                         try {
-                            const lines = fs.readFileSync(fullPath, 'utf8').split('\n');
+                            const content = fs.readFileSync(fullPath, 'utf8');
+                            const lines = content.split('\n');
+                            // Parse YAML frontmatter for prefix:
+                            if (lines[0]?.trim() === '---') {
+                                const closeIdx = lines.findIndex((l, i) => i > 0 && l.trim() === '---');
+                                if (closeIdx > 0) {
+                                    for (let i = 1; i < closeIdx; i++) {
+                                        const match = /^prefix:\s*(.+)$/.exec(lines[i]!);
+                                        if (match) { info.specPrefix = match[1]!.trim(); break; }
+                                    }
+                                }
+                            }
                             lines.forEach((rawLine, idx) => {
                                 const m = SPEC_RE.exec(rawLine);
                                 if (!m) return;
@@ -436,6 +449,7 @@ export class NavigatorPanel {
                 specItems: info?.items,
                 specFile: info?.specFile,
                 lldFile: info?.lldFile,
+                specPrefix: info?.specPrefix,
                 children: entry.children,
                 parent: entry.parent,
             };
