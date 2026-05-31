@@ -1,0 +1,25 @@
+title: LID Tooling
+description: Developer tools for the LID (Linked-Intent Development) methodology — keep design intent permanently linked to running code.
+
+theme: just-the-docs
+
+color_scheme: dark
+
+search_enabled: true
+heading_anchors: true
+back_to_top: true
+back_to_top_text: "Back to top"
+
+aux_links:
+  "GitHub":
+    - "https://github.com/EtaCassiopeia/lid-tooling"
+
+aux_links_new_tab: true
+
+footer_content: "MIT OR Apache-2.0 &mdash; <a href=\"https://github.com/EtaCassiopeia/lid-tooling\">EtaCassiopeia/lid-tooling</a>"
+
+# Exclude build artifacts
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor/

@@ -1,0 +1,118 @@
+---
+title: Installation
+nav_order: 2
+---
+
+# Installation
+
+{: .no_toc }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
+
+## VS Code extension
+
+### From the Marketplace (recommended)
+
+Search **LID** in the VS Code Extensions panel, or run:
+
+```sh
+code --install-extension lid-tools.vscode
+```
+
+Or install directly from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=lid-tools.vscode).
+
+`lid-lsp` is bundled — nothing else to install.
+
+### From a GitHub release
+
+Download `lid-vscode-<platform>.vsix` from the [latest release](https://github.com/EtaCassiopeia/lid-tooling/releases/latest), then:
+
+1. Open the Extensions panel → **⋯ → Install from VSIX…**
+2. Select the downloaded `.vsix`
+
+---
+
+## IntelliJ IDEA / JetBrains IDEs
+
+The plugin works in all JetBrains IDEs: IntelliJ IDEA, GoLand, PyCharm, RustRover, WebStorm, and more.
+
+### From the JetBrains Marketplace (recommended)
+
+1. Open **Settings → Plugins → Marketplace**
+2. Search **LID**
+3. Click **Install** → restart when prompted
+
+Or install directly from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/dev.lid.intellij).
+
+`lid-lsp` is bundled — nothing else to install.
+
+### From a GitHub release (install from disk)
+
+Download `lid-intellij-<version>.zip` from the [latest release](https://github.com/EtaCassiopeia/lid-tooling/releases/latest), then:
+
+1. Open **Settings → Plugins → ⚙ → Install Plugin from Disk…**
+2. Select the downloaded `.zip`
+3. Restart when prompted
+
+### From source
+
+Requires JDK 21+.
+
+```sh
+# Build lid-lsp first
+cargo build --release --bin lid-lsp
+cp target/release/lid-lsp extensions/intellij/server/lid-lsp
+
+# Build the plugin zip
+cd extensions/intellij
+./gradlew buildPlugin
+# → build/distributions/lid-intellij-<version>.zip
+
+# Or launch a sandboxed IDE with the plugin pre-installed
+./gradlew runIde
+```
+
+---
+
+## CLI + MCP server
+
+### macOS / Linux — Homebrew
+
+```sh
+brew tap EtaCassiopeia/lid
+brew install lid-tooling
+```
+
+Installs `lidc`, `lid-mcp`, and `lid-lsp` on your `$PATH`.
+
+### macOS / Linux — curl
+
+```sh
+# lidc only
+curl -fsSL https://raw.githubusercontent.com/EtaCassiopeia/lid-tooling/main/install.sh | bash
+
+# lidc + lid-mcp
+curl -fsSL https://raw.githubusercontent.com/EtaCassiopeia/lid-tooling/main/install.sh | bash -s -- --mcp
+```
+
+### Windows — PowerShell
+
+```powershell
+# lidc only
+irm https://raw.githubusercontent.com/EtaCassiopeia/lid-tooling/main/install.ps1 | iex
+
+# lidc + lid-mcp
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/EtaCassiopeia/lid-tooling/main/install.ps1))) -Mcp
+```
+
+### From source (Cargo)
+
+```sh
+cargo install --git https://github.com/EtaCassiopeia/lid-tooling lidc lid-mcp
+```
