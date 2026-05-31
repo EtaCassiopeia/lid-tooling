@@ -66,6 +66,9 @@ jobs:
       - name: Compile TypeScript
         run: npm run compile
 
+      - name: Run Jest unit tests
+        run: npm test
+
       - name: Package extension (smoke test)
         run: npx @vscode/vsce package --out lid-vscode-ci-smoke.vsix --skip-license
 
