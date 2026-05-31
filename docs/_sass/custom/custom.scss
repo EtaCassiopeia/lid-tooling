@@ -1,0 +1,125 @@
+// ── Navigation logo ──────────────────────────────────────────────────────────
+
+.site-logo img {
+  max-height: 28px;
+  width: auto;
+}
+
+// ── Code blocks ──────────────────────────────────────────────────────────────
+
+div.highlighter-rouge,
+figure.highlight {
+  border: 1px solid #2d3250;
+  border-radius: 8px;
+  overflow: hidden;
+
+  pre.highlight {
+    margin: 0;
+  }
+}
+
+// Inline code
+code.language-plaintext {
+  background-color: #1f2239;
+  border: 1px solid #2d3250;
+  border-radius: 4px;
+  color: #c5b3e6;
+  padding: 0.1em 0.35em;
+  font-size: 0.88em;
+}
+
+// ── Tables ───────────────────────────────────────────────────────────────────
+
+table {
+  border-radius: 8px;
+  overflow: hidden;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #2d3250;
+
+  thead tr {
+    background-color: #252843;
+
+    th {
+      border-bottom: 1px solid #3d4272;
+      color: #e8e4f4;
+      font-weight: 600;
+    }
+  }
+
+  tbody tr:nth-child(even) {
+    background-color: #1f2239;
+  }
+
+  td, th {
+    border-right: none;
+    border-left: none;
+  }
+}
+
+// ── Home page hero ───────────────────────────────────────────────────────────
+
+.main-content h1:first-child {
+  font-size: 2.4rem;
+  background: linear-gradient(135deg, #c5b3e6 0%, #9b7ed4 50%, #7C5CBF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.25em;
+}
+
+// ── Horizontal rules ─────────────────────────────────────────────────────────
+
+hr {
+  border-color: #2d3250;
+  margin: 2rem 0;
+}
+
+// ── Site header ──────────────────────────────────────────────────────────────
+
+.site-header {
+  border-bottom: 1px solid #2d3250;
+  background-color: #12141f;
+}
+
+// ── Sidebar ──────────────────────────────────────────────────────────────────
+
+.side-bar {
+  border-right: 1px solid #2d3250;
+}
+
+// Active nav item accent
+.nav-list .nav-list-item .nav-list-link.active {
+  color: #9b7ed4;
+  font-weight: 600;
+}
+
+// ── Buttons ──────────────────────────────────────────────────────────────────
+
+.btn-primary {
+  background-color: #7C5CBF;
+  border-color: #7C5CBF;
+
+  &:hover {
+    background-color: #9b7ed4;
+    border-color: #9b7ed4;
+  }
+}
+
+// ── Search ───────────────────────────────────────────────────────────────────
+
+.search-input {
+  border: 1px solid #2d3250;
+  border-radius: 6px;
+
+  &:focus {
+    border-color: #7C5CBF;
+    outline: none;
+  }
+}
+
+// ── Breadcrumb ───────────────────────────────────────────────────────────────
+
+.breadcrumb-nav-list-item::before {
+  color: #4a4870;
+}

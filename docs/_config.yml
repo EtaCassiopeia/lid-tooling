@@ -3,12 +3,15 @@ description: Developer tools for the LID (Linked-Intent Development) methodology
 
 theme: just-the-docs
 
-color_scheme: dark
+color_scheme: lid
+logo: "/assets/images/logo.svg"
+favicon_ico: "/assets/images/logo.svg"
 
 search_enabled: true
 heading_anchors: true
 back_to_top: true
 back_to_top_text: "Back to top"
+nav_sort: case_insensitive
 
 aux_links:
   "GitHub":

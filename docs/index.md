@@ -5,12 +5,15 @@ permalink: /
 ---
 
 # LID Tooling
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/EtaCassiopeia/lid-tooling/main/extensions/vscode/images/lid_tooling_logo.svg" alt="lid-tools logo" width="640"/>
-</p>
+{: .no_toc }
 
 Developer tools for the [LID (Linked-Intent Development)](https://github.com/jszmajda/lid) methodology — keep design intent permanently linked to running code.
+{: .fs-6 .fw-300 }
+
+[Get started]({{ site.baseurl }}/installation){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
+[View on GitHub](https://github.com/EtaCassiopeia/lid-tooling){: .btn .fs-5 .mb-4 .mb-md-0 }
+
+---
 
 LID answers one recurring problem: *you know what the code does, but you've lost track of why it exists and whether it still does what the design said it should.* This tooling enforces the link between requirements, design docs, and test citations — in your editor, your CI pipeline, and your AI workflow.
 
@@ -30,7 +33,7 @@ LID answers one recurring problem: *you know what the code does, but you've lost
 ## Quick start
 
 ```sh
-# 1. Install lidc (macOS/Linux via Homebrew)
+# 1. Install (macOS/Linux via Homebrew)
 brew tap EtaCassiopeia/lid && brew install lid-tooling
 
 # 2. Scaffold a new LID project
@@ -47,17 +50,26 @@ See [Installation]({{ site.baseurl }}/installation) for all platforms and instal
 
 ---
 
-## Project layout
+## How it works
 
 ```
 docs/
 ├── arrows/
-│   ├── index.yaml            # segment graph
+│   ├── index.yaml            # segment graph — statuses, dependencies
 │   └── <segment>/*.md        # arrow detail docs (HLDs, LLDs)
 └── intent/
     └── <segment>/
-        ├── <segment>-specs.md
-        └── <segment>-design.md
+        ├── <segment>-specs.md    # spec lines  (- [ ] **ID**: text)
+        └── <segment>-design.md   # design docs
 ```
 
-See [Project layout]({{ site.baseurl }}/project-layout) for the full schema reference and file formats.
+Source code cites specs with a line comment:
+
+```rust
+// @spec AUTH-002
+fn validate_session_expiry(session: &Session) -> bool { ... }
+```
+
+`lidc check` enforces that every `[x]` spec has at least one citation, every `@spec` reference points to a real spec ID, and the segment graph is acyclic — in your editor and in CI.
+
+See [Project layout]({{ site.baseurl }}/project-layout) for the full schema reference.
