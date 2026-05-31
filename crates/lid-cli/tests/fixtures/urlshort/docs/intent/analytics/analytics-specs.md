@@ -1,3 +1,7 @@
+---
+prefix: USH-ANLY
+---
+
 # EARS Specs: analytics
 
 **Implementing artifacts**: `src/analytics.rs`, `tests/analytics_test.rs`

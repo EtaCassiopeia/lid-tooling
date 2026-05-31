@@ -1,3 +1,7 @@
+---
+prefix: USH-HLTH
+---
+
 # EARS Specs: health-endpoint
 
 **Implementing artifacts**: `src/api.rs`, `tests/api_test.rs`

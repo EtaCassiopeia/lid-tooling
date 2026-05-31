@@ -1,3 +1,7 @@
+---
+prefix: USH-API
+---
+
 # EARS Specs: api
 
 **Implementing artifacts**: `src/api.rs`, `tests/api_test.rs`

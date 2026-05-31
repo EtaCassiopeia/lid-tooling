@@ -1,3 +1,7 @@
+---
+prefix: USH-ALIAS
+---
+
 # EARS Specs: alias-gen
 
 **Implementing artifacts**: `src/shortener_core.rs`, `tests/shortener_core_test.rs`

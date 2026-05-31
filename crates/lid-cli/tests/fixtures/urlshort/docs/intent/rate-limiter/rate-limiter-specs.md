@@ -1,3 +1,7 @@
+---
+prefix: USH-RATE
+---
+
 # EARS Specs: rate-limiter
 
 **Implementing artifacts**: `src/rate_limiter.rs`, `tests/rate_limiter_test.rs`

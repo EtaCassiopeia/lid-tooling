@@ -1,3 +1,7 @@
+---
+prefix: USH-IMEM
+---
+
 # EARS Specs: in-memory-store
 
 **Implementing artifacts**: `src/storage.rs`, `tests/storage_test.rs`

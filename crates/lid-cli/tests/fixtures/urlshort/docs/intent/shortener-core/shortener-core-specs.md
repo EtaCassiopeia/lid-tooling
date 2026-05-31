@@ -1,3 +1,7 @@
+---
+prefix: USH-CORE
+---
+
 # EARS Specs: shortener-core
 
 **Implementing artifacts**: `src/shortener_core.rs`, `tests/shortener_core_test.rs`

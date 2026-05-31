@@ -1,3 +1,7 @@
+---
+prefix: USH-STORE
+---
+
 # EARS Specs: storage
 
 **Implementing artifacts**: `src/storage.rs`, `tests/storage_test.rs`
