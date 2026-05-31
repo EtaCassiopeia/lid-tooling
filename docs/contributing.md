@@ -37,6 +37,7 @@ cargo fmt --check
 ```sh
 cd extensions/vscode
 npm ci && npm run compile
+npm test                              # Jest unit tests (YAML helpers, scaffold)
 npx @vscode/vsce package --skip-license
 ```
 
@@ -48,6 +49,7 @@ cargo build --release --bin lid-lsp
 cp target/release/lid-lsp extensions/intellij/server/lid-lsp
 
 cd extensions/intellij
+./gradlew test           # JUnit unit tests (YAML helpers)
 ./gradlew buildPlugin    # → build/distributions/lid-intellij-<version>.zip
 ./gradlew runIde         # launch a sandboxed IDE for manual testing
 ./gradlew verifyPlugin   # IDE compatibility check

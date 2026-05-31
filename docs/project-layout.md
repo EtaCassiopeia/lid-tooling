@@ -51,8 +51,7 @@ arrows:
   auth:
     status: OK
     detail: auth/core.md
-    blocks:
-      - api
+    blocks: [api]
   api:
     status: MAPPED
     detail: api/core.md
@@ -60,8 +59,7 @@ arrows:
   platform:
     status: AUDITED
     detail: platform/core.md
-    children:
-      - api
+    children: [api]
 ```
 
 ### Segment statuses
