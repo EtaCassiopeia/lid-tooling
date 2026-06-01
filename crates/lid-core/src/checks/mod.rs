@@ -16,6 +16,7 @@ pub mod decisions_structure;
 pub mod implementing_artifacts;
 pub mod lld_decisions;
 pub mod orphans;
+pub mod path_coherent_prefix;
 pub mod references;
 pub mod reverse_orphan;
 pub mod schema;
@@ -29,6 +30,7 @@ pub use decisions_structure::DecisionsStructureCheck;
 pub use implementing_artifacts::ImplementingArtifactsCheck;
 pub use lld_decisions::LldDecisionsCheck;
 pub use orphans::OrphanCheck;
+pub use path_coherent_prefix::PathCoherentPrefixCheck;
 pub use references::ReferenceCoherenceCheck;
 pub use reverse_orphan::ReverseOrphanCheck;
 pub use schema::SchemaCheck;
@@ -55,6 +57,7 @@ pub fn default_checks() -> Vec<Box<dyn Check>> {
         Box::new(DagCheck),
         Box::new(ImplementingArtifactsCheck),
         Box::new(DecisionsStructureCheck),
+        Box::new(PathCoherentPrefixCheck),
     ]
 }
 
@@ -84,6 +87,7 @@ pub enum CheckId {
     Dag,
     ImplementingArtifacts,
     DecisionsStructure,
+    PathCoherentPrefix,
 }
 
 impl CheckId {
@@ -105,6 +109,7 @@ impl CheckId {
             Self::Dag => "dag",
             Self::ImplementingArtifacts => "implementing-artifacts",
             Self::DecisionsStructure => "decisions-structure",
+            Self::PathCoherentPrefix => "path-coherent-prefix",
         }
     }
 }
@@ -131,6 +136,7 @@ impl std::str::FromStr for CheckId {
             Self::Dag,
             Self::ImplementingArtifacts,
             Self::DecisionsStructure,
+            Self::PathCoherentPrefix,
         ] {
             if id.as_str() == s {
                 return Ok(id);
@@ -433,6 +439,7 @@ mod tests {
             CheckId::Dag,
             CheckId::ImplementingArtifacts,
             CheckId::DecisionsStructure,
+            CheckId::PathCoherentPrefix,
         ] {
             let serde_form = serde_json::to_string(&id).unwrap();
             let serde_form = serde_form.trim_matches('"');
@@ -460,6 +467,7 @@ mod tests {
             CheckId::Dag,
             CheckId::ImplementingArtifacts,
             CheckId::DecisionsStructure,
+            CheckId::PathCoherentPrefix,
         ] {
             let back: CheckId = id.as_str().parse().unwrap();
             assert_eq!(back, id);
