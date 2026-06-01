@@ -42,9 +42,13 @@ The plugin works in all JetBrains IDEs: IntelliJ IDEA, GoLand, PyCharm, RustRove
 
 ### From the JetBrains Marketplace (recommended)
 
-1. Open **Settings → Plugins → Marketplace**
-2. Search **LID**
-3. Click **Install** → restart when prompted
+<script src="https://plugins.jetbrains.com/assets/scripts/mp-widget.js"></script>
+<div id="jb-install-btn"></div>
+<script>
+  MarketplaceWidget.setupMarketplaceWidget('card', 32047, "#jb-install-btn");
+</script>
+
+Or open **Settings → Plugins → Marketplace**, search **LID**, and click **Install**.
 
 Or install directly from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/32047-lid--linked-intent-development).
 
