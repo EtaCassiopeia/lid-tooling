@@ -26,7 +26,7 @@ jobs:
             ext: ''
             archive: tar.gz
             sha_cmd: shasum -a 256
-          - os: macos-13
+          - os: macos-14
             target: x86_64-apple-darwin
             vsce_target: darwin-x64
             ext: ''
