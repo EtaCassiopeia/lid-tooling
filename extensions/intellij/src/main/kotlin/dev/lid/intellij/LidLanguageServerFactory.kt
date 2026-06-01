@@ -1,7 +1,7 @@
 package dev.lid.intellij
 
 import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.ide.plugins.PluginManager
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.redhat.devtools.lsp4ij.LanguageServerFactory
 import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider
@@ -21,7 +21,8 @@ private class LidLanguageServer(project: Project) : OSProcessStreamConnectionPro
     }
 
     private fun resolveServerPath(): String {
-        val pluginDir = PluginManager.getPluginByClass(LidLanguageServerFactory::class.java)?.pluginPath
+        val pluginDir = ApplicationManager.getApplication()
+            .getService(LidPluginService::class.java)?.pluginPath
         if (pluginDir != null) {
             val binary = pluginDir.resolve("server/${platformBinaryName()}").toFile()
             if (binary.canExecute()) return binary.absolutePath
