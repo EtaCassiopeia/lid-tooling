@@ -19,13 +19,11 @@ nav_order: 2
 
 ### From the Marketplace (recommended)
 
-Search **LID** in the VS Code Extensions panel, or run:
-
-```sh
-code --install-extension lid-tools.lid
-```
+Search **LID** in the VS Code Extensions panel and click **Install** — this works even behind a corporate proxy.
 
 Or install directly from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=lid-tools.lid).
+
+> **Note:** The CLI command `code --install-extension lid-tools.lid` may fail with a certificate error on machines with SSL inspection. Use the Extensions panel or install from a VSIX instead (see below).
 
 `lid-lsp` is bundled — nothing else to install.
 
@@ -44,11 +42,15 @@ The plugin works in all JetBrains IDEs: IntelliJ IDEA, GoLand, PyCharm, RustRove
 
 ### From the JetBrains Marketplace (recommended)
 
-1. Open **Settings → Plugins → Marketplace**
-2. Search **LID**
-3. Click **Install** → restart when prompted
+<script src="https://plugins.jetbrains.com/assets/scripts/mp-widget.js"></script>
+<div id="jb-install-btn"></div>
+<script>
+  MarketplaceWidget.setupMarketplaceWidget('card', 32047, "#jb-install-btn");
+</script>
 
-Or install directly from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/dev.lid).
+Or open **Settings → Plugins → Marketplace**, search **LID**, and click **Install**.
+
+Or install directly from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/32047-lid--linked-intent-development).
 
 `lid-lsp` is bundled — nothing else to install.
 
