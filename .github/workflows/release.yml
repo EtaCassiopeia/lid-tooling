@@ -286,6 +286,12 @@ jobs:
         with:
           path: artifacts
 
+      - name: Set version from tag
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s/^version = \"[^\"]*\"/version = \"${VERSION}\"/" extensions/intellij/build.gradle.kts
+
       - name: Bundle all platform lid-lsp binaries
         shell: bash
         run: |
