@@ -28,7 +28,7 @@ tasks.test {
 
 intellijPlatform {
     pluginConfiguration {
-        name = "LID — Linked-Intent Development"
+        name = "LID - Linked-Intent Development"
         version = project.version.toString()
         ideaVersion { sinceBuild = "243" }
     }
