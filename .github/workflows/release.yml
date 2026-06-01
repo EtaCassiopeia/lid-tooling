@@ -87,7 +87,7 @@ jobs:
 
           # Create archive (zip for Windows, tar.gz for everything else).
           if [[ "${{ matrix.archive }}" == "zip" ]]; then
-            ( cd dist && zip -r "${base}.zip" "${base}" )
+            ( cd dist && 7z a "${base}.zip" "${base}" > /dev/null )
             ( cd dist && ${{ matrix.sha_cmd }} "${base}.zip" > "${base}.zip.sha256" )
           else
             tar -czf "dist/${base}.tar.gz" -C dist "${base}"
