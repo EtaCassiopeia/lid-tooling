@@ -1,6 +1,6 @@
 <idea-plugin>
-  <id>dev.lid.intellij</id>
-  <name>LID — Linked-Intent Development</name>
+  <id>dev.lid</id>
+  <name>LID - Linked-Intent Development</name>
   <vendor url="https://github.com/EtaCassiopeia/lid-tooling">lid-tools</vendor>
   <description><![CDATA[
     Editor support for the <a href="https://github.com/jszmajda/lid">LID (Linked-Intent Development)</a>
