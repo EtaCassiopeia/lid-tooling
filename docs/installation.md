@@ -110,6 +110,8 @@ Installs `lidc`, `lid-mcp`, and `lid-lsp` on your `$PATH`.
 
 ### macOS / Linux — curl
 
+Supported platforms: macOS (Apple Silicon, Intel), Linux x86_64, Linux ARM64 (Graviton, Raspberry Pi, Ampere).
+
 ```sh
 # lidc only
 curl -fsSL https://raw.githubusercontent.com/EtaCassiopeia/lid-tooling/main/install.sh | bash
