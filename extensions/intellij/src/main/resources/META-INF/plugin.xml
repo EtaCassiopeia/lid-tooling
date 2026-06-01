@@ -3,10 +3,10 @@
   <name>LID - Linked-Intent Development</name>
   <vendor url="https://github.com/EtaCassiopeia/lid-tooling">lid-tools</vendor>
   <description><![CDATA[
-    Editor support for the <a href="https://github.com/jszmajda/lid">LID (Linked-Intent Development)</a>
-    methodology: hover, go-to-definition, find references, rename, completion, and real-time diagnostics
-    for <code>@spec</code> citations, plus a visual Intent Navigator — powered by the bundled
-    <code>lid-lsp</code> language server.
+    Keep design intent permanently linked to running code.
+    <a href="https://github.com/jszmajda/lid">LID (Linked-Intent Development)</a> editor support
+    for <code>@spec</code> citations, language server features, and visual Intent Navigator —
+    powered by the bundled <code>lid-lsp</code> language server.
   ]]></description>
 
   <depends>com.intellij.modules.platform</depends>
