@@ -40,10 +40,14 @@ pub fn suggest_prefix(segment_id: &str, existing_prefixes: &[&str]) -> String {
 
 /// Create the intent-directory scaffold for a new segment.
 ///
+/// When `parent` is provided the files are created under the parent's intent
+/// folder: `docs/intent/{parent}/{seg}/`. Otherwise they go at the flat
+/// top-level location: `docs/intent/{seg}/`.
+///
 /// Creates:
-/// - `docs/intent/{seg}/`
-/// - `docs/intent/{seg}/{seg}-specs.md`  — empty spec list with `prefix:` frontmatter
-/// - `docs/intent/{seg}/{seg}-design.md` — minimal design stub
+/// - `docs/intent/[{parent}/]{seg}/`
+/// - `…/{seg}-specs.md`  — empty spec list with `prefix:` frontmatter
+/// - `…/{seg}-design.md` — minimal design stub
 ///
 /// Returns the paths of the two files written.
 ///
@@ -52,10 +56,14 @@ pub fn suggest_prefix(segment_id: &str, existing_prefixes: &[&str]) -> String {
 /// Returns an I/O error if any directory or file operation fails.
 pub fn scaffold_intent_dir(
     root: &Path,
+    parent: Option<&str>,
     segment_id: &str,
     spec_prefix: &str,
 ) -> Result<[PathBuf; 2], std::io::Error> {
-    let intent_dir = root.join("docs").join("intent").join(segment_id);
+    let intent_dir = match parent {
+        Some(p) => root.join("docs").join("intent").join(p).join(segment_id),
+        None => root.join("docs").join("intent").join(segment_id),
+    };
     std::fs::create_dir_all(&intent_dir)?;
 
     let specs_path = intent_dir.join(format!("{segment_id}-specs.md"));
@@ -83,6 +91,9 @@ pub fn scaffold_intent_dir(
 /// The stub includes `## References` bullets pointing at the intent files so
 /// that `lidc check` does not flag the design doc as an orphan.
 ///
+/// When `parent` is provided, the intent-file paths in the stub use the nested
+/// layout (`docs/intent/{parent}/{seg}/`) instead of the flat layout.
+///
 /// Returns `Some(path)` when the file was created, `None` when it already existed.
 ///
 /// # Errors
@@ -92,15 +103,20 @@ pub fn scaffold_arrow_doc(
     root: &Path,
     detail: &str,
     segment_id: &str,
+    parent: Option<&str>,
 ) -> Result<Option<PathBuf>, std::io::Error> {
     let arrow_path = root.join("docs").join("arrows").join(detail);
     if arrow_path.exists() {
         return Ok(None);
     }
-    if let Some(parent) = arrow_path.parent() {
-        std::fs::create_dir_all(parent)?;
+    if let Some(arrow_parent) = arrow_path.parent() {
+        std::fs::create_dir_all(arrow_parent)?;
     }
     let title = segment_id.replace('-', " ");
+    let intent_prefix = match parent {
+        Some(p) => format!("docs/intent/{p}/{segment_id}/{segment_id}"),
+        None => format!("docs/intent/{segment_id}/{segment_id}"),
+    };
     std::fs::write(
         &arrow_path,
         format!(
@@ -109,9 +125,9 @@ pub fn scaffold_arrow_doc(
              <!-- Describe the {segment_id} segment here. -->\n\n\
              ## References\n\n\
              ### LLD\n\
-             - `docs/intent/{segment_id}/{segment_id}-design.md`\n\n\
+             - `{intent_prefix}-design.md`\n\n\
              ### EARS\n\
-             - `docs/intent/{segment_id}/{segment_id}-specs.md`\n"
+             - `{intent_prefix}-specs.md`\n"
         ),
     )?;
     Ok(Some(arrow_path))
@@ -152,7 +168,7 @@ mod tests {
     #[test]
     fn scaffold_intent_dir_creates_files() {
         let dir = tempfile::tempdir().unwrap();
-        let [specs, design] = scaffold_intent_dir(dir.path(), "auth", "USH-AUTH").unwrap();
+        let [specs, design] = scaffold_intent_dir(dir.path(), None, "auth", "USH-AUTH").unwrap();
         assert!(specs.exists());
         assert!(design.exists());
         let specs_content = std::fs::read_to_string(&specs).unwrap();
@@ -165,7 +181,7 @@ mod tests {
     fn scaffold_arrow_doc_creates_file_with_references() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join("docs/arrows")).unwrap();
-        let created = scaffold_arrow_doc(dir.path(), "auth/overview.md", "auth").unwrap();
+        let created = scaffold_arrow_doc(dir.path(), "auth/overview.md", "auth", None).unwrap();
         assert!(created.is_some());
         let content = std::fs::read_to_string(created.unwrap()).unwrap();
         assert!(content.contains("docs/intent/auth/auth-design.md"));
@@ -178,7 +194,7 @@ mod tests {
         std::fs::create_dir_all(dir.path().join("docs/arrows")).unwrap();
         let path = dir.path().join("docs/arrows/existing.md");
         std::fs::write(&path, "existing content").unwrap();
-        let result = scaffold_arrow_doc(dir.path(), "existing.md", "seg").unwrap();
+        let result = scaffold_arrow_doc(dir.path(), "existing.md", "seg", None).unwrap();
         assert!(result.is_none());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "existing content");
     }
