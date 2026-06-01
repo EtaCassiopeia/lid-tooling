@@ -6,6 +6,7 @@
 pub mod arrow;
 pub mod arrow_doc;
 pub mod citation;
+pub mod decision_doc;
 pub mod ids;
 pub mod lld;
 pub mod spec;
@@ -13,6 +14,7 @@ pub mod spec;
 pub use arrow::{ArrowIndex, Edge, EdgeKind, Segment, Status, Unmapped, UnmappedDocs};
 pub use arrow_doc::{ArrowDoc, ArrowReferences, KNOWN_REFERENCE_SECTIONS};
 pub use citation::{CitationKind, SpecCitation};
+pub use decision_doc::{DecisionDoc, DecisionScope};
 pub use ids::{GitSha, SegmentId, SpecId};
 pub use lld::{DecisionRow, LldDoc};
 pub use spec::{SpecFile, SpecLine, SpecStatus};

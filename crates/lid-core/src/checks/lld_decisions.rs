@@ -15,8 +15,14 @@
 //!
 //! Detecting stale `[inferred]` rows (unchanged for months) requires
 //! git history and lands with the Wave 3 staleness checks.
+//!
+//! LID 1.2.0 exemption: an LLD whose parent directory contains a non-empty
+//! `decisions/` subdirectory is exempt from the missing-table warning. The
+//! design intent has been captured; it just lives in a standalone decision
+//! doc rather than inline in the design doc.
 
 use crate::LidRepo;
+use crate::model::DecisionScope;
 
 use super::{Category, Check, CheckId, Finding, Location, Severity};
 
@@ -37,6 +43,21 @@ impl Check for LldDecisionsCheck {
             });
 
             if total == 0 {
+                // Exempt if the node folder has a per-node decisions/ directory
+                // with at least one decision doc — the intent is captured there.
+                let node_name = lld
+                    .path
+                    .parent()
+                    .and_then(|p| p.file_name())
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("");
+                let has_decision_docs = repo.decision_docs.iter().any(
+                    |d| matches!(&d.scope, DecisionScope::Node { segment } if segment == node_name),
+                );
+                if has_decision_docs {
+                    continue;
+                }
+
                 findings.push(Finding {
                     check: CheckId::LldDecisions,
                     severity: Severity::Warning,
@@ -105,6 +126,13 @@ mod tests {
     }
 
     fn make_repo(llds: Vec<LldDoc>) -> LidRepo {
+        make_repo_with_decisions(llds, vec![])
+    }
+
+    fn make_repo_with_decisions(
+        llds: Vec<LldDoc>,
+        decision_docs: Vec<crate::model::DecisionDoc>,
+    ) -> LidRepo {
         LidRepo {
             root: PathBuf::from("/fake/root"),
             index: ArrowIndex {
@@ -118,6 +146,7 @@ mod tests {
             llds,
             arrow_docs: vec![],
             citations: vec![],
+            decision_docs,
         }
     }
 
@@ -204,5 +233,37 @@ mod tests {
     #[test]
     fn check_id_is_lld_decisions() {
         assert_eq!(LldDecisionsCheck.id(), CheckId::LldDecisions);
+    }
+
+    #[test]
+    fn lld_without_decisions_but_with_node_decisions_dir_is_silent() {
+        use crate::model::{DecisionDoc, DecisionScope};
+        // LLD at docs/intent/auth/auth-design.md with no table rows,
+        // but there is a decision doc scoped to the same node.
+        let decision_doc = DecisionDoc {
+            path: PathBuf::from("/fake/root/docs/intent/auth/decisions/token.md"),
+            scope: DecisionScope::Node {
+                segment: "auth".to_owned(),
+            },
+            title: "Token Format".to_owned(),
+        };
+        let repo = make_repo_with_decisions(
+            vec![lld("docs/intent/auth/auth-design.md", vec![])],
+            vec![decision_doc],
+        );
+        let f = LldDecisionsCheck.run(&repo);
+        assert!(
+            f.is_empty(),
+            "expected silence when decisions/ dir has docs, got {f:?}"
+        );
+    }
+
+    #[test]
+    fn lld_without_decisions_and_without_decisions_dir_still_warns() {
+        // Same path shape but no decision docs.
+        let repo = make_repo(vec![lld("docs/intent/auth/auth-design.md", vec![])]);
+        let f = LldDecisionsCheck.run(&repo);
+        assert_eq!(f.len(), 1);
+        assert_eq!(f[0].severity, Severity::Warning);
     }
 }

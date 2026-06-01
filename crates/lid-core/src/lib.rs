@@ -17,6 +17,8 @@ pub mod store;
 
 pub use checks::{Category, Check, CheckId, Finding, Location, Severity};
 pub use error::{LidError, Result};
-pub use model::{ArrowIndex, GitSha, Segment, SegmentId, SpecId, Status, Unmapped};
+pub use model::{
+    ArrowIndex, DecisionDoc, DecisionScope, GitSha, Segment, SegmentId, SpecId, Status, Unmapped,
+};
 pub use repo::LidRepo;
 pub use store::{DocStore, Document};

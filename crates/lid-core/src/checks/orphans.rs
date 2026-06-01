@@ -224,6 +224,7 @@ mod tests {
             llds,
             arrow_docs: vec![arrow_doc],
             citations: vec![],
+            decision_docs: vec![],
         }
     }
 
@@ -344,6 +345,7 @@ mod tests {
             llds,
             arrow_docs: vec![],
             citations: vec![],
+            decision_docs: vec![],
         };
 
         let findings = OrphanCheck.run(&repo);

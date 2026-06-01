@@ -245,6 +245,7 @@ mod tests {
             llds: vec![],
             arrow_docs,
             citations: vec![],
+            decision_docs: vec![],
         }
     }
 

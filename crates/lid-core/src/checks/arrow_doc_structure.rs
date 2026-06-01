@@ -103,6 +103,7 @@ mod tests {
             llds: vec![],
             arrow_docs: vec![doc],
             citations: vec![],
+            decision_docs: vec![],
         }
     }
 

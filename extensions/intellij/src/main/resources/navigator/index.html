@@ -213,6 +213,7 @@
   <div id="ctx-arrow">Open Arrow Doc</div>
   <div id="ctx-spec" class="hidden">Open Spec File</div>
   <div id="ctx-lld"  class="hidden">Open LLD</div>
+  <div id="ctx-decisions" class="hidden">Open Decision Doc</div>
   <div id="ctx-copy">Copy ID</div>
 </div>
 
@@ -572,6 +573,10 @@ function openPanel(node, edit) {
   html += '<div class="sec"><button class="btn-open" data-action="open-arrow">Open Arrow Doc</button>';
   if (node.specFile) html += '<button class="btn-open" data-action="open-spec">Open Spec File</button>';
   if (node.lldFile)  html += '<button class="btn-open" data-action="open-lld">Open LLD</button>';
+  if (node.decisionDocs && node.decisionDocs.length > 0) {
+    var decLabel = node.decisionDocs.length === 1 ? 'Open Decision Doc' : 'Open Decision Docs (' + node.decisionDocs.length + ')';
+    html += '<button class="btn-open" data-action="open-decisions">' + decLabel + '</button>';
+  }
   html += '</div>';
 
   // Next / Drift
@@ -615,6 +620,7 @@ panelBody.addEventListener('click', function(e) {
     if (action === 'open-arrow') window.__lidPostMessage({ type: 'open', segmentId: currentNode.id });
     else if (action === 'open-spec' && currentNode.specFile) window.__lidPostMessage({ type: 'openFile', path: currentNode.specFile });
     else if (action === 'open-lld' && currentNode.lldFile)   window.__lidPostMessage({ type: 'openFile', path: currentNode.lldFile });
+    else if (action === 'open-decisions' && currentNode.decisionDocs && currentNode.decisionDocs.length > 0) window.__lidPostMessage({ type: 'openFile', path: currentNode.decisionDocs[0] });
     return;
   }
 
@@ -693,6 +699,7 @@ function showCtxMenu(x, y, node) {
   ctxNode = node;
   document.getElementById('ctx-spec').classList.toggle('hidden', !node.specFile);
   document.getElementById('ctx-lld').classList.toggle('hidden', !node.lldFile);
+  document.getElementById('ctx-decisions').classList.toggle('hidden', !node.decisionDocs || node.decisionDocs.length === 0);
   ctxMenu.style.display = 'block';
   var vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
   ctxMenu.style.left = Math.min(x, vw - ctxMenu.offsetWidth - 4) + 'px';
@@ -708,6 +715,9 @@ document.getElementById('ctx-spec').addEventListener('click', function() {
 });
 document.getElementById('ctx-lld').addEventListener('click', function() {
   if (ctxNode && ctxNode.lldFile) window.__lidPostMessage({ type: 'openFile', path: ctxNode.lldFile }); hideCtxMenu();
+});
+document.getElementById('ctx-decisions').addEventListener('click', function() {
+  if (ctxNode && ctxNode.decisionDocs && ctxNode.decisionDocs.length > 0) window.__lidPostMessage({ type: 'openFile', path: ctxNode.decisionDocs[0] }); hideCtxMenu();
 });
 document.getElementById('ctx-copy').addEventListener('click', function() {
   if (ctxNode) navigator.clipboard && navigator.clipboard.writeText(ctxNode.id); hideCtxMenu();

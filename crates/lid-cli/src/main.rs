@@ -1,11 +1,13 @@
 //! `lidc` — coherence checker for the LID methodology.
 //!
 //! Subcommands:
-//! * `lidc init`   — scaffold a new LID project (index.yaml + stub arrow doc).
-//! * `lidc check`  — discover a LID repo, run the registered checks, report
+//! * `lidc init`      — scaffold a new LID project (index.yaml + stub arrow doc).
+//! * `lidc check`     — discover a LID repo, run the registered checks, report
 //!   findings, exit 1 when severity crosses `--fail-on` threshold.
-//! * `lidc status` — print a quick health dashboard (segment counts, spec
+//! * `lidc status`    — print a quick health dashboard (segment counts, spec
 //!   coverage, drift/next counts); always exits 0.
+//! * `lidc decisions` — list standalone decision documents; optionally filter
+//!   by scope (project-level or per-node).
 
 mod report;
 
@@ -17,7 +19,7 @@ use std::process::ExitCode;
 
 use anyhow::{Context, Result, anyhow};
 use clap::{Args, Parser, Subcommand};
-use lid_core::model::SpecStatus;
+use lid_core::model::{DecisionScope, SpecStatus};
 use lid_core::{CheckId, LidError, LidRepo, Severity, checks};
 
 use crate::report::{RenderOptions, json, markdown};
@@ -51,6 +53,19 @@ enum Cmd {
     Check(CheckArgs),
     /// Print a health dashboard: segment counts, spec coverage, drift/next.
     Status,
+    /// List standalone decision documents in the project.
+    ///
+    /// Shows project-level docs (`docs/decisions/`) and per-node docs
+    /// (`docs/intent/<node>/decisions/`). Use `--scope` to filter.
+    Decisions(DecisionsArgs),
+}
+
+#[derive(Args)]
+struct DecisionsArgs {
+    /// Filter by scope: `project` (docs/decisions/) or `node` (per-segment decisions/).
+    /// Omit to show all decision documents.
+    #[arg(long, value_name = "SCOPE")]
+    scope: Option<String>,
 }
 
 #[derive(Args)]
@@ -97,6 +112,7 @@ fn run() -> Result<ExitCode> {
         Cmd::Init(args) => cmd_init(cli.root.as_deref(), args),
         Cmd::Check(args) => cmd_check(cli.root.as_deref(), cli.json, args),
         Cmd::Status => cmd_status(cli.root.as_deref(), cli.json),
+        Cmd::Decisions(args) => cmd_decisions(cli.root.as_deref(), cli.json, args),
     }
 }
 
@@ -291,6 +307,109 @@ fn cmd_status(root: Option<&Path>, as_json: bool) -> Result<ExitCode> {
         );
         println!();
         println!("Run `lidc check` for full coherence findings.");
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn cmd_decisions(root: Option<&Path>, as_json: bool, args: &DecisionsArgs) -> Result<ExitCode> {
+    let repo = discover_repo(root)?;
+
+    let scope_filter = args.scope.as_deref();
+    if let Some(s) = scope_filter {
+        if s != "project" && s != "node" {
+            anyhow::bail!("invalid --scope value '{s}': expected 'project' or 'node'");
+        }
+    }
+
+    let docs: Vec<_> = repo
+        .decision_docs
+        .iter()
+        .filter(|d| match scope_filter {
+            Some("project") => matches!(d.scope, DecisionScope::Project),
+            Some("node") => matches!(d.scope, DecisionScope::Node { .. }),
+            _ => true,
+        })
+        .collect();
+
+    if as_json {
+        let json = serde_json::json!(
+            docs.iter()
+                .map(|d| {
+                    let (scope, segment) = match &d.scope {
+                        DecisionScope::Project => ("project", None),
+                        DecisionScope::Node { segment } => ("node", Some(segment.as_str())),
+                    };
+                    let mut obj = serde_json::json!({
+                        "path": d.path,
+                        "scope": scope,
+                        "title": d.title,
+                    });
+                    if let Some(seg) = segment {
+                        obj["segment"] = serde_json::json!(seg);
+                    }
+                    obj
+                })
+                .collect::<Vec<_>>()
+        );
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json).context("serialising decisions JSON")?
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    let total = docs.len();
+    println!("Decision documents   {total} total");
+    println!();
+
+    // Project-level first
+    let project_docs: Vec<_> = docs
+        .iter()
+        .filter(|d| matches!(d.scope, DecisionScope::Project))
+        .collect();
+    if !project_docs.is_empty() {
+        println!("Project  (docs/decisions/)");
+        for d in &project_docs {
+            let rel = d.path.strip_prefix(&repo.root).unwrap_or(&d.path);
+            if d.title.is_empty() {
+                println!("  {}", rel.display());
+            } else {
+                println!("  {:<48}  {}", rel.display().to_string(), d.title);
+            }
+        }
+        println!();
+    }
+
+    // Per-node, grouped by segment
+    let mut by_segment: BTreeMap<&str, Vec<_>> = BTreeMap::new();
+    for d in docs
+        .iter()
+        .filter(|d| matches!(d.scope, DecisionScope::Node { .. }))
+    {
+        if let DecisionScope::Node { segment } = &d.scope {
+            by_segment.entry(segment.as_str()).or_default().push(*d);
+        }
+    }
+    for (segment, seg_docs) in &by_segment {
+        println!("{segment}");
+        for d in seg_docs {
+            let rel = d.path.strip_prefix(&repo.root).unwrap_or(&d.path);
+            if d.title.is_empty() {
+                println!("  {}", rel.display());
+            } else {
+                println!("  {:<48}  {}", rel.display().to_string(), d.title);
+            }
+        }
+        println!();
+    }
+
+    if total == 0 {
+        println!("No decision documents found.");
+        println!();
+        println!(
+            "Add docs to docs/decisions/ (project-level) or docs/intent/<node>/decisions/ (per-node)."
+        );
     }
 
     Ok(ExitCode::SUCCESS)

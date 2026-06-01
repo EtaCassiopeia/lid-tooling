@@ -41,6 +41,7 @@ interface GraphNode {
     specPrefix?: string;
     children?: string[];
     parent?: string;
+    decisionDocs?: string[];
 }
 
 interface GraphEdge {
@@ -397,7 +398,7 @@ function openPanel(node: GraphNode, edit = false): void {
     editMode = edit;
     btnEdit.textContent = editMode ? '● Done' : '✎ Edit';
     btnEdit.classList.toggle('active', editMode);
-    const { id, status, specs, specItems, specFile, lldFile, specPrefix, sampled, audited, next, drift } = node;
+    const { id, status, specs, specItems, specFile, lldFile, specPrefix, sampled, audited, next, drift, decisionDocs } = node;
 
     panelTitle.textContent = id;
 
@@ -535,6 +536,10 @@ function openPanel(node: GraphNode, edit = false): void {
       <button class="btn-open" data-action="open-arrow">Open Arrow Doc</button>`;
     if (specFile) html += `<button class="btn-open" data-action="open-spec">Open Spec File</button>`;
     if (lldFile)  html += `<button class="btn-open" data-action="open-lld">Open LLD</button>`;
+    if (decisionDocs?.length) {
+        const decLabel = decisionDocs.length === 1 ? 'Open Decision Doc' : `Open Decision Docs (${decisionDocs.length})`;
+        html += `<button class="btn-open" data-action="open-decisions">${decLabel}</button>`;
+    }
     html += `</div>`;
 
     // ── Next / Drift ──────────────────────────────────────────────────────────
@@ -587,6 +592,7 @@ panelBody.addEventListener('click', (e) => {
         if (action === 'open-arrow') vscode.postMessage({ type: 'open', segmentId: node.id });
         else if (action === 'open-spec' && node.specFile) vscode.postMessage({ type: 'openFile', path: node.specFile });
         else if (action === 'open-lld'  && node.lldFile)  vscode.postMessage({ type: 'openFile', path: node.lldFile });
+        else if (action === 'open-decisions' && node.decisionDocs?.length) vscode.postMessage({ type: 'openFile', path: node.decisionDocs[0]! });
         return;
     }
 
@@ -687,11 +693,12 @@ function closePanel(): void {
 
 // ── Context menu ─────────────────────────────────────────────────────────────
 
-const ctxMenu  = document.getElementById('ctxmenu')!;
-const ctxArrow = document.getElementById('ctx-arrow')!;
-const ctxSpec  = document.getElementById('ctx-spec')!;
-const ctxLld   = document.getElementById('ctx-lld')!;
-const ctxCopy  = document.getElementById('ctx-copy')!;
+const ctxMenu      = document.getElementById('ctxmenu')!;
+const ctxArrow     = document.getElementById('ctx-arrow')!;
+const ctxSpec      = document.getElementById('ctx-spec')!;
+const ctxLld       = document.getElementById('ctx-lld')!;
+const ctxDecisions = document.getElementById('ctx-decisions')!;
+const ctxCopy      = document.getElementById('ctx-copy')!;
 
 let ctxNode: GraphNode | null = null;
 
@@ -699,6 +706,7 @@ function showCtxMenu(clientX: number, clientY: number, node: GraphNode): void {
     ctxNode = node;
     ctxSpec.classList.toggle('hidden', !node.specFile);
     ctxLld.classList.toggle('hidden', !node.lldFile);
+    ctxDecisions.classList.toggle('hidden', !(node.decisionDocs?.length));
     ctxMenu.style.display = 'block';
     const vw = document.documentElement.clientWidth;
     const vh = document.documentElement.clientHeight;
@@ -721,6 +729,10 @@ ctxSpec.addEventListener('click', () => {
 });
 ctxLld.addEventListener('click', () => {
     if (ctxNode?.lldFile) vscode.postMessage({ type: 'openFile', path: ctxNode.lldFile });
+    hideCtxMenu();
+});
+ctxDecisions.addEventListener('click', () => {
+    if (ctxNode?.decisionDocs?.length) vscode.postMessage({ type: 'openFile', path: ctxNode.decisionDocs[0]! });
     hideCtxMenu();
 });
 ctxCopy.addEventListener('click', () => {
