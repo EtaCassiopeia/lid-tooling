@@ -1,6 +1,22 @@
 use std::path::{Path, PathBuf};
 
-/// Suggest a spec-ID prefix for a new segment.
+/// Derive the canonical spec-ID prefix from a segment's position in the design tree.
+///
+/// Following the LID 1.2.0 path-coherent convention: a spec at
+/// `docs/intent/{parent}/{seg}/` should declare `prefix: PARENT-SEG`.
+/// When there is no parent the prefix is simply the uppercased segment name.
+///
+/// This is the default used by all scaffolding code when no explicit prefix is
+/// supplied.
+#[must_use]
+pub fn path_derived_prefix(parent: Option<&str>, segment_id: &str) -> String {
+    match parent {
+        None => segment_id.to_uppercase(),
+        Some(p) => format!("{}-{}", p.to_uppercase(), segment_id.to_uppercase()),
+    }
+}
+
+/// Suggest a spec-ID prefix by inferring the project's existing namespace.
 ///
 /// Strategy:
 /// 1. Collect the first hyphen-delimited component of every existing prefix
@@ -9,9 +25,9 @@ use std::path::{Path, PathBuf};
 ///    prefixes, return `{NAMESPACE}-{SEGMENT_UPPER}`.
 /// 3. Otherwise return `{SEGMENT_UPPER}` (uppercase segment name).
 ///
-/// This lets a project with a consistent namespace like `USH` auto-suggest
-/// `USH-BILLING` for a new `billing` segment, while a mixed or empty project
-/// simply uppercases the name.
+/// This is a utility for callers that want to mirror a project's established
+/// namespace convention (e.g. `USH-*`). Scaffolding uses [`path_derived_prefix`]
+/// instead, which is coherent with the path-coherent-prefix check.
 #[must_use]
 pub fn suggest_prefix(segment_id: &str, existing_prefixes: &[&str]) -> String {
     let segment_upper = segment_id.to_uppercase();
@@ -137,6 +153,24 @@ pub fn scaffold_arrow_doc(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn path_derived_prefix_no_parent_uppercases_segment() {
+        assert_eq!(path_derived_prefix(None, "auth"), "AUTH");
+        assert_eq!(
+            path_derived_prefix(None, "shortener-core"),
+            "SHORTENER-CORE"
+        );
+    }
+
+    #[test]
+    fn path_derived_prefix_with_parent_joins_with_hyphen() {
+        assert_eq!(path_derived_prefix(Some("peval"), "run"), "PEVAL-RUN");
+        assert_eq!(
+            path_derived_prefix(Some("checkout"), "payment"),
+            "CHECKOUT-PAYMENT"
+        );
+    }
 
     #[test]
     fn suggest_prefix_no_existing_returns_segment_upper() {

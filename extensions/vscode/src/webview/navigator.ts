@@ -91,7 +91,6 @@ let cy: cytoscape.Core | undefined;
 
 let _clusters: Record<string, string[]> = {};
 let _allSegmentIds: string[] = [];
-let _allSpecPrefixes: string[] = [];
 let _addSegBlocks: string[] = [];
 let _addSegChildren: string[] = [];
 
@@ -104,19 +103,6 @@ const LAYOUT_OPTIONS = {
     animate: false,
 };
 
-function suggestPrefix(segmentId: string, existingPrefixes: string[]): string {
-    const upper = segmentId.toUpperCase();
-    if (existingPrefixes.length === 0) return upper;
-    const counts: Record<string, number> = {};
-    for (const p of existingPrefixes) {
-        const ns = p.split('-')[0];
-        if (ns) counts[ns] = (counts[ns] ?? 0) + 1;
-    }
-    const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-    if (best && best[1] * 2 > existingPrefixes.length) return `${best[0]}-${upper}`;
-    return upper;
-}
-
 function buildLabel(n: GraphNode): string {
     const s = n.specs;
     if (!s) return n.id;
@@ -127,7 +113,6 @@ function buildLabel(n: GraphNode): string {
 function render(payload: GraphPayload): void {
     _clusters = payload.clusters ?? {};
     _allSegmentIds = payload.nodes.map(n => n.id).sort();
-    _allSpecPrefixes = payload.nodes.map(n => n.specPrefix).filter((p): p is string => !!p);
     const clusterSel = document.getElementById('filter-cluster') as HTMLSelectElement;
     if (clusterSel) {
         const prev = clusterSel.value;
@@ -887,7 +872,7 @@ document.getElementById('btn-add-seg')!.addEventListener('click', () => {
     const detailInput   = document.getElementById('seg-detail-input') as HTMLInputElement;
     segIdInput.value  = '';
     detailInput.value = '';
-    prefixInput.value = suggestPrefix('', _allSpecPrefixes);
+    prefixInput.value = '';
     _detailAutoFilled = false;
     (document.getElementById('seg-add-err') as HTMLElement).textContent = '';
     _addSegBlocks   = [];
@@ -900,7 +885,7 @@ document.getElementById('btn-add-seg')!.addEventListener('click', () => {
 document.getElementById('seg-id-input')!.addEventListener('input', (e) => {
     const segId = (e.target as HTMLInputElement).value.trim();
     const prefixInput = document.getElementById('seg-prefix-input') as HTMLInputElement;
-    prefixInput.value = suggestPrefix(segId, _allSpecPrefixes);
+    prefixInput.value = segId.toUpperCase();
     const detailInput = document.getElementById('seg-detail-input') as HTMLInputElement;
     if (!detailInput.value || _detailAutoFilled) {
         detailInput.value = segId ? `${segId}/core.md` : '';
@@ -967,7 +952,7 @@ document.getElementById('btn-seg-submit')!.addEventListener('click', () => {
         detail,
         blocks:     [..._addSegBlocks],
         children:   [..._addSegChildren],
-        specPrefix: specPrefix || suggestPrefix(segId, _allSpecPrefixes),
+        specPrefix: specPrefix || segId.toUpperCase(),
     });
 });
 
