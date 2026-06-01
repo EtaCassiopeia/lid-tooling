@@ -254,3 +254,196 @@ fn invalid_only_value_exits_two_with_helpful_error() {
         .code(2)
         .stderr(contains("bogus-check"));
 }
+
+/// Build a minimal three-level deep LID layout under `root`.
+///
+/// Hierarchy: `checkout` → `payment` → `gateway`
+///
+/// Each node has its own subfolder under `docs/intent/` mirroring the
+/// recursive node-as-folder convention from LID 1.2.0 §3.
+fn make_depth3_repo(root: &Path) {
+    fs::create_dir_all(root.join("docs/arrows/checkout/payment")).unwrap();
+    fs::create_dir_all(root.join("docs/intent/checkout/payment/gateway")).unwrap();
+
+    fs::write(
+        root.join("docs/arrows/index.yaml"),
+        "\
+schema_version: 2
+arrows:
+  checkout:
+    status: MAPPED
+    detail: checkout.md
+    children: [payment]
+    blocks: []
+    blockedBy: []
+  payment:
+    status: MAPPED
+    parent: checkout
+    detail: checkout/payment.md
+    children: [gateway]
+    blocks: []
+    blockedBy: []
+  gateway:
+    status: MAPPED
+    parent: payment
+    detail: checkout/payment/gateway.md
+    blocks: []
+    blockedBy: []
+",
+    )
+    .unwrap();
+
+    fs::write(
+        root.join("docs/arrows/checkout.md"),
+        "# Arrow: checkout\n\n## References\n\n### LLD\n- docs/intent/checkout/checkout-design.md\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("docs/arrows/checkout/payment.md"),
+        "# Arrow: payment\n\n## References\n\n### LLD\n- docs/intent/checkout/payment/payment-design.md\n\n### EARS\n- docs/intent/checkout/payment/payment-specs.md\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("docs/arrows/checkout/payment/gateway.md"),
+        "# Arrow: gateway\n\n## References\n\n### LLD\n- docs/intent/checkout/payment/gateway/gateway-design.md\n\n### EARS\n- docs/intent/checkout/payment/gateway/gateway-specs.md\n",
+    )
+    .unwrap();
+
+    fs::write(
+        root.join("docs/intent/checkout/checkout-design.md"),
+        "\
+# Design: checkout
+
+## Decisions & Alternatives
+
+| Decision | Chosen | Alternatives | Rationale |
+| --- | --- | --- | --- |
+| Decomposition | Split into payment module | Monolith | Separation of concerns |
+",
+    )
+    .unwrap();
+
+    fs::write(
+        root.join("docs/intent/checkout/payment/payment-design.md"),
+        "\
+# Design: payment
+
+## Decisions & Alternatives
+
+| Decision | Chosen | Alternatives | Rationale |
+| --- | --- | --- | --- |
+| Payment provider | Stripe | PayPal | Better API |
+",
+    )
+    .unwrap();
+    fs::write(
+        root.join("docs/intent/checkout/payment/payment-specs.md"),
+        "---\nprefix: CHECKOUT-PAYMENT\n---\n\n# payment specs\n\n- [ ] **CHECKOUT-PAYMENT-001**: The system shall process payments.\n",
+    )
+    .unwrap();
+
+    fs::write(
+        root.join("docs/intent/checkout/payment/gateway/gateway-design.md"),
+        "\
+# Design: gateway
+
+## Decisions & Alternatives
+
+| Decision | Chosen | Alternatives | Rationale |
+| --- | --- | --- | --- |
+| Gateway protocol | REST | gRPC | Broader ecosystem support |
+",
+    )
+    .unwrap();
+    fs::write(
+        root.join("docs/intent/checkout/payment/gateway/gateway-specs.md"),
+        "---\nprefix: CHECKOUT-PAYMENT-GATEWAY\n---\n\n# gateway specs\n\n- [ ] **CHECKOUT-PAYMENT-GATEWAY-001**: The system shall route requests to the gateway.\n",
+    )
+    .unwrap();
+}
+
+#[test]
+fn depth3_clean_tree_produces_no_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    make_depth3_repo(dir.path());
+
+    Command::cargo_bin("lidc")
+        .unwrap()
+        .args(["check", "--root"])
+        .arg(dir.path())
+        .assert()
+        .success()
+        .stdout(contains("no findings"));
+}
+
+#[test]
+fn depth3_orphan_design_doc_is_detected() {
+    let dir = tempfile::tempdir().unwrap();
+    make_depth3_repo(dir.path());
+    // Plant an unreferenced design doc three levels deep.
+    fs::write(
+        dir.path()
+            .join("docs/intent/checkout/payment/gateway/stale-design.md"),
+        "\
+# Design: stale
+
+## Decisions & Alternatives
+
+| Decision | Chosen | Alternatives | Rationale |
+| --- | --- | --- | --- |
+| Stale | Yes | No | Testing |
+",
+    )
+    .unwrap();
+
+    Command::cargo_bin("lidc")
+        .unwrap()
+        .args(["check", "--fail-on", "warning", "--root"])
+        .arg(dir.path())
+        .assert()
+        .code(1)
+        .stdout(contains("stale-design.md"));
+}
+
+#[test]
+fn depth3_incorrect_spec_prefix_is_warned() {
+    let dir = tempfile::tempdir().unwrap();
+    make_depth3_repo(dir.path());
+    // Overwrite the gateway specs with the wrong prefix.
+    fs::write(
+        dir.path()
+            .join("docs/intent/checkout/payment/gateway/gateway-specs.md"),
+        "---\nprefix: WRONG\n---\n\n# gateway specs\n\n- [ ] **WRONG-001**: stub.\n",
+    )
+    .unwrap();
+
+    let output = Command::cargo_bin("lidc")
+        .unwrap()
+        .args([
+            "check",
+            "--json",
+            "--only",
+            "path-coherent-prefix",
+            "--root",
+        ])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        report["summary"]["findings"].as_u64().unwrap(),
+        1,
+        "expected one path-coherent-prefix warning for wrong prefix: {}",
+        serde_json::to_string_pretty(&report["findings"]).unwrap_or_default()
+    );
+    let msg = report["findings"][0]["message"].as_str().unwrap();
+    assert!(
+        msg.contains("WRONG"),
+        "message should name the wrong prefix: {msg}"
+    );
+    assert!(
+        msg.contains("CHECKOUT-PAYMENT-GATEWAY"),
+        "message should name the expected prefix: {msg}"
+    );
+}
