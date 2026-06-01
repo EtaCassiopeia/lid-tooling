@@ -97,6 +97,28 @@ cd extensions/intellij
 
 ---
 
+## Zed extension
+
+### From the Zed Extension Registry (recommended)
+
+Open the **Extensions** panel (`Cmd+Shift+X`), search **LID**, and click **Install**.
+
+`lid-lsp` must be on your `$PATH` — install it via Homebrew or the curl script (see [CLI + MCP server](#cli--mcp-server) below). The extension will surface a clear error in the Zed status bar if `lid-lsp` cannot be found.
+
+### From source
+
+Requires the `wasm32-wasip1` Rust target and the Zed CLI:
+
+```sh
+rustup target add wasm32-wasip1
+cd extensions/zed
+cargo build --release --target wasm32-wasip1
+```
+
+Then load the extension from the local directory in Zed: **Extensions → Install Dev Extension → select `extensions/zed/`**.
+
+---
+
 ## CLI + MCP server
 
 ### macOS / Linux — Homebrew

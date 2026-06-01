@@ -1,0 +1,5 @@
+name = "LID"
+grammar = "markdown"
+path_suffixes = ["specs.md", "design.md"]
+line_comment = "<!-- "
+block_comment = { start = "<!--", end = "-->" }

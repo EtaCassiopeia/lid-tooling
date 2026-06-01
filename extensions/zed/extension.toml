@@ -1,0 +1,11 @@
+id = "lid"
+name = "LID (Linked-Intent Development)"
+description = "Language support for LID projects via lid-lsp."
+version = "0.1.0"
+schema_version = 1
+authors = ["lid-tools"]
+repository = "https://github.com/EtaCassiopeia/lid-tooling"
+
+[language_servers.lid-lsp]
+name = "lid-lsp"
+language = "LID"
