@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use lid_core::model::{SpecId, SpecStatus};
 use lid_core::parse::markdown;
@@ -143,9 +143,14 @@ pub async fn lid_add_spec(
         .await
         .map_err(ErrorData::from)?;
 
-    {
+    let seg = input.segment_id.to_lowercase();
+    let filename = format!("{seg}-specs.md");
+
+    // In one read lock: reject duplicates, locate the specs file (handles both
+    // flat docs/intent/{seg}/ and nested docs/intent/{parent}/{seg}/ layouts),
+    // and capture the declared prefix.
+    let (specs_path, declared_prefix) = {
         let repo = handle.read().await;
-        // Reject duplicate spec IDs.
         if repo
             .specs
             .iter()
@@ -156,26 +161,38 @@ pub async fn lid_add_spec(
                 input.spec_id.clone(),
             )));
         }
-    }
-
-    let seg = input.segment_id.to_lowercase();
-    let specs_path = Path::new(&input.project_root)
-        .join("docs")
-        .join("intent")
-        .join(&seg)
-        .join(format!("{seg}-specs.md"));
-
-    // Validate prefix when the spec file already exists and declares one.
-    let declared_prefix = {
-        let repo = handle.read().await;
-        let specs_rel = PathBuf::from("docs")
-            .join("intent")
-            .join(&seg)
-            .join(format!("{seg}-specs.md"));
-        repo.specs
+        // Find existing spec file by filename (works for any nesting depth).
+        if let Some(sf) = repo
+            .specs
             .iter()
-            .find(|sf| sf.path == specs_rel)
-            .and_then(|sf| sf.prefix.clone())
+            .find(|sf| sf.path.file_name().is_some_and(|f| f == filename.as_str()))
+        {
+            (repo.root.join(&sf.path), sf.prefix.clone())
+        } else {
+            // File doesn't exist yet — construct path using the parent if known.
+            let seg_id_parsed = lid_core::model::SegmentId::parse(&seg).ok();
+            let parent = seg_id_parsed
+                .as_ref()
+                .and_then(|id| repo.index.arrows.get(id))
+                .and_then(|s| s.parent.as_ref())
+                .map(|p| p.as_ref().to_owned());
+            let path = match parent.as_deref() {
+                Some(p) => repo
+                    .root
+                    .join("docs")
+                    .join("intent")
+                    .join(p)
+                    .join(&seg)
+                    .join(&filename),
+                None => repo
+                    .root
+                    .join("docs")
+                    .join("intent")
+                    .join(&seg)
+                    .join(&filename),
+            };
+            (path, None)
+        }
     };
     if let Some(ref prefix) = declared_prefix {
         let expected = format!("{prefix}-");

@@ -1,5 +1,6 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use lid_core::model::SegmentId;
 use rmcp::model::ErrorData;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -57,11 +58,35 @@ pub async fn lid_append_to_design_doc(
     input: AppendToDesignDocInput,
 ) -> Result<String, ErrorData> {
     let seg = input.segment_id.to_lowercase();
-    let design_path = Path::new(&input.project_root)
-        .join("docs")
-        .join("intent")
-        .join(&seg)
-        .join(format!("{seg}-design.md"));
+
+    // Derive the design doc path: use the segment's parent (if any) so that
+    // child segments in a nested layout are found at
+    // docs/intent/{parent}/{seg}/{seg}-design.md instead of the flat path.
+    let design_path: PathBuf = {
+        let handle = registry
+            .get_or_discover(&input.project_root)
+            .await
+            .map_err(ErrorData::from)?;
+        let repo = handle.read().await;
+        let parent = SegmentId::parse(&seg)
+            .ok()
+            .and_then(|id| repo.index.arrows.get(&id))
+            .and_then(|s| s.parent.as_ref())
+            .map(|p| p.as_ref().to_owned());
+        match parent.as_deref() {
+            Some(p) => Path::new(&input.project_root)
+                .join("docs")
+                .join("intent")
+                .join(p)
+                .join(&seg)
+                .join(format!("{seg}-design.md")),
+            None => Path::new(&input.project_root)
+                .join("docs")
+                .join("intent")
+                .join(&seg)
+                .join(format!("{seg}-design.md")),
+        }
+    };
 
     if design_path.exists() {
         let mut existing = tokio::fs::read_to_string(&design_path)

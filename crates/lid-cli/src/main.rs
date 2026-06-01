@@ -132,9 +132,9 @@ fn cmd_init(root: Option<&Path>, args: &InitArgs) -> Result<ExitCode> {
     )
     .context("writing docs/arrows/index.yaml")?;
 
-    lid_core::scaffold::scaffold_arrow_doc(&dir, &detail, seg)
+    lid_core::scaffold::scaffold_arrow_doc(&dir, &detail, seg, None)
         .with_context(|| format!("writing docs/arrows/{detail}"))?;
-    lid_core::scaffold::scaffold_intent_dir(&dir, seg, &spec_prefix)
+    lid_core::scaffold::scaffold_intent_dir(&dir, None, seg, &spec_prefix)
         .with_context(|| format!("scaffolding docs/intent/{seg}/"))?;
 
     println!("Initialized LID project at {}", dir.display());

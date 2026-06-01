@@ -239,6 +239,7 @@ async fn add_segment_and_update_status() {
             blocks: vec![],
             children: vec![],
             spec_prefix: None,
+            parent: None,
         },
     )
     .await
@@ -341,6 +342,7 @@ async fn add_segment_does_not_reformat_realistic_yaml() {
             blocks: vec![],
             children: vec![],
             spec_prefix: Some("USH-BILL".to_owned()),
+            parent: None,
         },
     )
     .await
@@ -613,5 +615,185 @@ async fn update_segment_patches_blocks_without_round_trip() {
     assert!(
         after.contains("children: [in-memory-store]"),
         "other segment's arrays must be intact"
+    );
+}
+
+#[tokio::test]
+async fn add_child_segment_creates_files_in_parent_dir() {
+    let dir = tempfile::tempdir().unwrap();
+    // Build a minimal project with a parent segment already in the index.
+    fs::create_dir_all(dir.path().join("docs/arrows")).unwrap();
+    fs::create_dir_all(dir.path().join("docs/intent/payments")).unwrap();
+    fs::write(
+        dir.path().join("docs/arrows/index.yaml"),
+        "schema_version: 2\narrows:\n  payments:\n    status: MAPPED\n    detail: payments/overview.md\n",
+    )
+    .unwrap();
+    fs::write(
+        dir.path().join("docs/intent/payments/payments-specs.md"),
+        "---\nprefix: PAY\n---\n\n# payments specs\n",
+    )
+    .unwrap();
+
+    let root = dir.path().to_string_lossy().into_owned();
+    let registry = RepoRegistry::new();
+    tools::discover::lid_discover(
+        &registry,
+        tools::discover::DiscoverInput { path: root.clone() },
+    )
+    .await
+    .unwrap();
+
+    tools::write_segment::lid_add_segment(
+        &registry,
+        tools::write_segment::AddSegmentInput {
+            project_root: root.clone(),
+            segment_id: "checkout".to_owned(),
+            status: "UNMAPPED".to_owned(),
+            detail: "payments/checkout.md".to_owned(),
+            blocks: vec![],
+            children: vec![],
+            spec_prefix: Some("PAY-CHECKOUT".to_owned()),
+            parent: Some("payments".to_owned()),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Intent files must be under docs/intent/payments/checkout/, not docs/intent/checkout/.
+    assert!(
+        dir.path()
+            .join("docs/intent/payments/checkout/checkout-specs.md")
+            .exists(),
+        "nested specs file should be created under parent dir"
+    );
+    assert!(
+        dir.path()
+            .join("docs/intent/payments/checkout/checkout-design.md")
+            .exists(),
+        "nested design file should be created under parent dir"
+    );
+    assert!(
+        !dir.path().join("docs/intent/checkout").exists(),
+        "flat top-level dir should not be created for child segment"
+    );
+
+    // Arrow doc references must point to the nested intent paths.
+    let arrow_content =
+        fs::read_to_string(dir.path().join("docs/arrows/payments/checkout.md")).unwrap();
+    assert!(
+        arrow_content.contains("docs/intent/payments/checkout/checkout-design.md"),
+        "arrow doc LLD reference must use nested path"
+    );
+
+    // index.yaml must include parent field.
+    let index = fs::read_to_string(dir.path().join("docs/arrows/index.yaml")).unwrap();
+    assert!(
+        index.contains("parent: payments"),
+        "parent field must be written to index.yaml"
+    );
+}
+
+#[tokio::test]
+async fn add_spec_to_child_segment_finds_nested_path() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("docs/arrows")).unwrap();
+    // Create a nested project: payments (parent) + checkout (child).
+    fs::write(
+        dir.path().join("docs/arrows/index.yaml"),
+        "schema_version: 2\narrows:\n  payments:\n    status: MAPPED\n    detail: payments/overview.md\n  checkout:\n    status: MAPPED\n    parent: payments\n    detail: payments/checkout.md\n",
+    )
+    .unwrap();
+    fs::create_dir_all(dir.path().join("docs/intent/payments/checkout")).unwrap();
+    fs::write(
+        dir.path()
+            .join("docs/intent/payments/checkout/checkout-specs.md"),
+        "---\nprefix: PAY-CHECKOUT\n---\n\n# checkout specs\n",
+    )
+    .unwrap();
+
+    let root = dir.path().to_string_lossy().into_owned();
+    let registry = RepoRegistry::new();
+    tools::discover::lid_discover(
+        &registry,
+        tools::discover::DiscoverInput { path: root.clone() },
+    )
+    .await
+    .unwrap();
+
+    tools::write_spec::lid_add_spec(
+        &registry,
+        tools::write_spec::AddSpecInput {
+            project_root: root.clone(),
+            segment_id: "checkout".to_owned(),
+            spec_id: "PAY-CHECKOUT-001".to_owned(),
+            text: "The system shall complete checkout within 3 seconds.".to_owned(),
+        },
+    )
+    .await
+    .unwrap();
+
+    let content = fs::read_to_string(
+        dir.path()
+            .join("docs/intent/payments/checkout/checkout-specs.md"),
+    )
+    .unwrap();
+    assert!(
+        content.contains("PAY-CHECKOUT-001"),
+        "spec must be appended to the nested spec file"
+    );
+}
+
+#[tokio::test]
+async fn append_to_design_doc_child_uses_parent_path() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("docs/arrows")).unwrap();
+    fs::write(
+        dir.path().join("docs/arrows/index.yaml"),
+        "schema_version: 2\narrows:\n  payments:\n    status: MAPPED\n    detail: payments/overview.md\n  checkout:\n    status: MAPPED\n    parent: payments\n    detail: payments/checkout.md\n",
+    )
+    .unwrap();
+    fs::create_dir_all(dir.path().join("docs/intent/payments/checkout")).unwrap();
+    fs::write(
+        dir.path()
+            .join("docs/intent/payments/checkout/checkout-design.md"),
+        "# checkout design\n\n## Overview\n\n<!-- stub -->\n",
+    )
+    .unwrap();
+
+    let root = dir.path().to_string_lossy().into_owned();
+    let registry = RepoRegistry::new();
+    tools::discover::lid_discover(
+        &registry,
+        tools::discover::DiscoverInput { path: root.clone() },
+    )
+    .await
+    .unwrap();
+
+    tools::read_file::lid_append_to_design_doc(
+        &registry,
+        tools::read_file::AppendToDesignDocInput {
+            project_root: root.clone(),
+            segment_id: "checkout".to_owned(),
+            content: "## Decision\n\nUse a single-page checkout flow.".to_owned(),
+        },
+    )
+    .await
+    .unwrap();
+
+    let content = fs::read_to_string(
+        dir.path()
+            .join("docs/intent/payments/checkout/checkout-design.md"),
+    )
+    .unwrap();
+    assert!(
+        content.contains("## Decision"),
+        "content must be appended to the nested design doc"
+    );
+    assert!(
+        !dir.path()
+            .join("docs/intent/checkout/checkout-design.md")
+            .exists(),
+        "must not create flat design doc for child segment"
     );
 }

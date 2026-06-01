@@ -80,12 +80,12 @@ fn init_blocking(path: &str, segment: &str, spec_prefix: &str) -> Result<InitOut
     );
     std::fs::write(&index_path, &index_yaml).map_err(McpToolError::Io)?;
 
-    let arrow_path = scaffold::scaffold_arrow_doc(&root, &detail, segment)
+    let arrow_path = scaffold::scaffold_arrow_doc(&root, &detail, segment, None)
         .map_err(McpToolError::Io)?
         .ok_or_else(|| McpToolError::Io(std::io::Error::other("arrow doc already exists")))?;
 
-    let intent_files =
-        scaffold::scaffold_intent_dir(&root, segment, spec_prefix).map_err(McpToolError::Io)?;
+    let intent_files = scaffold::scaffold_intent_dir(&root, None, segment, spec_prefix)
+        .map_err(McpToolError::Io)?;
 
     let rel = |p: &Path| {
         p.strip_prefix(&root)

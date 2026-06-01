@@ -31,6 +31,9 @@ pub struct AddSegmentInput {
     /// project's existing prefixes or the segment name.
     #[serde(default)]
     pub spec_prefix: Option<String>,
+    /// Parent segment ID when this is a child in a recursive design tree.
+    #[serde(default)]
+    pub parent: Option<String>,
 }
 
 #[allow(clippy::too_many_lines)]
@@ -86,6 +89,16 @@ pub async fn lid_add_segment(
         })
     };
 
+    // Validate and capture parent segment ID if provided.
+    let input_parent: Option<SegmentId> = match &input.parent {
+        Some(p) if !p.is_empty() => Some(
+            SegmentId::parse(p)
+                .map_err(|_| McpToolError::InvalidSegmentId(p.clone()))
+                .map_err(ErrorData::from)?,
+        ),
+        _ => None,
+    };
+
     let index_path = Path::new(&input.project_root)
         .join("docs")
         .join("arrows")
@@ -106,6 +119,7 @@ pub async fn lid_add_segment(
             &input.detail,
             &blocks,
             &children,
+            input_parent.as_ref().map(SegmentId::as_str),
         );
         let updated = insert_into_arrows(&raw, &block);
         atomic_write(&index_path, &updated)
@@ -113,29 +127,31 @@ pub async fn lid_add_segment(
             .map_err(ErrorData::from)?;
     }
 
+    let new_seg = Segment {
+        status,
+        detail: std::path::PathBuf::from(&input.detail),
+        sampled: None,
+        audited: None,
+        audited_sha: None,
+        blocks: blocks.clone(),
+        blocked_by: Vec::new(),
+        next: None,
+        drift: None,
+        merged_into: None,
+        children: children.clone(),
+        parent: input_parent.clone(),
+    };
+
     if children.is_empty() {
         // Common case: no children to back-fill. Update in-memory state only.
         let mut repo = handle.write().await;
-        let new_seg = Segment {
-            status,
-            detail: std::path::PathBuf::from(&input.detail),
-            sampled: None,
-            audited: None,
-            audited_sha: None,
-            blocks: blocks.clone(),
-            blocked_by: Vec::new(),
-            next: None,
-            drift: None,
-            merged_into: None,
-            children: children.clone(),
-            parent: None,
-        };
         repo.index.arrows.insert(seg_id.clone(), new_seg);
         drop(repo);
     } else {
         // Back-fill parent on existing children. Requires modifying those entries,
         // so we do a full round-trip (model now has skip_serializing_if to limit damage).
         let mut repo = handle.write().await;
+        repo.index.arrows.insert(seg_id.clone(), new_seg);
         for child in &children {
             if let Some(entry) = repo.index.arrows.get_mut(child) {
                 entry.parent = Some(seg_id.clone());
@@ -156,9 +172,12 @@ pub async fn lid_add_segment(
         let seg = input.segment_id.clone();
         let detail = input.detail.clone();
         let prefix = spec_prefix.clone();
+        let par = input_parent.as_ref().map(|p| p.as_str().to_owned());
         move || -> Result<(), McpToolError> {
-            scaffold::scaffold_arrow_doc(&root, &detail, &seg).map_err(McpToolError::Io)?;
-            scaffold::scaffold_intent_dir(&root, &seg, &prefix).map_err(McpToolError::Io)?;
+            scaffold::scaffold_arrow_doc(&root, &detail, &seg, par.as_deref())
+                .map_err(McpToolError::Io)?;
+            scaffold::scaffold_intent_dir(&root, par.as_deref(), &seg, &prefix)
+                .map_err(McpToolError::Io)?;
             Ok(())
         }
     })
@@ -319,6 +338,7 @@ fn build_segment_block(
     detail: &str,
     blocks: &[SegmentId],
     children: &[SegmentId],
+    parent: Option<&str>,
 ) -> String {
     let mut lines = vec![format!("  {seg_id}:")];
     lines.push(format!("    status: {status}"));
@@ -343,6 +363,9 @@ fn build_segment_block(
             .collect::<Vec<_>>()
             .join(", ");
         lines.push(format!("    children: [{list}]"));
+    }
+    if let Some(p) = parent {
+        lines.push(format!("    parent: {p}"));
     }
     lines.join("\n")
 }
