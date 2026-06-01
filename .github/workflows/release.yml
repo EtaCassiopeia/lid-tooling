@@ -243,7 +243,13 @@ jobs:
         run: |
           npm install -g @vscode/vsce
           for vsix in vsix/*.vsix; do
-            vsce publish --pat "${{ secrets.VSCE_PAT }}" --packagePath "$vsix"
+            out=$(vsce publish --pat "${{ secrets.VSCE_PAT }}" --packagePath "$vsix" 2>&1) && echo "$out" || {
+              if echo "$out" | grep -q "already exists"; then
+                echo "Already published: $out"
+              else
+                echo "$out"; exit 1
+              fi
+            }
           done
 
       - name: Publish to Open VSX
@@ -305,7 +311,15 @@ jobs:
 
       - name: Sign and publish plugin
         working-directory: extensions/intellij
-        run: ./gradlew signPlugin publishPlugin --no-daemon
+        shell: bash
+        run: |
+          out=$(./gradlew signPlugin publishPlugin --no-daemon 2>&1) && echo "$out" || {
+            if echo "$out" | grep -q "already contains version"; then
+              echo "Already published: $(echo "$out" | grep 'already contains version')"
+            else
+              echo "$out"; exit 1
+            fi
+          }
         env:
           JETBRAINS_MARKETPLACE_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
           CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
