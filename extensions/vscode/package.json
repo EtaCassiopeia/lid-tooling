@@ -1,5 +1,5 @@
 {
-  "name": "vscode",
+  "name": "lid",
   "displayName": "LID — Linked-Intent Development",
   "description": "Editor support for the LID methodology: hover, go-to-definition, find references, rename, completion, diagnostics for @spec citations, and a visual Intent Navigator.",
   "version": "0.2.0",
