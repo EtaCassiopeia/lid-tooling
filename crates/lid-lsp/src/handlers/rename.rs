@@ -259,6 +259,7 @@ mod tests {
                 line: source_line_for_old,
                 kind: CitationKind::Code,
             }],
+            decision_docs: vec![],
         };
         (dir, repo)
     }
@@ -405,6 +406,7 @@ mod tests {
             llds: vec![],
             arrow_docs: vec![],
             citations: vec![],
+            decision_docs: vec![],
         };
         let store = DocStore::new();
         let err = rename_at_position(&repo, &store, spec, position(0, 10), "AUTH-002").unwrap_err();

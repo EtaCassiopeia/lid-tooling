@@ -24,8 +24,8 @@ use regex::Regex;
 
 use crate::error::{LidError, Result};
 use crate::model::{
-    ArrowDoc, ArrowReferences, DecisionRow, KNOWN_REFERENCE_SECTIONS, LldDoc, SpecFile, SpecId,
-    SpecLine, SpecStatus,
+    ArrowDoc, ArrowReferences, DecisionDoc, DecisionRow, DecisionScope, KNOWN_REFERENCE_SECTIONS,
+    LldDoc, SpecFile, SpecId, SpecLine, SpecStatus,
 };
 
 /// Matches `- [x] **AUTH-001**: text` and its `[ ]`/`[D]` variants.
@@ -378,6 +378,43 @@ pub fn parse_arrow_doc(content: &str, source_path: &Path) -> ArrowDoc {
         path: source_path.to_path_buf(),
         references: refs,
         unrecognized_reference_sections: unrecognized,
+    }
+}
+
+/// Load and parse a standalone decision document.
+///
+/// The `scope` must be determined by the caller from the file's location:
+/// `DecisionScope::Project` for files under `docs/decisions/` and
+/// `DecisionScope::Node { segment }` for files under
+/// `docs/intent/<segment>/decisions/`.
+///
+/// # Errors
+/// Returns [`LidError::Io`] when the file cannot be read.
+pub fn load_decision_doc(path: &Path, scope: DecisionScope) -> Result<DecisionDoc> {
+    let content = fs::read_to_string(path).map_err(|source| LidError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    Ok(parse_decision_doc(&content, path, scope))
+}
+
+/// Parse a decision document from an in-memory string.
+///
+/// Extracts the first H1 heading as the title. Returns an empty title when
+/// no `# Heading` line is present — the `decisions-structure` check flags
+/// that case as a warning.
+#[must_use]
+pub fn parse_decision_doc(content: &str, source_path: &Path, scope: DecisionScope) -> DecisionDoc {
+    let title = content
+        .lines()
+        .find_map(|line| line.strip_prefix("# "))
+        .unwrap_or("")
+        .trim()
+        .to_owned();
+    DecisionDoc {
+        path: source_path.to_path_buf(),
+        scope,
+        title,
     }
 }
 
@@ -952,5 +989,55 @@ Some prose.
             update_spec_status_in_text(without_newline, &id, SpecStatus::Deferred).unwrap();
         assert!(updated_with.ends_with('\n'));
         assert!(!updated_without.ends_with('\n'));
+    }
+
+    // ── Decision doc parser ────────────────────────────────────────────
+
+    #[test]
+    fn parse_decision_doc_extracts_h1_title() {
+        let content = "# Session Storage Strategy\n\nWe chose Redis because…\n";
+        let doc = parse_decision_doc(
+            content,
+            Path::new("docs/decisions/session.md"),
+            DecisionScope::Project,
+        );
+        assert_eq!(doc.title, "Session Storage Strategy");
+        assert_eq!(doc.scope, DecisionScope::Project);
+    }
+
+    #[test]
+    fn parse_decision_doc_trims_whitespace_in_title() {
+        let content = "#   Spaced Title  \n\nProse.\n";
+        let doc = parse_decision_doc(content, Path::new("foo.md"), DecisionScope::Project);
+        assert_eq!(doc.title, "Spaced Title");
+    }
+
+    #[test]
+    fn parse_decision_doc_returns_empty_title_when_no_h1() {
+        let content = "## Not an H1\n\nSome prose.\n";
+        let doc = parse_decision_doc(content, Path::new("foo.md"), DecisionScope::Project);
+        assert!(
+            doc.title.is_empty(),
+            "expected empty title, got {:?}",
+            doc.title
+        );
+    }
+
+    #[test]
+    fn parse_decision_doc_node_scope_is_preserved() {
+        let content = "# Token Format\n";
+        let doc = parse_decision_doc(
+            content,
+            Path::new("docs/intent/auth/decisions/token.md"),
+            DecisionScope::Node {
+                segment: "auth".to_owned(),
+            },
+        );
+        assert_eq!(
+            doc.scope,
+            DecisionScope::Node {
+                segment: "auth".to_owned()
+            }
+        );
     }
 }

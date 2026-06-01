@@ -14,6 +14,7 @@ use crate::tools::{
     find_refs::FindRefsInput,
     get_segment::GetSegmentInput,
     init::InitInput,
+    list_decisions::{GetDecisionInput, ListDecisionsInput},
     list_segments::ListSegmentsInput,
     list_specs::ListSpecsInput,
     read_file::{AppendToDesignDocInput, ReadFileInput},
@@ -189,6 +190,27 @@ impl LidMcpServer {
     )]
     async fn lid_read_file(&self, Parameters(input): Parameters<ReadFileInput>) -> String {
         crate::tools::read_file::lid_read_file(&self.registry, input)
+            .await
+            .unwrap_or_else(|e| format!("error: {}", e.message))
+    }
+
+    #[tool(
+        description = "List all standalone decision documents in the project. Returns path, scope (project or node with segment name), and title. Optionally filter by scope_filter: \"project\" or \"node\"."
+    )]
+    async fn lid_list_decisions(
+        &self,
+        Parameters(input): Parameters<ListDecisionsInput>,
+    ) -> String {
+        crate::tools::list_decisions::lid_list_decisions(&self.registry, input)
+            .await
+            .unwrap_or_else(|e| format!("error: {}", e.message))
+    }
+
+    #[tool(
+        description = "Read the full markdown content of a standalone decision document. Path must be relative to project_root (e.g. \"docs/decisions/arch.md\" or \"docs/intent/auth/decisions/token.md\"). Must not contain '..'."
+    )]
+    async fn lid_get_decision(&self, Parameters(input): Parameters<GetDecisionInput>) -> String {
+        crate::tools::list_decisions::lid_get_decision(&self.registry, input)
             .await
             .unwrap_or_else(|e| format!("error: {}", e.message))
     }

@@ -20,7 +20,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::error::{LidError, Result};
-use crate::model::{ArrowDoc, ArrowIndex, LldDoc, SpecCitation, SpecFile};
+use crate::model::{
+    ArrowDoc, ArrowIndex, DecisionDoc, DecisionScope, LldDoc, SpecCitation, SpecFile,
+};
 use crate::parse;
 
 /// Schema versions this build of lid-tooling can parse correctly.
@@ -40,6 +42,9 @@ pub struct LidRepo {
     pub llds: Vec<LldDoc>,
     pub arrow_docs: Vec<ArrowDoc>,
     pub citations: Vec<SpecCitation>,
+    /// Standalone decision documents: project-level (`docs/decisions/`) and
+    /// per-node (`docs/intent/<node>/decisions/`), sorted by path.
+    pub decision_docs: Vec<DecisionDoc>,
 }
 
 impl LidRepo {
@@ -84,6 +89,7 @@ impl LidRepo {
         )?;
 
         let citations = parse::source::scan_path(&root);
+        let decision_docs = collect_decision_docs(&root)?;
 
         Ok(Self {
             root,
@@ -92,6 +98,7 @@ impl LidRepo {
             llds,
             arrow_docs,
             citations,
+            decision_docs,
         })
     }
 }
@@ -162,6 +169,88 @@ fn collect_md_paths(dir: &Path, suffix: &str, out: &mut Vec<PathBuf>) -> Result<
                 .is_some_and(|n| n.ends_with(suffix))
         {
             out.push(path);
+        }
+    }
+    Ok(())
+}
+
+/// Collect all standalone decision documents for the project.
+///
+/// Two scan locations:
+/// * `<root>/docs/decisions/` — project-level decision docs
+/// * `<root>/docs/intent/**/decisions/` — per-node decision docs; the
+///   segment name is the folder immediately above the `decisions/` directory
+fn collect_decision_docs(root: &Path) -> Result<Vec<DecisionDoc>> {
+    let mut docs: Vec<DecisionDoc> = Vec::new();
+
+    // Project-level: docs/decisions/*.md
+    let project_dir = root.join("docs").join("decisions");
+    if project_dir.is_dir() {
+        collect_flat_decision_docs(&project_dir, &DecisionScope::Project, &mut docs)?;
+    }
+
+    // Per-node: walk docs/intent/ looking for `decisions/` subdirectories
+    let intent_dir = root.join("docs").join("intent");
+    if intent_dir.is_dir() {
+        collect_node_decision_docs(&intent_dir, &mut docs)?;
+    }
+
+    docs.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(docs)
+}
+
+/// Load all `.md` files in `dir` with the given scope (flat, non-recursive).
+fn collect_flat_decision_docs(
+    dir: &Path,
+    scope: &DecisionScope,
+    out: &mut Vec<DecisionDoc>,
+) -> Result<()> {
+    for entry in fs::read_dir(dir).map_err(|source| LidError::Io {
+        path: dir.to_path_buf(),
+        source,
+    })? {
+        let entry = entry.map_err(|source| LidError::Io {
+            path: dir.to_path_buf(),
+            source,
+        })?;
+        let path = entry.path();
+        if path.is_file()
+            && path.extension().and_then(|e| e.to_str()) == Some("md")
+            && !is_non_artifact_filename(&path)
+        {
+            out.push(parse::markdown::load_decision_doc(&path, scope.clone())?);
+        }
+    }
+    Ok(())
+}
+
+/// Recursively walk `dir` (under `docs/intent/`). When a subdirectory named
+/// `"decisions"` is found, load its `.md` files with `DecisionScope::Node`
+/// keyed to the parent folder name. All other subdirectories are recursed into.
+fn collect_node_decision_docs(dir: &Path, out: &mut Vec<DecisionDoc>) -> Result<()> {
+    for entry in fs::read_dir(dir).map_err(|source| LidError::Io {
+        path: dir.to_path_buf(),
+        source,
+    })? {
+        let entry = entry.map_err(|source| LidError::Io {
+            path: dir.to_path_buf(),
+            source,
+        })?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        if path.file_name().and_then(|n| n.to_str()) == Some("decisions") {
+            // The segment is the name of the directory that *contains* decisions/
+            let segment = path
+                .parent()
+                .and_then(|p| p.file_name())
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_owned();
+            collect_flat_decision_docs(&path, &DecisionScope::Node { segment }, out)?;
+        } else {
+            collect_node_decision_docs(&path, out)?;
         }
     }
     Ok(())
@@ -272,6 +361,32 @@ arrows:
         dir
     }
 
+    fn build_repo_with_decisions() -> tempfile::TempDir {
+        let dir = build_repo();
+        let root = dir.path();
+        // Project-level decision
+        fs::create_dir_all(root.join("docs/decisions")).unwrap();
+        fs::write(
+            root.join("docs/decisions/arch.md"),
+            "# Architecture: Use PostgreSQL\n\nWe chose PostgreSQL because…\n",
+        )
+        .unwrap();
+        // Per-node decision inside auth
+        fs::create_dir_all(root.join("docs/intent/auth/decisions")).unwrap();
+        fs::write(
+            root.join("docs/intent/auth/decisions/token-format.md"),
+            "# Token Format: JWT\n\nWe chose JWT because…\n",
+        )
+        .unwrap();
+        // Per-node decision without H1 (to test empty title path)
+        fs::write(
+            root.join("docs/intent/auth/decisions/no-title.md"),
+            "Some prose with no heading.\n",
+        )
+        .unwrap();
+        dir
+    }
+
     #[test]
     fn discover_finds_root_at_starting_path() {
         let repo_dir = build_repo();
@@ -312,6 +427,52 @@ arrows:
             "arrow_docs: {:?}",
             repo.arrow_docs
         );
+        assert!(
+            repo.decision_docs.is_empty(),
+            "expected no decision docs in base repo"
+        );
+    }
+
+    #[test]
+    fn discover_loads_project_level_decision_docs() {
+        let repo_dir = build_repo_with_decisions();
+        let repo = LidRepo::discover(repo_dir.path()).unwrap();
+
+        let project_docs: Vec<_> = repo
+            .decision_docs
+            .iter()
+            .filter(|d| matches!(d.scope, crate::model::DecisionScope::Project))
+            .collect();
+        assert_eq!(project_docs.len(), 1, "expected 1 project decision doc");
+        assert_eq!(project_docs[0].title, "Architecture: Use PostgreSQL");
+    }
+
+    #[test]
+    fn discover_loads_per_node_decision_docs() {
+        let repo_dir = build_repo_with_decisions();
+        let repo = LidRepo::discover(repo_dir.path()).unwrap();
+
+        let node_docs: Vec<_> = repo
+            .decision_docs
+            .iter()
+            .filter(|d| matches!(&d.scope, crate::model::DecisionScope::Node { segment } if segment == "auth"))
+            .collect();
+        assert_eq!(node_docs.len(), 2, "expected 2 auth decision docs");
+        let titled = node_docs.iter().find(|d| d.title == "Token Format: JWT");
+        assert!(titled.is_some(), "expected titled decision doc");
+    }
+
+    #[test]
+    fn discover_records_empty_title_when_no_h1() {
+        let repo_dir = build_repo_with_decisions();
+        let repo = LidRepo::discover(repo_dir.path()).unwrap();
+
+        let no_title = repo
+            .decision_docs
+            .iter()
+            .find(|d| d.path.ends_with("no-title.md"));
+        assert!(no_title.is_some());
+        assert!(no_title.unwrap().title.is_empty());
     }
 
     #[test]

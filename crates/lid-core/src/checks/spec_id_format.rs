@@ -147,6 +147,7 @@ mod tests {
             llds: vec![],
             arrow_docs: vec![],
             citations: vec![],
+            decision_docs: vec![],
         }
     }
 
@@ -250,6 +251,7 @@ mod tests {
             llds: vec![],
             arrow_docs: vec![],
             citations: vec![],
+            decision_docs: vec![],
         };
         let findings = SpecIdFormatCheck.run(&repo);
         assert!(findings.is_empty(), "got {findings:?}");
@@ -278,6 +280,7 @@ mod tests {
             llds: vec![],
             arrow_docs: vec![],
             citations: vec![],
+            decision_docs: vec![],
         };
         let findings = SpecIdFormatCheck.run(&repo);
         assert_eq!(findings.len(), 1);

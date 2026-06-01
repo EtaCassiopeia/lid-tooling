@@ -175,6 +175,7 @@ mod tests {
             llds: vec![],
             arrow_docs: vec![arrow_doc],
             citations: vec![],
+            decision_docs: vec![],
         };
         (dir, repo)
     }
@@ -357,6 +358,7 @@ mod tests {
                 unrecognized_reference_sections: vec![],
             }],
             citations: vec![],
+            decision_docs: vec![],
         };
         let findings = ReferenceCoherenceCheck.run(&repo);
         assert!(findings.is_empty(), "got {findings:?}");

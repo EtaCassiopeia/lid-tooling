@@ -12,6 +12,7 @@
 pub mod arrow_doc_structure;
 pub mod coverage;
 pub mod dag;
+pub mod decisions_structure;
 pub mod implementing_artifacts;
 pub mod lld_decisions;
 pub mod orphans;
@@ -24,6 +25,7 @@ pub mod spec_status_counts;
 pub use arrow_doc_structure::ArrowDocStructureCheck;
 pub use coverage::CoverageCheck;
 pub use dag::DagCheck;
+pub use decisions_structure::DecisionsStructureCheck;
 pub use implementing_artifacts::ImplementingArtifactsCheck;
 pub use lld_decisions::LldDecisionsCheck;
 pub use orphans::OrphanCheck;
@@ -52,6 +54,7 @@ pub fn default_checks() -> Vec<Box<dyn Check>> {
         Box::new(LldDecisionsCheck),
         Box::new(DagCheck),
         Box::new(ImplementingArtifactsCheck),
+        Box::new(DecisionsStructureCheck),
     ]
 }
 
@@ -80,6 +83,7 @@ pub enum CheckId {
     LldDecisions,
     Dag,
     ImplementingArtifacts,
+    DecisionsStructure,
 }
 
 impl CheckId {
@@ -100,6 +104,7 @@ impl CheckId {
             Self::LldDecisions => "lld-decisions",
             Self::Dag => "dag",
             Self::ImplementingArtifacts => "implementing-artifacts",
+            Self::DecisionsStructure => "decisions-structure",
         }
     }
 }
@@ -125,6 +130,7 @@ impl std::str::FromStr for CheckId {
             Self::LldDecisions,
             Self::Dag,
             Self::ImplementingArtifacts,
+            Self::DecisionsStructure,
         ] {
             if id.as_str() == s {
                 return Ok(id);
@@ -426,6 +432,7 @@ mod tests {
             CheckId::LldDecisions,
             CheckId::Dag,
             CheckId::ImplementingArtifacts,
+            CheckId::DecisionsStructure,
         ] {
             let serde_form = serde_json::to_string(&id).unwrap();
             let serde_form = serde_form.trim_matches('"');
@@ -452,6 +459,7 @@ mod tests {
             CheckId::LldDecisions,
             CheckId::Dag,
             CheckId::ImplementingArtifacts,
+            CheckId::DecisionsStructure,
         ] {
             let back: CheckId = id.as_str().parse().unwrap();
             assert_eq!(back, id);

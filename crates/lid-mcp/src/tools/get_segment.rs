@@ -1,3 +1,4 @@
+use lid_core::model::DecisionScope;
 use rmcp::model::ErrorData;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -19,6 +20,12 @@ struct SpecSummary {
 }
 
 #[derive(Debug, Serialize)]
+struct DecisionSummary {
+    path: String,
+    title: String,
+}
+
+#[derive(Debug, Serialize)]
 struct SegmentDetail {
     id: String,
     status: String,
@@ -31,6 +38,8 @@ struct SegmentDetail {
     children: Vec<String>,
     detail: String,
     specs: Vec<SpecSummary>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    decision_docs: Vec<DecisionSummary>,
 }
 
 pub async fn lid_get_segment(
@@ -68,6 +77,19 @@ pub async fn lid_get_segment(
         })
         .collect();
 
+    let segment_lower = seg_id.to_lowercase();
+    let decision_docs: Vec<DecisionSummary> = repo
+        .decision_docs
+        .iter()
+        .filter(
+            |d| matches!(&d.scope, DecisionScope::Node { segment } if segment == &segment_lower),
+        )
+        .map(|d| DecisionSummary {
+            path: d.path.to_string_lossy().into_owned(),
+            title: d.title.clone(),
+        })
+        .collect();
+
     let detail = SegmentDetail {
         id: seg_id.clone(),
         status: seg.status.to_string(),
@@ -78,6 +100,7 @@ pub async fn lid_get_segment(
         children: seg.children.iter().map(ToString::to_string).collect(),
         detail: seg.detail.to_string_lossy().into_owned(),
         specs,
+        decision_docs,
     };
     serde_json::to_string_pretty(&detail)
         .map_err(|e| ErrorData::internal_error(e.to_string(), None))
