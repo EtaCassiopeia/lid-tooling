@@ -440,3 +440,50 @@ jobs:
           git diff --cached --quiet && echo "No changes" && exit 0
           git commit -m "Update lid-tooling to ${GITHUB_REF_NAME}"
           git push
+
+  # ── Sync Zed extension mirror ─────────────────────────────────────────────────
+  #
+  # Pushes extensions/zed/ to github.com/EtaCassiopeia/zed-lid as a standalone
+  # repo so it can be submitted to the Zed Extension Registry, which requires
+  # extension.toml at the repo root.
+  #
+  # Requires one GitHub secret:
+  #   ZED_MIRROR_PAT  – classic PAT with repo write scope on EtaCassiopeia/zed-lid
+
+  sync-zed-mirror:
+    name: Sync Zed extension mirror
+    if: github.ref_type == 'tag'
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Split and push extensions/zed to mirror
+        env:
+          ZED_MIRROR_PAT: ${{ secrets.ZED_MIRROR_PAT }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${GITHUB_REF_NAME}"
+
+          # Extract extensions/zed/ subtree history into a local branch
+          git subtree split --prefix=extensions/zed -b zed-mirror
+
+          # Switch to the subtree branch (extension.toml is now at root)
+          git checkout zed-mirror
+
+          # Stamp the release version into extension.toml
+          sed -i "s/^version = \"[^\"]*\"/version = \"${VERSION}\"/" extension.toml
+          git diff --quiet || git commit -am "chore: release ${TAG}"
+
+          MIRROR="https://x-access-token:${ZED_MIRROR_PAT}@github.com/EtaCassiopeia/zed-lid.git"
+          git push "${MIRROR}" "zed-mirror:main" --force
+          git tag -f "${TAG}"
+          git push "${MIRROR}" "${TAG}" --force
