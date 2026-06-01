@@ -7,6 +7,6 @@ src/**
 out/**/*.map
 **/*.ts
 **/*.tsbuildinfo
-node_modules/**/*.map
-node_modules/**/*.ts
-node_modules/.bin/**
+node_modules/**
+jest.config.js
+package-lock.json
