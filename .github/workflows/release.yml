@@ -48,6 +48,22 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Set version from tag
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # BSD sed (macOS) requires -i '' ; GNU sed (Linux/Windows) accepts -i ''
+          sed -i '' "s/^version = \"[^\"]*\"/version = \"${VERSION}\"/" Cargo.toml 2>/dev/null || \
+            sed -i  "s/^version = \"[^\"]*\"/version = \"${VERSION}\"/" Cargo.toml
+          node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('extensions/vscode/package.json'));
+            p.version = '${VERSION}';
+            fs.writeFileSync('extensions/vscode/package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+          sed -i '' "s/^version = \"[^\"]*\"/version = \"${VERSION}\"/" extensions/intellij/build.gradle.kts 2>/dev/null || \
+            sed -i  "s/^version = \"[^\"]*\"/version = \"${VERSION}\"/" extensions/intellij/build.gradle.kts
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
