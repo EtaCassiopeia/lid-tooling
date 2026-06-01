@@ -34,6 +34,21 @@ Download `lid-vscode-<platform>.vsix` from the [latest release](https://github.c
 1. Open the Extensions panel → **⋯ → Install from VSIX…**
 2. Select the downloaded `.vsix`
 
+### VS Code-compatible editors
+
+The LID extension uses only standard VS Code API surface and is published to **Open VSX** — the registry used by most VS Code forks. It works out of the box in Cursor, Windsurf, and VSCodium with no extra steps.
+
+| Editor | Install method |
+|--------|---------------|
+| **Cursor** | Search **LID** in the Extensions panel |
+| **Windsurf** | Search **LID** in the Extensions panel |
+| **VSCodium** | Search **LID** in the Extensions panel (Open VSX) |
+| **Positron** | Download `lid-vscode-<platform>.vsix` from the [latest release](https://github.com/EtaCassiopeia/lid-tooling/releases/latest) → **Extensions: Install from VSIX** |
+
+`lid-lsp` is bundled — nothing else to install.
+
+> **Note:** Cursor and Windsurf also support `lid-mcp` natively via their built-in MCP integration. See [MCP Server](mcp.md) for per-client configuration snippets.
+
 ---
 
 ## IntelliJ IDEA / JetBrains IDEs

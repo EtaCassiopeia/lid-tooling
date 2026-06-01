@@ -21,6 +21,16 @@ nav_order: 6
 
 ## Configuration
 
+### Supported clients
+
+| Client | Config location |
+|--------|----------------|
+| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) |
+| Cursor | `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` at project root |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+| GitHub Copilot (VS Code) | VS Code `settings.json` or `.vscode/mcp.json` at project root |
+| Claude Code | `.mcp.json` at project root |
+
 ### Claude Desktop (macOS)
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
@@ -33,7 +43,66 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-### Cursor / VS Code / other MCP clients
+### Cursor
+
+Global (`~/.cursor/mcp.json`) or per-project (`.cursor/mcp.json` at project root — takes precedence):
+
+```json
+{
+  "mcpServers": {
+    "lid": {
+      "command": "lid-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+### Windsurf
+
+Add to `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "lid": {
+      "command": "lid-mcp",
+      "args": [],
+      "type": "stdio"
+    }
+  }
+}
+```
+
+### GitHub Copilot (VS Code)
+
+In VS Code `settings.json`:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "lid": {
+        "type": "stdio",
+        "command": "lid-mcp",
+        "args": []
+      }
+    }
+  }
+}
+```
+
+Or per-project via `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "lid": { "type": "stdio", "command": "lid-mcp", "args": [] }
+  }
+}
+```
+
+### Claude Code / other stdio clients
 
 Add `.mcp.json` at your project root:
 
@@ -45,11 +114,11 @@ Add `.mcp.json` at your project root:
 }
 ```
 
+> **First call:** Always invoke `lid_discover` with the absolute project root before using any other tool. It registers the project in the server's in-memory store and returns the root path used by all subsequent calls.
+
 ---
 
 ## Tools
-
-Always call `lid_discover` first to register the project root, then use any other tool.
 
 | Tool | Description |
 |------|-------------|
@@ -72,7 +141,7 @@ Always call `lid_discover` first to register the project root, then use any othe
 
 ### `spec_prefix` parameter
 
-Both `lid_init` and `lid_add_segment` accept an optional `spec_prefix` field. When omitted, the prefix is inferred: if a strict majority of the project's existing spec prefixes share the same namespace component (e.g. most start with `USH-`), that namespace is prepended to the uppercased segment name (`USH-BILLING`); otherwise the segment name is uppercased directly (`BILLING`).
+Both `lid_init` and `lid_add_segment` accept an optional `spec_prefix` field. When omitted, the prefix is derived from the segment's position in the design tree following the LID 1.2.0 path-coherent convention: a segment at `docs/intent/{parent}/{seg}/` gets prefix `PARENT-SEG`; a top-level segment gets `SEG`. For example, adding `gateway` under `payment` under `checkout` produces `CHECKOUT-PAYMENT-GATEWAY`.
 
 ---
 
