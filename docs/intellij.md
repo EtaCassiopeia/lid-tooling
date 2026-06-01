@@ -17,7 +17,7 @@ nav_order: 4
 
 The plugin auto-activates in any project containing `docs/arrows/index.yaml`. It works in all JetBrains IDEs: IntelliJ IDEA, GoLand, PyCharm, RustRover, WebStorm, and more.
 
-Install from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/dev.lid.intellij) — see [Installation]({{ site.baseurl }}/installation#intellij-idea--jetbrains-ides) for all methods.
+Install from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/dev.lid) — see [Installation]({{ site.baseurl }}/installation#intellij-idea--jetbrains-ides) for all methods.
 
 ---
 

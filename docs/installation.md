@@ -22,10 +22,10 @@ nav_order: 2
 Search **LID** in the VS Code Extensions panel, or run:
 
 ```sh
-code --install-extension lid-tools.vscode
+code --install-extension lid-tools.lid
 ```
 
-Or install directly from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=lid-tools.vscode).
+Or install directly from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=lid-tools.lid).
 
 `lid-lsp` is bundled — nothing else to install.
 
@@ -48,7 +48,7 @@ The plugin works in all JetBrains IDEs: IntelliJ IDEA, GoLand, PyCharm, RustRove
 2. Search **LID**
 3. Click **Install** → restart when prompted
 
-Or install directly from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/dev.lid.intellij).
+Or install directly from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/dev.lid).
 
 `lid-lsp` is bundled — nothing else to install.
 

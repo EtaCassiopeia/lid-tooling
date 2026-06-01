@@ -17,7 +17,7 @@ nav_order: 3
 
 The extension auto-activates in any workspace containing `docs/arrows/index.yaml`.
 
-Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=lid-tools.vscode) — see [Installation]({{ site.baseurl }}/installation#vs-code-extension) for all methods.
+Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=lid-tools.lid) — see [Installation]({{ site.baseurl }}/installation#vs-code-extension) for all methods.
 
 ---
 
