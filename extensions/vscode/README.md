@@ -9,7 +9,7 @@ LID ([Linked-Intent Development](https://github.com/jszmajda/lid)) is a lightwei
 Search **LID** in the VS Code Extensions panel, or:
 
 ```
-ext install lid-tools.vscode
+ext install lid-tools.lid
 ```
 
 The language server (`lid-lsp`) is bundled inside the extension — nothing else to install.
