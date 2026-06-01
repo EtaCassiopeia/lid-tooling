@@ -109,8 +109,6 @@
 
   <extensions defaultExtensionNs="com.intellij">
 
-    <applicationService serviceImplementation="dev.lid.intellij.LidPluginService"/>
-
     <!-- Bundled languages -->
     <annotator language="JAVA"         implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
     <annotator language="kotlin"       implementationClass="dev.lid.intellij.highlight.LidAnnotator"/>
