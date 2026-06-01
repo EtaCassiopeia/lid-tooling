@@ -27,8 +27,9 @@ pub struct AddSegmentInput {
     /// Child segment IDs (optional).
     #[serde(default)]
     pub children: Vec<String>,
-    /// Spec-ID prefix (e.g. "MYAPP-AUTH"). If omitted, derived from the
-    /// project's existing prefixes or the segment name.
+    /// Spec-ID prefix (e.g. "AUTH" for a top-level segment, "PEVAL-RUN" for a
+    /// nested one). If omitted, derived from the path: parent segment name +
+    /// segment name, uppercased and joined by a hyphen.
     #[serde(default)]
     pub spec_prefix: Option<String>,
     /// Parent segment ID when this is a child in a recursive design tree.
@@ -66,12 +67,23 @@ pub async fn lid_add_segment(
         })
         .collect::<Result<_, _>>()?;
 
+    // Validate and capture parent segment ID before acquiring the repo lock,
+    // since the parent is needed to derive the path-coherent spec prefix.
+    let input_parent: Option<SegmentId> = match &input.parent {
+        Some(p) if !p.is_empty() => Some(
+            SegmentId::parse(p)
+                .map_err(|_| McpToolError::InvalidSegmentId(p.clone()))
+                .map_err(ErrorData::from)?,
+        ),
+        _ => None,
+    };
+
     let handle = registry
         .get_or_discover(&input.project_root)
         .await
         .map_err(ErrorData::from)?;
 
-    // Resolve spec prefix: explicit → infer from existing prefixes → derive from name.
+    // Resolve spec prefix: explicit → path-derived (PARENT-SEG convention).
     let spec_prefix = {
         let repo = handle.read().await;
         if repo.index.arrows.contains_key(&seg_id) {
@@ -80,23 +92,11 @@ pub async fn lid_add_segment(
             )));
         }
         input.spec_prefix.clone().unwrap_or_else(|| {
-            let existing: Vec<&str> = repo
-                .specs
-                .iter()
-                .filter_map(|sf| sf.prefix.as_deref())
-                .collect();
-            scaffold::suggest_prefix(&input.segment_id, &existing)
+            scaffold::path_derived_prefix(
+                input_parent.as_ref().map(SegmentId::as_str),
+                &input.segment_id,
+            )
         })
-    };
-
-    // Validate and capture parent segment ID if provided.
-    let input_parent: Option<SegmentId> = match &input.parent {
-        Some(p) if !p.is_empty() => Some(
-            SegmentId::parse(p)
-                .map_err(|_| McpToolError::InvalidSegmentId(p.clone()))
-                .map_err(ErrorData::from)?,
-        ),
-        _ => None,
     };
 
     let index_path = Path::new(&input.project_root)

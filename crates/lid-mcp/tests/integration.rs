@@ -797,3 +797,79 @@ async fn append_to_design_doc_child_uses_parent_path() {
         "must not create flat design doc for child segment"
     );
 }
+
+#[tokio::test]
+async fn add_segment_derives_prefix_from_path_when_none_given() {
+    let dir = tempfile::tempdir().unwrap();
+    make_repo(dir.path());
+    let root = dir.path().to_string_lossy().into_owned();
+
+    let registry = RepoRegistry::new();
+    tools::discover::lid_discover(
+        &registry,
+        tools::discover::DiscoverInput { path: root.clone() },
+    )
+    .await
+    .unwrap();
+
+    tools::write_segment::lid_add_segment(
+        &registry,
+        tools::write_segment::AddSegmentInput {
+            project_root: root.clone(),
+            segment_id: "billing".to_owned(),
+            status: "UNMAPPED".to_owned(),
+            detail: "billing/core.md".to_owned(),
+            blocks: vec![],
+            children: vec![],
+            spec_prefix: None,
+            parent: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let specs =
+        fs::read_to_string(dir.path().join("docs/intent/billing/billing-specs.md")).unwrap();
+    assert!(
+        specs.contains("prefix: BILLING"),
+        "top-level segment should get path-derived prefix BILLING, got: {specs}"
+    );
+}
+
+#[tokio::test]
+async fn add_nested_segment_derives_parent_prefix_from_path() {
+    let dir = tempfile::tempdir().unwrap();
+    make_repo(dir.path());
+    let root = dir.path().to_string_lossy().into_owned();
+
+    let registry = RepoRegistry::new();
+    tools::discover::lid_discover(
+        &registry,
+        tools::discover::DiscoverInput { path: root.clone() },
+    )
+    .await
+    .unwrap();
+
+    tools::write_segment::lid_add_segment(
+        &registry,
+        tools::write_segment::AddSegmentInput {
+            project_root: root.clone(),
+            segment_id: "tokens".to_owned(),
+            status: "UNMAPPED".to_owned(),
+            detail: "auth/tokens.md".to_owned(),
+            blocks: vec![],
+            children: vec![],
+            spec_prefix: None,
+            parent: Some("auth".to_owned()),
+        },
+    )
+    .await
+    .unwrap();
+
+    let specs =
+        fs::read_to_string(dir.path().join("docs/intent/auth/tokens/tokens-specs.md")).unwrap();
+    assert!(
+        specs.contains("prefix: AUTH-TOKENS"),
+        "nested segment should get path-derived prefix AUTH-TOKENS, got: {specs}"
+    );
+}
