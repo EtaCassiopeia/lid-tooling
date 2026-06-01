@@ -48,6 +48,7 @@ interface SpecInfo {
     specFile?: string;
     lldFile?: string;
     specPrefix?: string;
+    decisionDocs?: string[];
 }
 
 interface GraphNode {
@@ -65,6 +66,7 @@ interface GraphNode {
     specPrefix?: string;
     children?: string[];
     parent?: string;
+    decisionDocs?: string[];
 }
 
 interface GraphEdge {
@@ -440,7 +442,22 @@ export class NavigatorPanel {
             for (const ent of entries) {
                 const fullPath = path.join(dir, ent.name);
                 if (ent.isDirectory()) {
-                    walkDir(fullPath);
+                    if (ent.name === 'decisions') {
+                        const segId = path.basename(dir);
+                        const info = ensureEntry(segId);
+                        try {
+                            const decFiles = fs.readdirSync(fullPath, { withFileTypes: true });
+                            for (const f of decFiles) {
+                                if (f.isFile() && f.name.endsWith('.md')) {
+                                    if (!info.decisionDocs) info.decisionDocs = [];
+                                    info.decisionDocs.push(path.join(fullPath, f.name));
+                                }
+                            }
+                            info.decisionDocs?.sort();
+                        } catch { /* skip unreadable dir */ }
+                    } else {
+                        walkDir(fullPath);
+                    }
                 } else if (ent.isFile()) {
                     if (ent.name.endsWith('-specs.md')) {
                         const segId = ent.name.slice(0, -'-specs.md'.length);
@@ -519,6 +536,7 @@ export class NavigatorPanel {
                 specPrefix: info?.specPrefix,
                 children: entry.children,
                 parent: entry.parent,
+                decisionDocs: info?.decisionDocs?.length ? info.decisionDocs : undefined,
             };
         });
 
@@ -967,6 +985,7 @@ function buildHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
     <div class="ctx-item" id="ctx-arrow">Open Arrow Doc</div>
     <div class="ctx-item" id="ctx-spec">Open Spec File</div>
     <div class="ctx-item" id="ctx-lld">Open LLD</div>
+    <div class="ctx-item" id="ctx-decisions">Open Decision Doc</div>
     <div class="ctx-sep"></div>
     <div class="ctx-item" id="ctx-copy">Copy Segment ID</div>
   </div>

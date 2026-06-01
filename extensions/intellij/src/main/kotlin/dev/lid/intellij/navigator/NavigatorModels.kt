@@ -36,6 +36,7 @@ data class SpecInfo(
     var specFile: String? = null,
     var lldFile: String? = null,
     var specPrefix: String? = null,
+    val decisionDocs: MutableList<String> = mutableListOf(),
 )
 
 data class GraphNode(
@@ -53,6 +54,7 @@ data class GraphNode(
     val specPrefix: String? = null,
     val children: List<String>? = null,
     val parent: String? = null,
+    val decisionDocs: List<String>? = null,
 )
 
 data class GraphEdge(val source: String, val target: String, val kind: String)
