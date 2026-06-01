@@ -22,7 +22,7 @@ private class LidLanguageServer(project: Project) : OSProcessStreamConnectionPro
     }
 
     private fun resolveServerPath(): String {
-        val pluginDir = PluginManagerCore.getPlugin(PluginId.getId("dev.lid.intellij"))?.pluginPath
+        val pluginDir = PluginManagerCore.getPlugin(PluginId.getId("dev.lid"))?.pluginPath
         if (pluginDir != null) {
             val binary = pluginDir.resolve("server/${platformBinaryName()}").toFile()
             if (binary.canExecute()) return binary.absolutePath
