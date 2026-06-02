@@ -12,10 +12,10 @@ GET /:alias — resolves the alias via `shortener-core` and returns 301 with a `
 - `docs/high-level-design.md` § Key Design Decisions / Redirect status
 
 ### LLD
-- `docs/intent/api/redirect-endpoint-design.md`
+- `docs/intent/api/redirect-endpoint/redirect-endpoint-design.md`
 
 ### EARS
-- `docs/intent/api/redirect-endpoint-specs.md` (4 specs, prefix `USH-GET-*`)
+- `docs/intent/api/redirect-endpoint/redirect-endpoint-specs.md` (4 specs, prefix `API-REDIRECT-ENDPOINT-*`)
 
 ### Tests
 - `tests/api_test.rs`
@@ -27,4 +27,4 @@ GET /:alias — resolves the alias via `shortener-core` and returns 301 with a `
 
 | Category | Spec range | Implemented | Active gap | Deferred |
 |---|---|---|---|---|
-| All USH-GET | USH-GET-001..004 | 2 | 2 | 0 |
+| All API-REDIRECT-ENDPOINT | API-REDIRECT-ENDPOINT-001..004 | 2 | 2 | 0 |

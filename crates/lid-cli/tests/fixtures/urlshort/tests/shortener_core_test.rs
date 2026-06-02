@@ -1,14 +1,14 @@
 // Unit tests for alias generation and collision handling.
 
-// @spec USH-CORE-001
-// @spec USH-CORE-002
-// @spec USH-CORE-003
-// @spec USH-CORE-004
-// @spec USH-CORE-009
-// @spec USH-ALIAS-001
-// @spec USH-ALIAS-002
-// @spec USH-ALIAS-003
-// @spec USH-ALIAS-004
-// @spec USH-ALIAS-005
-// @spec USH-ALIAS-006
-// @spec USH-COLL-001
+// @spec SHORTENER-CORE-001
+// @spec SHORTENER-CORE-002
+// @spec SHORTENER-CORE-003
+// @spec SHORTENER-CORE-004
+// @spec SHORTENER-CORE-009
+// @spec SHORTENER-CORE-ALIAS-GEN-001
+// @spec SHORTENER-CORE-ALIAS-GEN-002
+// @spec SHORTENER-CORE-ALIAS-GEN-003
+// @spec SHORTENER-CORE-ALIAS-GEN-004
+// @spec SHORTENER-CORE-ALIAS-GEN-005
+// @spec SHORTENER-CORE-ALIAS-GEN-006
+// @spec SHORTENER-CORE-COLLISION-001

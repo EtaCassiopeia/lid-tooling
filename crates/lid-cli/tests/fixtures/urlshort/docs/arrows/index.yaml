@@ -57,7 +57,7 @@ arrows:
     parent: shortener-core
     sampled: 2026-04-20
     detail: shortener-core/collision.md
-    next: "add exponential back-off; USH-COLL-004 and USH-COLL-005 still open"
+    next: "add exponential back-off; SHORTENER-CORE-COLLISION-004 and SHORTENER-CORE-COLLISION-005 still open"
 
   url-validator:
     status: MERGED
@@ -101,8 +101,8 @@ arrows:
     sampled: 2026-05-01
     detail: rate-limiter.md
     blocks: [api]
-    drift: "sliding-window algorithm adopted in PR #42, but USH-RATE-003 describes token-bucket — spec and implementation are out of sync"
-    next: "update USH-RATE-003 to match sliding-window; verify USH-RATE-004 and USH-RATE-005 still hold"
+    drift: "sliding-window algorithm adopted in PR #42, but RATE-LIMITER-003 describes token-bucket — spec and implementation are out of sync"
+    next: "update RATE-LIMITER-003 to match sliding-window; verify RATE-LIMITER-004 and RATE-LIMITER-005 still hold"
 
   # ── Future ───────────────────────────────────────────────────────────────────
   analytics:

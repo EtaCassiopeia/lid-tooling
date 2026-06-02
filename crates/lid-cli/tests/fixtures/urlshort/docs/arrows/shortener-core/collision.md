@@ -12,10 +12,10 @@ Collision detection and retry. When the generated alias is already taken by a di
 - `docs/high-level-design.md` § Key Design Decisions / Collision strategy
 
 ### LLD
-- `docs/intent/shortener-core/collision-design.md`
+- `docs/intent/shortener-core/collision/collision-design.md`
 
 ### EARS
-- `docs/intent/shortener-core/collision-specs.md` (5 specs, prefix `USH-COLL-*`)
+- `docs/intent/shortener-core/collision/collision-specs.md` (5 specs, prefix `SHORTENER-CORE-COLLISION-*`)
 
 ### Tests
 - `tests/shortener_core_test.rs`
@@ -27,4 +27,4 @@ Collision detection and retry. When the generated alias is already taken by a di
 
 | Category | Spec range | Implemented | Active gap | Deferred |
 |---|---|---|---|---|
-| All USH-COLL | USH-COLL-001..005 | 1 | 4 | 0 |
+| All SHORTENER-CORE-COLLISION | SHORTENER-CORE-COLLISION-001..005 | 1 | 4 | 0 |
