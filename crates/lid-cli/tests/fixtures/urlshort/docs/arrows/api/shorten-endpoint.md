@@ -12,10 +12,10 @@ POST /shorten — accepts a JSON body `{ "url": "..." }`, delegates to `shortene
 - `docs/high-level-design.md` § Key Design Decisions / Shorten response code
 
 ### LLD
-- `docs/intent/api/shorten-endpoint-design.md`
+- `docs/intent/api/shorten-endpoint/shorten-endpoint-design.md`
 
 ### EARS
-- `docs/intent/api/shorten-endpoint-specs.md` (5 specs, prefix `USH-POST-*`)
+- `docs/intent/api/shorten-endpoint/shorten-endpoint-specs.md` (5 specs, prefix `API-SHORTEN-ENDPOINT-*`)
 
 ### Tests
 - `tests/api_test.rs`
@@ -27,4 +27,4 @@ POST /shorten — accepts a JSON body `{ "url": "..." }`, delegates to `shortene
 
 | Category | Spec range | Implemented | Active gap | Deferred |
 |---|---|---|---|---|
-| All USH-POST | USH-POST-001..005 | 3 | 2 | 0 |
+| All API-SHORTEN-ENDPOINT | API-SHORTEN-ENDPOINT-001..005 | 3 | 2 | 0 |

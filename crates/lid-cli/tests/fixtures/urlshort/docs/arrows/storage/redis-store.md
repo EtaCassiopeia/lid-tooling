@@ -12,10 +12,10 @@ Redis-backed `Store` implementation. Target for production deployments once the 
 - `docs/high-level-design.md` § Approach / storage
 
 ### LLD
-- `docs/intent/storage/redis-store-design.md`
+- `docs/intent/storage/redis-store/redis-store-design.md`
 
 ### EARS
-- `docs/intent/storage/redis-store-specs.md` (4 specs, prefix `USH-RDIS-*`)
+- `docs/intent/storage/redis-store/redis-store-specs.md` (4 specs, prefix `STORAGE-REDIS-STORE-*`)
 
 ### Tests
 - (none yet)
@@ -27,4 +27,4 @@ Redis-backed `Store` implementation. Target for production deployments once the 
 
 | Category | Spec range | Implemented | Active gap | Deferred |
 |---|---|---|---|---|
-| All USH-RDIS | USH-RDIS-001..004 | 0 | 4 | 0 |
+| All STORAGE-REDIS-STORE | STORAGE-REDIS-STORE-001..004 | 0 | 4 | 0 |

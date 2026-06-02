@@ -12,10 +12,10 @@ GET /health — returns 200 `{ "status": "ok" }`. Used by load-balancer health c
 - `docs/high-level-design.md` § Approach / api
 
 ### LLD
-- `docs/intent/api/health-endpoint-design.md`
+- `docs/intent/api/health-endpoint/health-endpoint-design.md`
 
 ### EARS
-- `docs/intent/api/health-endpoint-specs.md` (3 specs, prefix `USH-HLTH-*`)
+- `docs/intent/api/health-endpoint/health-endpoint-specs.md` (3 specs, prefix `API-HEALTH-ENDPOINT-*`)
 
 ### Tests
 - `tests/api_test.rs`
@@ -27,4 +27,4 @@ GET /health — returns 200 `{ "status": "ok" }`. Used by load-balancer health c
 
 | Category | Spec range | Implemented | Active gap | Deferred |
 |---|---|---|---|---|
-| All USH-HLTH | USH-HLTH-001..003 | 3 | 0 | 0 |
+| All API-HEALTH-ENDPOINT | API-HEALTH-ENDPOINT-001..003 | 3 | 0 | 0 |

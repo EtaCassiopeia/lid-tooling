@@ -12,10 +12,10 @@ Alias generation algorithm — SHA-256 of the input URL, first 7 base62 characte
 - `docs/high-level-design.md` § Key Design Decisions / Alias length
 
 ### LLD
-- `docs/intent/shortener-core/alias-gen-design.md`
+- `docs/intent/shortener-core/alias-gen/alias-gen-design.md`
 
 ### EARS
-- `docs/intent/shortener-core/alias-gen-specs.md` (6 specs, prefix `USH-ALIAS-*`)
+- `docs/intent/shortener-core/alias-gen/alias-gen-specs.md` (6 specs, prefix `SHORTENER-CORE-ALIAS-GEN-*`)
 
 ### Tests
 - `tests/shortener_core_test.rs`
@@ -27,4 +27,4 @@ Alias generation algorithm — SHA-256 of the input URL, first 7 base62 characte
 
 | Category | Spec range | Implemented | Active gap | Deferred |
 |---|---|---|---|---|
-| All USH-ALIAS | USH-ALIAS-001..006 | 6 | 0 | 0 |
+| All SHORTENER-CORE-ALIAS-GEN | SHORTENER-CORE-ALIAS-GEN-001..006 | 6 | 0 | 0 |
