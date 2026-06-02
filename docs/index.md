@@ -7,7 +7,7 @@ permalink: /
 # LID Tooling
 {: .no_toc }
 
-Developer tools for the [LID (Linked-Intent Development)](https://github.com/jszmajda/lid) methodology — keep design intent permanently linked to running code.
+Developer tools for the [LID (Linked-Intent Development)](https://linked-intent.dev) methodology — keep design intent permanently linked to running code.
 {: .fs-6 .fw-300 }
 
 [Get started]({{ site.baseurl }}/installation){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
