@@ -448,7 +448,8 @@ jobs:
   # extension.toml at the repo root.
   #
   # Requires one GitHub secret:
-  #   ZED_MIRROR_PAT  – classic PAT with repo write scope on EtaCassiopeia/zed-lid
+  #   HOMEBREW_TAP_TOKEN  – reused here; classic PAT with repo scope covers all
+  #                         repos under the account, including EtaCassiopeia/zed-lid
 
   sync-zed-mirror:
     name: Sync Zed extension mirror
@@ -467,7 +468,7 @@ jobs:
 
       - name: Split and push extensions/zed to mirror
         env:
-          ZED_MIRROR_PAT: ${{ secrets.ZED_MIRROR_PAT }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
@@ -483,7 +484,7 @@ jobs:
           sed -i "s/^version = \"[^\"]*\"/version = \"${VERSION}\"/" extension.toml
           git diff --quiet || git commit -am "chore: release ${TAG}"
 
-          MIRROR="https://x-access-token:${ZED_MIRROR_PAT}@github.com/EtaCassiopeia/zed-lid.git"
+          MIRROR="https://x-access-token:${GH_TOKEN}@github.com/EtaCassiopeia/zed-lid.git"
           git push "${MIRROR}" "zed-mirror:main" --force
           git tag -f "${TAG}"
           git push "${MIRROR}" "${TAG}" --force
