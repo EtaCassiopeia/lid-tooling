@@ -1,0 +1,55 @@
+// Drafting Room — dark color scheme for LID Tooling docs.
+//
+// Palette adapted from the linked-intent.dev "architectural drafting table"
+// aesthetic: ink on deep slate, ochre pen-ink accent, blueprint steel secondary.
+
+$color-scheme: dark;
+
+// ── Palette tokens ────────────────────────────────────────────────────────────
+
+$paper:    #0c1117;   // page base — deep slate
+$paper-2:  #121821;   // elevated surfaces (sidebar, cards)
+$paper-3:  #182029;   // deepest recess (code blocks, search)
+$graphite: #1e2730;   // card borders, visible rules
+$ink:      #ecead8;   // paper-warm primary text
+$ink-2:    #b8b4a2;   // secondary prose
+$ink-3:    #7d7a6c;   // annotations, captions
+$nib:      #e0a060;   // ochre pen-ink — primary accent
+$nib-2:    #f2b77a;   // hover / active
+$azure:    #6da3c5;   // blueprint steel — secondary accent
+
+// ── Core surfaces ─────────────────────────────────────────────────────────────
+
+$body-background-color:       $paper;
+$sidebar-color:               $paper-2;
+$feedback-color:              $paper;
+
+// ── Typography ────────────────────────────────────────────────────────────────
+
+$body-text-color:             $ink-2;
+$body-heading-color:          $ink;
+
+// Fraunces (variable serif) for headings + prose; loaded via head_custom.html.
+// JetBrains Mono for all code.  System stacks are fallbacks for first paint.
+$body-font-family:   "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, ui-serif, serif;
+$mono-font-family:   "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+// ── Interactive ───────────────────────────────────────────────────────────────
+
+$link-color:                  $nib;
+$nav-child-link-color:        $ink-3;
+$base-button-color:           $paper-3;
+$btn-primary-color:           darken($nib, 10%);
+
+// ── Borders & surfaces ────────────────────────────────────────────────────────
+
+$border-color:                $graphite;
+$table-background-color:      $paper-2;
+$search-background-color:     $paper-3;
+$search-result-preview-color: $ink-3;
+$code-background-color:       $paper-3;
+$code-linenumber-color:       $ink-3;
+
+// ── Syntax highlighting ───────────────────────────────────────────────────────
+
+@import "./vendor/accessible-pygments/github-dark";

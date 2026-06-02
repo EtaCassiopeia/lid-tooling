@@ -77,6 +77,30 @@ fn urlshort_fixture_has_no_reference_coherence_errors() {
 }
 
 #[test]
+fn urlshort_fixture_has_no_path_coherent_prefix_errors() {
+    let output = Command::cargo_bin("lidc")
+        .unwrap()
+        .args([
+            "check",
+            "--json",
+            "--only",
+            "path-coherent-prefix",
+            "--root",
+        ])
+        .arg(fixture_root())
+        .output()
+        .unwrap();
+
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        report["summary"]["findings"].as_u64().unwrap(),
+        0,
+        "path-coherent-prefix on urlshort should be clean, got: {}",
+        serde_json::to_string_pretty(&report["findings"]).unwrap_or_default()
+    );
+}
+
+#[test]
 fn urlshort_fixture_has_no_reverse_orphan_errors() {
     let output = Command::cargo_bin("lidc")
         .unwrap()

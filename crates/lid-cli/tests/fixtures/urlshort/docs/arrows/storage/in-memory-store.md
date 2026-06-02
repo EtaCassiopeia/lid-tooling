@@ -12,10 +12,10 @@
 - `docs/high-level-design.md` § Approach / storage
 
 ### LLD
-- `docs/intent/storage/in-memory-store-design.md`
+- `docs/intent/storage/in-memory-store/in-memory-store-design.md`
 
 ### EARS
-- `docs/intent/storage/in-memory-store-specs.md` (5 specs, prefix `USH-IMEM-*`)
+- `docs/intent/storage/in-memory-store/in-memory-store-specs.md` (5 specs, prefix `STORAGE-IN-MEMORY-STORE-*`)
 
 ### Tests
 - `tests/storage_test.rs`
@@ -27,4 +27,4 @@
 
 | Category | Spec range | Implemented | Active gap | Deferred |
 |---|---|---|---|---|
-| All USH-IMEM | USH-IMEM-001..005 | 4 | 0 | 1 |
+| All STORAGE-IN-MEMORY-STORE | STORAGE-IN-MEMORY-STORE-001..005 | 4 | 0 | 1 |

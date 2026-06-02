@@ -1,17 +1,17 @@
 // Integration tests for storage layer — StorageBackend trait and InMemoryStore.
 
-// @spec USH-STORE-001
-// @spec USH-STORE-002
-// @spec USH-STORE-003
-// @spec USH-STORE-004
-// @spec USH-STORE-005
-// @spec USH-STORE-006
-// @spec USH-SITF-001
-// @spec USH-SITF-002
-// @spec USH-SITF-003
-// @spec USH-SITF-004
-// @spec USH-SITF-005
-// @spec USH-IMEM-001
-// @spec USH-IMEM-002
-// @spec USH-IMEM-003
-// @spec USH-IMEM-004
+// @spec STORAGE-001
+// @spec STORAGE-002
+// @spec STORAGE-003
+// @spec STORAGE-004
+// @spec STORAGE-005
+// @spec STORAGE-006
+// @spec STORAGE-STORE-INTERFACE-001
+// @spec STORAGE-STORE-INTERFACE-002
+// @spec STORAGE-STORE-INTERFACE-003
+// @spec STORAGE-STORE-INTERFACE-004
+// @spec STORAGE-STORE-INTERFACE-005
+// @spec STORAGE-IN-MEMORY-STORE-001
+// @spec STORAGE-IN-MEMORY-STORE-002
+// @spec STORAGE-IN-MEMORY-STORE-003
+// @spec STORAGE-IN-MEMORY-STORE-004

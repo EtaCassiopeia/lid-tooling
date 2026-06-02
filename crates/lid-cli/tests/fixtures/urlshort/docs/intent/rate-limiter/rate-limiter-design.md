@@ -5,7 +5,7 @@
 
 ## Context
 
-`rate-limiter` throttles POST /shorten per API key. The original spec described a token-bucket model; the implementation uses a sliding window. The two are behaviourally different under burst traffic. USH-RATE-003 must be updated to reflect the actual implementation.
+`rate-limiter` throttles POST /shorten per API key. The original spec described a token-bucket model; the implementation uses a sliding window. The two are behaviourally different under burst traffic. RATE-LIMITER-003 must be updated to reflect the actual implementation.
 
 ## Algorithm (Sliding Window)
 
