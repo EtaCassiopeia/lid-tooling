@@ -1,6 +1,6 @@
 id = "lid"
 name = "LID (Linked-Intent Development)"
-description = "Language support for LID projects via lid-lsp."
+description = "Language support for LID projects via lid-lsp. Note: the Intent Navigator (interactive design-tree panel) is VS Code-only and not available in Zed."
 version = "0.1.0"
 schema_version = 1
 authors = ["lid-tools"]
