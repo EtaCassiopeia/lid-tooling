@@ -2,7 +2,7 @@ title: LID Tooling
 description: Developer tools for the LID (Linked-Intent Development) methodology — keep design intent permanently linked to running code.
 
 remote_theme: just-the-docs/just-the-docs
-color_scheme: dark
+color_scheme: drafting-room
 
 logo: "/assets/images/logo.svg"
 favicon_ico: "/assets/images/logo.svg"

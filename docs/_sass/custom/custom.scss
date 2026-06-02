@@ -1,5 +1,171 @@
-// Logo size in nav header
+// ── Logo ──────────────────────────────────────────────────────────────────────
+
 .site-logo img {
   max-height: 28px;
   width: auto;
+}
+
+// ── Drafting Room overrides ───────────────────────────────────────────────────
+//
+// Palette references (defined in color_schemes/drafting-room.scss):
+//   $paper / $paper-2 / $paper-3  — background layers
+//   $graphite                     — borders
+//   $ink / $ink-2 / $ink-3        — text hierarchy
+//   $nib / $nib-2                 — ochre accent
+//   $azure                        — blueprint steel
+
+// Subtle warm glow at the top of every page — matches the marketing site's
+// body radial gradient.
+body {
+  background-image:
+    radial-gradient(
+      ellipse 120% 40% at 50% 0%,
+      rgba(224, 160, 96, 0.025),
+      transparent 60%
+    );
+  background-attachment: fixed;
+}
+
+// Selection — ochre ink on slate, mirrors the marketing site.
+::selection {
+  background: #e0a060;
+  color: #0c1117;
+}
+
+// Focus ring — ochre, tight, no rounded corners (drafting table aesthetic).
+:focus-visible {
+  outline: 2px solid #e0a060;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+// ── Headings ──────────────────────────────────────────────────────────────────
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  font-feature-settings: "kern" 1, "liga" 1, "lnum" 1;
+}
+
+h1 { letter-spacing: -0.025em; }
+h2 { letter-spacing: -0.018em; }
+
+// Dimension-line rule under h2 — a nod to the drafting table rhythm.
+.main-content h2 {
+  border-bottom: 1px solid #1e2730;
+  padding-bottom: 0.35em;
+  margin-bottom: 1em;
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+
+// Faint vertical grid lines in the sidebar, echoing the marketing site grid.
+.side-bar {
+  background-image:
+    linear-gradient(rgba(224, 160, 96, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(224, 160, 96, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+  border-right: 1px solid #1e2730;
+}
+
+// Site title — serif, ochre accent on hover.
+.site-title {
+  font-weight: 500;
+  letter-spacing: -0.01em;
+
+  &:hover { color: #e0a060 !important; }
+}
+
+// Active nav item gets a left accent rule instead of the default blue pill.
+.nav-list .nav-list-item .nav-list-link.active {
+  color: #e0a060;
+  font-weight: 500;
+  border-left: 2px solid #e0a060;
+  padding-left: calc(1rem - 2px);
+  background: rgba(224, 160, 96, 0.06);
+}
+
+// ── Links ─────────────────────────────────────────────────────────────────────
+
+// Inline links get the same subtle underline treatment as the marketing site.
+.main-content a:not(.btn):not(.nav-list-link) {
+  border-bottom: 1px solid rgba(224, 160, 96, 0.35);
+  transition: color 140ms ease, border-color 140ms ease;
+
+  &:hover {
+    color: #f2b77a;
+    border-bottom-color: #f2b77a;
+  }
+}
+
+// ── Code ──────────────────────────────────────────────────────────────────────
+
+// Inline code — paper-3 background with graphite border.
+code {
+  font-size: 0.87em;
+  border: 1px solid #1e2730;
+  border-radius: 2px;
+  padding: 0.07em 0.38em;
+}
+
+// Block code — tighter radius, graphite border frame.
+div.highlighter-rouge, figure.highlight {
+  border: 1px solid #1e2730;
+  border-radius: 3px;
+}
+
+// ── Tables ────────────────────────────────────────────────────────────────────
+
+.main-content table {
+  border: 1px solid #1e2730;
+  border-radius: 3px;
+
+  th {
+    background: #182029;
+    color: #ecead8;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    border-bottom: 1px solid #1e2730;
+  }
+
+  td { border-color: #1e2730; }
+
+  tr:hover td { background: rgba(224, 160, 96, 0.04); }
+}
+
+// ── Buttons ───────────────────────────────────────────────────────────────────
+
+.btn-primary {
+  background: #e0a060;
+  border-color: #e0a060;
+  color: #0c1117;
+  font-weight: 600;
+
+  &:hover {
+    background: #f2b77a;
+    border-color: #f2b77a;
+    color: #0c1117;
+  }
+}
+
+// ── Callouts ─────────────────────────────────────────────────────────────────
+
+// Note callout — blueprint steel.
+.note {
+  background: rgba(109, 163, 197, 0.08);
+  border-left-color: #6da3c5;
+}
+
+// Tip callout — ochre accent.
+.tip {
+  background: rgba(224, 160, 96, 0.08);
+  border-left-color: #e0a060;
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+
+.search-input {
+  border-color: #1e2730;
+  &:focus { border-color: #e0a060; box-shadow: 0 0 0 2px rgba(224, 160, 96, 0.2); }
 }
