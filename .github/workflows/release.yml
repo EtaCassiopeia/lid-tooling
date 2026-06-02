@@ -10,6 +10,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
@@ -45,7 +46,7 @@ jobs:
             archive: tar.gz
             sha_cmd: sha256sum
             use_cross: true
-          - os: windows-latest
+          - os: windows-2025
             target: x86_64-pc-windows-msvc
             vsce_target: win32-x64
             ext: .exe
