@@ -87,6 +87,9 @@ fn init_blocking(path: &str, segment: &str, spec_prefix: &str) -> Result<InitOut
     let intent_files = scaffold::scaffold_intent_dir(&root, None, segment, spec_prefix)
         .map_err(McpToolError::Io)?;
 
+    let instruction_files =
+        scaffold::scaffold_instruction_files(&root).map_err(McpToolError::Io)?;
+
     let rel = |p: &Path| {
         p.strip_prefix(&root)
             .unwrap_or(p)
@@ -96,6 +99,7 @@ fn init_blocking(path: &str, segment: &str, spec_prefix: &str) -> Result<InitOut
 
     let mut files_created = vec![rel(&index_path), rel(&arrow_path)];
     files_created.extend(intent_files.iter().map(|p| rel(p)));
+    files_created.extend(instruction_files.iter().map(|p| rel(p)));
 
     Ok(InitOutput {
         root: root.to_string_lossy().into_owned(),

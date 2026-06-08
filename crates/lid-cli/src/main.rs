@@ -152,6 +152,8 @@ fn cmd_init(root: Option<&Path>, args: &InitArgs) -> Result<ExitCode> {
         .with_context(|| format!("writing docs/arrows/{detail}"))?;
     lid_core::scaffold::scaffold_intent_dir(&dir, None, seg, &spec_prefix)
         .with_context(|| format!("scaffolding docs/intent/{seg}/"))?;
+    lid_core::scaffold::scaffold_instruction_files(&dir)
+        .context("writing AGENTS.md / CLAUDE.md")?;
 
     println!("Initialized LID project at {}", dir.display());
     println!();
@@ -160,8 +162,11 @@ fn cmd_init(root: Option<&Path>, args: &InitArgs) -> Result<ExitCode> {
     println!("  docs/arrows/{detail:<28} stub arrow document");
     println!("  docs/intent/{seg}/{seg}-specs.md");
     println!("  docs/intent/{seg}/{seg}-design.md");
+    println!("  AGENTS.md                            LID v1.3.0 instruction file");
+    println!("  CLAUDE.md                            symlink → AGENTS.md");
     println!();
     println!("Next:");
+    println!("  edit AGENTS.md                    add project context above the LID block");
     println!("  lidc check                        verify coherence");
     println!("  lidc status                       segment and spec summary");
 

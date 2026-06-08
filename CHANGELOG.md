@@ -4,6 +4,25 @@ All notable changes to lid-tooling are documented here.
 lid-tooling follows its own [semantic versioning](https://semver.org/) independent
 of the upstream LID project. `PATCH` increments are tooling-only fixes.
 
+## [0.3.0]
+
+### Added
+
+- `lidc init` and `lid_init` (MCP) now create `AGENTS.md` (primary instruction
+  file) and `CLAUDE.md` (symlink alias on Unix; one-line `@AGENTS.md` import on
+  Windows) when scaffolding a new project, tracking LID 1.3.0
+  ([jszmajda/lid#28](https://github.com/jszmajda/lid/pull/28))
+- `AGENTS.md` template includes the *Memory vs. intent* directive from LID 1.3.0:
+  durable project knowledge is recorded in the arrow (HLD / LLD / EARS / decision
+  doc) rather than in private per-tool agent memory
+- Cursor is now a first-class LID plugin host — see upstream
+  [LID 1.3.0 release notes](https://github.com/jszmajda/lid/releases/tag/v1.3.0)
+  for setup details
+
+### Changed
+
+- Scaffold instruction-file template updated from LID 1.2.0 → 1.3.0
+
 ## [0.2.0]
 
 ### Added
