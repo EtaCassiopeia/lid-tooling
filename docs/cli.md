@@ -25,7 +25,7 @@ lidc [--root <path>] [--json] <command>
 
 | Command | Description |
 |---------|-------------|
-| `lidc init [--segment NAME] [--spec-prefix PREFIX]` | Scaffold a new LID project (fails if one already exists) |
+| `lidc init [--segment NAME] [--spec-prefix PREFIX]` | Scaffold a new LID project — creates `index.yaml`, arrow doc, intent stubs, `AGENTS.md`, and `CLAUDE.md` (fails if one already exists) |
 | `lidc check` | Run all coherence checks; exit 1 on findings, 2 on error |
 | `lidc check --only <ids>` | Run a comma-separated subset of checks |
 | `lidc check --fail-on warning` | Promote warnings to failures (default: `error`) |
@@ -67,7 +67,7 @@ Pass one or more IDs (comma-separated) to `--only` to run a subset:
 
 ```sh
 # 1. Scaffold a new LID project
-lidc init                              # creates index.yaml, arrow doc, and intent stubs for "core"
+lidc init                              # creates index.yaml, arrow doc, intent stubs, AGENTS.md, CLAUDE.md
 lidc init --segment payments           # custom first segment name
 lidc init --segment payments \
           --spec-prefix PAY            # explicit spec-ID prefix (default: uppercased segment name)

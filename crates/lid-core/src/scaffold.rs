@@ -149,6 +149,60 @@ pub fn scaffold_arrow_doc(
     Ok(Some(arrow_path))
 }
 
+const AGENTS_MD_CONTENT: &str = "\
+## LID
+- Mode: Full
+- Version: 1.3.0
+
+## LID Directives
+- Arrow overlay: `docs/arrows/index.yaml`
+- Intent tree: `docs/intent/`
+
+### Memory vs. intent.
+Before saving durable project knowledge to agent or tool memory, test whether \
+it is project *intent* — would a fresh agent, in any tool, next session, need \
+it to build this system correctly? If yes, record it in the arrow (HLD / LLD / \
+EARS / decision doc), which travels and cascades — not in private, per-tool \
+memory, where intent escapes the arrow. Knowledge about the user or how they \
+like to work stays in memory.
+";
+
+/// Create `AGENTS.md` and `CLAUDE.md` instruction files at `root`.
+///
+/// On Unix `CLAUDE.md` is a symlink pointing at `AGENTS.md`; on other
+/// platforms it is a one-line `@AGENTS.md` import file. Both files are
+/// skipped if they already exist (idempotent).
+///
+/// Returns the paths of files actually written (0–2 entries).
+///
+/// # Errors
+///
+/// Returns an I/O error if any file or symlink operation fails.
+pub fn scaffold_instruction_files(root: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
+    let agents_path = root.join("AGENTS.md");
+    let claude_path = root.join("CLAUDE.md");
+    let mut created = Vec::new();
+
+    if !agents_path.exists() {
+        std::fs::write(&agents_path, AGENTS_MD_CONTENT)?;
+        created.push(agents_path.clone());
+    }
+
+    if !claude_path.exists() {
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink("AGENTS.md", &claude_path)?;
+        }
+        #[cfg(not(unix))]
+        {
+            std::fs::write(&claude_path, "@AGENTS.md\n")?;
+        }
+        created.push(claude_path);
+    }
+
+    Ok(created)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -220,6 +274,37 @@ mod tests {
         let content = std::fs::read_to_string(created.unwrap()).unwrap();
         assert!(content.contains("docs/intent/auth/auth-design.md"));
         assert!(content.contains("docs/intent/auth/auth-specs.md"));
+    }
+
+    #[test]
+    fn scaffold_instruction_files_creates_both() {
+        let dir = tempfile::tempdir().unwrap();
+        let created = scaffold_instruction_files(dir.path()).unwrap();
+        assert_eq!(created.len(), 2);
+        let agents = dir.path().join("AGENTS.md");
+        assert!(agents.exists());
+        let content = std::fs::read_to_string(&agents).unwrap();
+        assert!(content.contains("Memory vs. intent."));
+        assert!(content.contains("Version: 1.3.0"));
+        assert!(dir.path().join("CLAUDE.md").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn scaffold_instruction_files_claude_is_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        scaffold_instruction_files(dir.path()).unwrap();
+        let meta = std::fs::symlink_metadata(dir.path().join("CLAUDE.md")).unwrap();
+        assert!(meta.file_type().is_symlink());
+    }
+
+    #[test]
+    fn scaffold_instruction_files_idempotent() {
+        let dir = tempfile::tempdir().unwrap();
+        let first = scaffold_instruction_files(dir.path()).unwrap();
+        assert_eq!(first.len(), 2);
+        let second = scaffold_instruction_files(dir.path()).unwrap();
+        assert_eq!(second.len(), 0);
     }
 
     #[test]

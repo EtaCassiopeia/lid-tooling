@@ -26,6 +26,11 @@ fn init_creates_expected_files() {
     assert!(index.contains("schema_version: 2"));
     assert!(index.contains("core:"));
     assert!(index.contains("UNMAPPED"));
+
+    let agents = fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
+    assert!(agents.contains("Version: 1.3.0"));
+    assert!(agents.contains("Memory vs. intent."));
+    assert!(dir.path().join("CLAUDE.md").exists());
 }
 
 #[test]
