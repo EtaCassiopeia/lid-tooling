@@ -92,4 +92,4 @@ Add to your CI pipeline (GitHub Actions example):
   run: lidc check
 ```
 
-`lidc check` exits `0` when clean, `1` when there are findings, and `2` on hard errors — so it integrates cleanly as a quality gate.
+`lidc check` exits `0` when clean, `1` when there are findings, and `2` on hard errors — so it integrates cleanly as a quality gate. It also provides *attestation*: every implemented spec is annotated in source, and every annotation refers to a real spec — coherence verifiable by grep.

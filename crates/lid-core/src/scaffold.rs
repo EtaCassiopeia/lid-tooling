@@ -165,6 +165,12 @@ it to build this system correctly? If yes, record it in the arrow (HLD / LLD / \
 EARS / decision doc), which travels and cascades — not in private, per-tool \
 memory, where intent escapes the arrow. Knowledge about the user or how they \
 like to work stays in memory.
+
+### Docs carry current intent.
+Write each doc as if authored fresh today, from current intent alone — no \
+narration of how it changed, no rebuttals to questions only a past discussion \
+raised. Record rejected alternatives and why in the LLD's Decisions & \
+Alternatives table, not as asides in body prose.
 ";
 
 /// Create `AGENTS.md` and `CLAUDE.md` instruction files at `root`.
